@@ -1,4 +1,4 @@
-# cz: one app for agents and decisions (T3 Code fork + ccez-inbox)
+# czcode: one app for agents and decisions (T3 Code fork + ccez-inbox)
 
 Decided by the owner 2026-10-04: one app for everything, named **cz**. Agent
 threads (from T3 Code) and decisions with media (from ccez-inbox) live in
@@ -13,7 +13,8 @@ script, and the upstream sync log.
 
 ## What exists today
 
-- **T3 Code** (this repo, fork of `pingdotgg/t3code`, MIT, TypeScript):
+- **T3 Code** (this repo, `chris-straka/czcode` at `~/SWE/czcode`, renamed from
+  `t3code` on 2026-10-04; fork of `pingdotgg/t3code`, MIT, TypeScript):
   Expo/React Native mobile app (`apps/mobile`), React + TanStack Router web
   app (`apps/web`), Electron desktop (`apps/desktop`), the `t3` server and CLI
   that run on each machine (`apps/server`, Node + Effect), the T3 Connect relay
@@ -53,6 +54,8 @@ script, and the upstream sync log.
   built-in Node that runs the server, the web-preview browser and cookie
   import, and every upstream desktop improvement through the weekly sync.
   Only names, icons, IDs, and the update feed change.
+- **Themes:** keep T3's themes for now (owner isn't a fan); a cz theme of
+  the owner's choosing comes later as its own phase.
 - **Thread ↔ decision links both ways:** an inbox item opens its thread; a
   thread shows its open inbox items inline, answerable without leaving it.
 
@@ -80,7 +83,7 @@ it's merged:
 | Phase | Builds | Gate (numbers + screenshots in `ccez/docs/phase-N.md`) |
 |---|---|---|
 | P0 Brand | Owner picks the cz icon (2-4 options via the inbox). Brand sources in `ccez/brand/`; one config module for app name, scheme, bundle IDs, hostnames, update feed | Owner's pick recorded |
-| P1 Rename | The codemod in `ccez/rename/` + `upstream-cz` branch flow; run it on `main`: packages `@cz/*`, CLI/server `cz`, `~/.cz` with migration from `~/.t3`, `CZ_*` env vars (old names read as fallback once, with a warning), icons, splash, favicons, notification and adaptive icons, iOS Icon Composer projects, bundle IDs, schemes, deep links; Electron desktop renamed (app name, icons, bundle ID, `cz://` deep links, updater pointed at the owner's GitHub releases); remove `apps/marketing`; **PostHog analytics removed**; README rewritten. Ask the owner before renaming the GitHub repo (`chris-straka/t3code` → `chris-straka/cz`) and the local folder (`~/SWE/t3code` → `~/SWE/cz`), since T3 project paths, nightshift config, and docs point at them | `ccez/rename/check` passes (zero T3 names outside the allowlist); typecheck + tests + mobile static check pass; `cz serve` runs on the Mac and keeps existing threads (data migrated); mobile dev build on the S24, the web app, and the Mac desktop app show only the cz brand (screenshots of every screen, splash, launcher, notification, About) |
+| P1 Rename | The codemod in `ccez/rename/` + `upstream-cz` branch flow; run it on `main`: packages `@cz/*`, CLI/server `cz`, `~/.cz` with migration from `~/.t3`, `CZ_*` env vars (old names read as fallback once, with a warning), icons, splash, favicons, notification and adaptive icons, iOS Icon Composer projects, bundle IDs, schemes, deep links; Electron desktop renamed (app name, icons, bundle ID, `cz://` deep links, updater pointed at the owner's GitHub releases); remove `apps/marketing`; **PostHog analytics removed**; README rewritten. | `ccez/rename/check` passes (zero T3 names outside the allowlist); typecheck + tests + mobile static check pass; `cz serve` runs on the Mac and keeps existing threads (data migrated); mobile dev build on the S24, the web app, and the Mac desktop app show only the cz brand (screenshots of every screen, splash, launcher, notification, About) |
 | P2 Tailscale only | Every machine runs `cz serve --tailscale-serve`; the phone pairs once per machine with `cz pair --tailscale` (both already exist in T3, renamed); Connect sign-in, Clerk, relay code, and the push-registration UI removed from server, web, and mobile (`infra/relay` deleted) | Phone pairs with the Mac and a second box over Tailscale, off home Wi-Fi, and opens threads; network log shows no request to any T3 host |
 | P3 Decisions backend | In `~/SWE/ccez-inbox` (after its current agent finishes): new kinds, per-option reactions, redlines, passage comments, uploads, `blocking`/`default`/`expires_at`/`cost_note`/`resume`/`thread` fields with a migration of existing items, `inbox history`, `inbox resume-due`, "when to ask" rules in the MCP tool descriptions (DECISIONS.md, backend section) | Worker + CLI + MCP tests for every kind; old items migrated; an agent submits one of each kind via MCP and reads answers back |
 | P4 Decisions tab | `packages/inbox-client` (typed client shared by web, desktop, mobile); per-device inbox token stored in the OS keystore at pairing; Decisions tab in T3's design system with Darkroom's interaction ideas (DECISIONS.md, Look and feel): feed (blocking first, then project priority, then age), filters, review session, and full-screen views for all 10 types: Pick, Review (with redline drawing), Listen (keep/kill/favourite, loop, "more like these", in-context playback), Look (3D: orbit, animations, clay/wireframe, scale figure, side-by-side; WebView `<model-viewer>` on mobile), Read (passage comments), Playtest (APK install + feedback form), Rank, Pitch, Request (upload/type/record), Timeline (genforge steps, redo from here) | Playwright (web) + Maestro or Detox (mobile) tests per type; on the S24 the owner answers one of each type and each agent reads its answer; PWA retired: inbox.ccez.uk serves only the API plus a redirect page |
@@ -90,8 +93,7 @@ it's merged:
 | P8 Push (optional, when the owner wants it) | Direct Firebase push from each cz server (thread finished, needs input) and from the inbox Worker (new blocking decision, daily digest), reusing the relay's FCM payload format; the owner's Firebase project | Pushes arrive on the S24 with the app backgrounded; tapping opens the thread or decision |
 
 Who: one Opus 5.5 thread builds P0-P6 in order (P3 waits until the current ccez-inbox agent is done) without stopping between
-phases, except at P0 (owner's icon pick), before renaming the GitHub repo or
-local folder, and before deploying inbox Worker auth changes (outward-facing: ask
+phases, except at P0 (owner's icon pick), and before deploying inbox Worker auth changes (outward-facing: ask
 first). Muse runs P7 weekly.
 
 ## Rules
