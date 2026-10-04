@@ -2,9 +2,27 @@
 
 Design, 2026-10-04. Replaces the "Inbox tab = port the PWA" idea in
 `PLAN.md`. Backend: the existing ccez-inbox Worker + D1 + R2 and the `inbox`
-CLI/MCP (`~/SWE/ccez-inbox`), extended as below. Look and feel: start from
-the inbox's Darkroom redesign (branch `darkroom-redesign-wip` in
-ccez-inbox).
+CLI/MCP (`~/SWE/ccez-inbox`), extended as below.
+
+## Look and feel
+
+Use **T3's design system** (its components, themes, fonts, light/dark, and
+navigation) so the Decisions tab feels like the rest of the app and picks up
+upstream UI improvements. Don't port the inbox PWA's Darkroom styling or its
+self-hosted font. Do keep these interaction ideas from Darkroom (branch
+`darkroom-redesign-wip` in ccez-inbox):
+
+- **Filter chips** by project and type at the top of the feed.
+- **Cards that fit the type:** approve/reject right on the card for Review
+  and Pitch (plus swipe), an Install button on Playtest cards, option
+  thumbnails on Pick cards, so many decisions never need opening.
+- **Picture tiles** for image options (big, tappable, label underneath).
+- **Sticky answer panel:** the answer buttons stay pinned at the bottom
+  while the owner scrolls through the media.
+- **Answered card:** after deciding, the item shows what was chosen and the
+  note, with undo for a short while.
+- **Loading skeletons** instead of spinners.
+- The **monochrome notification badge** idea, for when push arrives (P8).
 
 ## Two places for the owner's attention
 
