@@ -31,7 +31,7 @@ script, and the upstream sync log.
 
 - **One app, cz.** Tabs: **Threads** (agent threads as T3 has them today),
   **Inbox** (decisions), **Fleet** (machines, quotas, nightshift queue),
-  **Settings**. On Android (Expo), on the Mac (Tauri desktop), and in any
+  **Settings**. On Android (Expo), on the Mac (Electron desktop), and in any
   browser (web app).
 - **CLI and server: `cz`.** `cz serve`, `cz pair`, `cz service install`,
   `cz update`; data in `~/.cz` (migrated from `~/.t3` on first run); env vars
@@ -40,20 +40,17 @@ script, and the upstream sync log.
 - **The inbox backend stays.** The Worker, D1, R2, the item model, and the
   `inbox` CLI/MCP don't change, so genforge, nightshift, and every agent keep
   working untouched. cz becomes a new client of that API.
-- **The inbox PWA is retired** once the Inbox tab reaches parity (P5). Until
+- **The inbox PWA is retired** once the Inbox tab reaches parity (P4). Until
   then it keeps working and keeps getting improvements.
 - **No hosted middleman:** devices reach machines over **Tailscale**; T3
   Connect's relay and Clerk sign-in are removed. Push goes straight from the
   owner's machines (threads) and the inbox Worker (decisions) to the owner's
   own Firebase project. No analytics leave the owner's machines.
-- **Desktop: Tauri 2, not Electron** (owner's call, 2026-10-04; same stack as
-  ccez-llm and ccez-daw). The Tauri shell is Rust; the cz server stays
-  TypeScript and runs as a sidecar process (or as the already-running
-  background service). Known trade: on macOS Tauri renders with WebKit
-  (Safari's engine), not Chromium, so the web UI must be checked and fixed
-  on WebKit (OpenCode hit style and performance differences when they were on
-  Tauri). Electron-only features (Chromium web-preview browser, cookie import
-  from other browsers) are dropped unless the owner asks for them back.
+- **Desktop: T3's Electron app, rebranded to cz** (owner's call,
+  2026-10-04, after weighing Tauri). It keeps Chromium rendering, the
+  built-in Node that runs the server, the web-preview browser and cookie
+  import, and every upstream desktop improvement through the weekly sync.
+  Only names, icons, IDs, and the update feed change.
 - **Thread ↔ decision links both ways:** an inbox item opens its thread; a
   thread shows its open inbox items inline, answerable without leaving it.
 
@@ -81,19 +78,18 @@ it's merged:
 | Phase | Builds | Gate (numbers + screenshots in `ccez/docs/phase-N.md`) |
 |---|---|---|
 | P0 Brand | Owner picks the cz icon (2-4 options via the inbox). Brand sources in `ccez/brand/`; one config module for app name, scheme, bundle IDs, hostnames, update feed | Owner's pick recorded |
-| P1 Rename | The codemod in `ccez/rename/` + `upstream-cz` branch flow; run it on `main`: packages `@cz/*`, CLI/server `cz`, `~/.cz` with migration from `~/.t3`, `CZ_*` env vars (old names read as fallback once, with a warning), icons, splash, favicons, notification and adaptive icons, iOS Icon Composer projects, bundle IDs, schemes, deep links; remove `apps/marketing`; **PostHog analytics removed**; README rewritten. Ask the owner before renaming the GitHub repo (`chris-straka/t3code` → `chris-straka/cz`) and the local folder (`~/SWE/t3code` → `~/SWE/cz`), since T3 project paths, nightshift config, and docs point at them | `ccez/rename/check` passes (zero T3 names outside the allowlist); typecheck + tests + mobile static check pass; `cz serve` runs on the Mac and keeps existing threads (data migrated); mobile dev build on the S24 and the web app show only the cz brand (screenshots of every screen, splash, launcher, notification, About) |
+| P1 Rename | The codemod in `ccez/rename/` + `upstream-cz` branch flow; run it on `main`: packages `@cz/*`, CLI/server `cz`, `~/.cz` with migration from `~/.t3`, `CZ_*` env vars (old names read as fallback once, with a warning), icons, splash, favicons, notification and adaptive icons, iOS Icon Composer projects, bundle IDs, schemes, deep links; Electron desktop renamed (app name, icons, bundle ID, `cz://` deep links, updater pointed at the owner's GitHub releases); remove `apps/marketing`; **PostHog analytics removed**; README rewritten. Ask the owner before renaming the GitHub repo (`chris-straka/t3code` → `chris-straka/cz`) and the local folder (`~/SWE/t3code` → `~/SWE/cz`), since T3 project paths, nightshift config, and docs point at them | `ccez/rename/check` passes (zero T3 names outside the allowlist); typecheck + tests + mobile static check pass; `cz serve` runs on the Mac and keeps existing threads (data migrated); mobile dev build on the S24, the web app, and the Mac desktop app show only the cz brand (screenshots of every screen, splash, launcher, notification, About) |
 | P2 Tailscale + direct push | **Connection:** every machine runs `cz serve --tailscale-serve`; the phone pairs once per machine with `cz pair --tailscale`; Connect sign-in, Clerk, and relay code removed from server, web, and mobile (`infra/relay` deleted). **Push:** new `DirectPush` server service: when agent activity changes (finished, failed, needs approval, asks for input), the machine's cz server sends it to Firebase Cloud Messaging (HTTP v1) itself, using the owner's Firebase service-account key from the Keychain; the phone registers its FCM token with each paired machine over the existing authenticated connection; reuse the relay's payload format (`fcmPayloads.ts`) so notification handling, Live Updates, and tap-to-open-thread work unchanged. APNs later, when iOS starts | Phone pairs with the Mac and a second box over Tailscale, off home Wi-Fi; "thread finished" and "needs input" pushes arrive on the S24 with the app backgrounded and after a reopen; tapping opens the thread; network log shows no request to any T3 host |
-| P3 Desktop (Tauri) | `apps/desktop-tauri`: Tauri 2 shell (Rust) loading the web app; starts the cz server as a sidecar or attaches to the background service; tray icon with thread status, native notifications, global shortcut, deep links (`cz://`), auto-update from GitHub releases; `apps/desktop` (Electron) removed. WebKit pass: every web screen checked in the Tauri window, style and performance fixes landed in `apps/web` | Mac build launches, connects, streams a long agent thread at 60 FPS scroll with no visual differences vs Chrome on a screen-by-screen screenshot comparison; RAM and idle CPU recorded next to the Electron build; tray, notification, deep link, and update all work |
-| P4 Inbox tab | `packages/inbox-client` (typed client for the inbox API, shared by web, desktop, and mobile); cz authenticates to the inbox Worker with a per-device Cloudflare Access service token (created during pairing, stored in the OS keystore; ask the owner before the Access change), so there's no separate sign-in; Inbox tab: feed with project/kind filters, swipe approve/reject, item view, pick/rank/A-B compare, comments | Playwright (web) + Maestro or Detox (mobile) tests; owner answers a 3-image pick in cz and the waiting agent reads it |
-| P5 Media + parity | GLB viewer (the inbox's `<model-viewer>` page inside `react-native-webview` on mobile, native element on web/desktop), audio/video (`expo-audio`, `expo-video`), voice notes (reuse the existing voice input), build items with APK install, pitch → task, digest; the inbox Worker sends its pushes to the same Firebase project and cz shows them alongside thread pushes | Every item kind the PWA renders also renders in cz (checklist + screenshots); GLB rotates on the S24; APK installs from an item; PWA retired: inbox.ccez.uk serves only the API plus a redirect page |
-| P6 Fuse | Fleet tab (merge the inbox fleet panel with the environment list: quotas, reset countdowns, nightshift queue, queue a task); item → thread deep link; open items shown inline in their thread; genforge production timelines (genforge P7) render as a step strip with "redo from here" | Owner queues a task at night from the Fleet tab, it runs after reset, its result arrives as an inline item in that thread |
-| P7 Ship | Android release APK signed with the owner's key, installed on the S24, auto-update path (Play internal testing or in-app APK update); signed Tauri Mac build; iOS later via TestFlight ($99/yr) | Owner uses only cz for 3 days; issues fixed |
-| P8 Upstream sync | Weekly agent task (nightshift): regenerate `upstream-cz` with the codemod, merge into `main`, resolve conflicts (extend the codemod when upstream adds new T3 names), run rename check + typecheck + tests + mobile static check, rebuild, log in `ccez/docs/upstream-sync.md`. Upstream changes to Electron, the relay, or Connect are dropped; useful desktop changes are ported to Tauri by hand | Two consecutive weekly syncs merged with all gates green |
+| P3 Inbox tab | `packages/inbox-client` (typed client for the inbox API, shared by web, desktop, and mobile); cz authenticates to the inbox Worker with a per-device Cloudflare Access service token (created during pairing, stored in the OS keystore; ask the owner before the Access change), so there's no separate sign-in; Inbox tab: feed with project/kind filters, swipe approve/reject, item view, pick/rank/A-B compare, comments | Playwright (web) + Maestro or Detox (mobile) tests; owner answers a 3-image pick in cz and the waiting agent reads it |
+| P4 Media + parity | GLB viewer (the inbox's `<model-viewer>` page inside `react-native-webview` on mobile, native element on web/desktop), audio/video (`expo-audio`, `expo-video`), voice notes (reuse the existing voice input), build items with APK install, pitch → task, digest; the inbox Worker sends its pushes to the same Firebase project and cz shows them alongside thread pushes | Every item kind the PWA renders also renders in cz (checklist + screenshots); GLB rotates on the S24; APK installs from an item; PWA retired: inbox.ccez.uk serves only the API plus a redirect page |
+| P5 Fuse | Fleet tab (merge the inbox fleet panel with the environment list: quotas, reset countdowns, nightshift queue, queue a task); item → thread deep link; open items shown inline in their thread; genforge production timelines (genforge P7) render as a step strip with "redo from here" | Owner queues a task at night from the Fleet tab, it runs after reset, its result arrives as an inline item in that thread |
+| P6 Ship | Android release APK signed with the owner's key, installed on the S24, auto-update path (Play internal testing or in-app APK update); signed Mac desktop build; iOS later via TestFlight ($99/yr) | Owner uses only cz for 3 days; issues fixed |
+| P7 Upstream sync | Weekly agent task (nightshift): regenerate `upstream-cz` with the codemod, merge into `main`, resolve conflicts (extend the codemod when upstream adds new T3 names), run rename check + typecheck + tests + mobile static check, rebuild, log in `ccez/docs/upstream-sync.md`. Upstream changes to the relay or Connect are dropped | Two consecutive weekly syncs merged with all gates green |
 
-Who: one Opus 5.5 thread builds P0-P7 in order without stopping between
+Who: one Opus 5.5 thread builds P0-P6 in order without stopping between
 phases, except at P0 (owner's icon pick), before renaming the GitHub repo or
 local folder, and before any Cloudflare Access change (outward-facing: ask
-first). Muse runs P8 weekly.
+first). Muse runs P7 weekly.
 
 ## Rules
 
