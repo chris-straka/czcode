@@ -1,0 +1,5 @@
+#!/bin/sh
+# Fails if any T3 name is left outside the allowlist in map.ts.
+# Usage: ccez/rename/check [repo-dir]
+here=$(cd "$(dirname "$0")" && pwd)
+exec node "$here/rename.ts" --check "${1:-$(git -C "$here" rev-parse --show-toplevel)}"
