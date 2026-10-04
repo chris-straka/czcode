@@ -30,22 +30,24 @@ script, and the upstream sync log.
 ## Target
 
 - **One app, cz.** Tabs: **Threads** (agent threads as T3 has them today),
-  **Inbox** (decisions), **Fleet** (machines, quotas, nightshift queue),
-  **Settings**. On Android (Expo), on the Mac (Electron desktop), and in any
+  **Decisions** (judgment calls with media, designed in
+  [DECISIONS.md](DECISIONS.md)), plus T3's existing Usage → Limits page
+  (gains the reset queue) and **Settings**. No separate Fleet tab: T3 already
+  has threads, quotas, reset countdowns, and load balancing. On Android (Expo), on the Mac (Electron desktop), and in any
   browser (web app).
 - **CLI and server: `cz`.** `cz serve`, `cz pair`, `cz service install`,
   `cz update`; data in `~/.cz` (migrated from `~/.t3` on first run); env vars
   `CZ_*`; package scope `@cz/*`; schemes `cz://`; bundle IDs `uk.ccez.cz`
   (`.dev`, `.preview`).
-- **The inbox backend stays.** The Worker, D1, R2, the item model, and the
-  `inbox` CLI/MCP don't change, so genforge, nightshift, and every agent keep
-  working untouched. cz becomes a new client of that API.
-- **The inbox PWA is retired** once the Inbox tab reaches parity (P4). Until
-  then it keeps working and keeps getting improvements.
+- **The inbox backend stays and grows.** The Worker, D1, R2, and the
+  `inbox` CLI/MCP stay the way agents (genforge, nightshift, every thread)
+  submit decisions; DECISIONS.md lists the new kinds and fields. cz is its
+  main client.
+- **The inbox PWA is retired** once the Decisions tab covers every type.
 - **No hosted middleman:** devices reach machines over **Tailscale**; T3
-  Connect's relay and Clerk sign-in are removed. Push goes straight from the
-  owner's machines (threads) and the inbox Worker (decisions) to the owner's
-  own Firebase project. No analytics leave the owner's machines.
+  Connect's relay and Clerk sign-in are removed. **No push notifications for
+  now** (the owner checks in on their own time); an optional later phase adds
+  direct Firebase push. No analytics leave the owner's machines.
 - **Desktop: T3's Electron app, rebranded to cz** (owner's call,
   2026-10-04, after weighing Tauri). It keeps Chromium rendering, the
   built-in Node that runs the server, the web-preview browser and cookie
@@ -79,16 +81,17 @@ it's merged:
 |---|---|---|
 | P0 Brand | Owner picks the cz icon (2-4 options via the inbox). Brand sources in `ccez/brand/`; one config module for app name, scheme, bundle IDs, hostnames, update feed | Owner's pick recorded |
 | P1 Rename | The codemod in `ccez/rename/` + `upstream-cz` branch flow; run it on `main`: packages `@cz/*`, CLI/server `cz`, `~/.cz` with migration from `~/.t3`, `CZ_*` env vars (old names read as fallback once, with a warning), icons, splash, favicons, notification and adaptive icons, iOS Icon Composer projects, bundle IDs, schemes, deep links; Electron desktop renamed (app name, icons, bundle ID, `cz://` deep links, updater pointed at the owner's GitHub releases); remove `apps/marketing`; **PostHog analytics removed**; README rewritten. Ask the owner before renaming the GitHub repo (`chris-straka/t3code` → `chris-straka/cz`) and the local folder (`~/SWE/t3code` → `~/SWE/cz`), since T3 project paths, nightshift config, and docs point at them | `ccez/rename/check` passes (zero T3 names outside the allowlist); typecheck + tests + mobile static check pass; `cz serve` runs on the Mac and keeps existing threads (data migrated); mobile dev build on the S24, the web app, and the Mac desktop app show only the cz brand (screenshots of every screen, splash, launcher, notification, About) |
-| P2 Tailscale + direct push | **Connection:** every machine runs `cz serve --tailscale-serve`; the phone pairs once per machine with `cz pair --tailscale`; Connect sign-in, Clerk, and relay code removed from server, web, and mobile (`infra/relay` deleted). **Push:** new `DirectPush` server service: when agent activity changes (finished, failed, needs approval, asks for input), the machine's cz server sends it to Firebase Cloud Messaging (HTTP v1) itself, using the owner's Firebase service-account key from the Keychain; the phone registers its FCM token with each paired machine over the existing authenticated connection; reuse the relay's payload format (`fcmPayloads.ts`) so notification handling, Live Updates, and tap-to-open-thread work unchanged. APNs later, when iOS starts | Phone pairs with the Mac and a second box over Tailscale, off home Wi-Fi; "thread finished" and "needs input" pushes arrive on the S24 with the app backgrounded and after a reopen; tapping opens the thread; network log shows no request to any T3 host |
-| P3 Inbox tab | `packages/inbox-client` (typed client for the inbox API, shared by web, desktop, and mobile); cz authenticates to the inbox Worker with a per-device Cloudflare Access service token (created during pairing, stored in the OS keystore; ask the owner before the Access change), so there's no separate sign-in; Inbox tab: feed with project/kind filters, swipe approve/reject, item view, pick/rank/A-B compare, comments | Playwright (web) + Maestro or Detox (mobile) tests; owner answers a 3-image pick in cz and the waiting agent reads it |
-| P4 Media + parity | GLB viewer (the inbox's `<model-viewer>` page inside `react-native-webview` on mobile, native element on web/desktop), audio/video (`expo-audio`, `expo-video`), voice notes (reuse the existing voice input), build items with APK install, pitch → task, digest; the inbox Worker sends its pushes to the same Firebase project and cz shows them alongside thread pushes | Every item kind the PWA renders also renders in cz (checklist + screenshots); GLB rotates on the S24; APK installs from an item; PWA retired: inbox.ccez.uk serves only the API plus a redirect page |
-| P5 Fuse | Fleet tab (merge the inbox fleet panel with the environment list: quotas, reset countdowns, nightshift queue, queue a task); item → thread deep link; open items shown inline in their thread; genforge production timelines (genforge P7) render as a step strip with "redo from here" | Owner queues a task at night from the Fleet tab, it runs after reset, its result arrives as an inline item in that thread |
+| P2 Tailscale only | Every machine runs `cz serve --tailscale-serve`; the phone pairs once per machine with `cz pair --tailscale` (both already exist in T3, renamed); Connect sign-in, Clerk, relay code, and the push-registration UI removed from server, web, and mobile (`infra/relay` deleted) | Phone pairs with the Mac and a second box over Tailscale, off home Wi-Fi, and opens threads; network log shows no request to any T3 host |
+| P3 Decisions backend | In `~/SWE/ccez-inbox` (after its current agent finishes): new kinds, per-option reactions, redlines, passage comments, uploads, `blocking`/`default`/`expires_at`/`cost_note`/`resume`/`thread` fields with a migration of existing items, `inbox history`, `inbox resume-due`, "when to ask" rules in the MCP tool descriptions (DECISIONS.md, backend section) | Worker + CLI + MCP tests for every kind; old items migrated; an agent submits one of each kind via MCP and reads answers back |
+| P4 Decisions tab | `packages/inbox-client` (typed client shared by web, desktop, mobile); per-device inbox token stored in the OS keystore at pairing; Decisions tab with the Darkroom look: feed (blocking first, then project priority, then age), filters, review session, and full-screen views for all 10 types: Pick, Review (with redline drawing), Listen (keep/kill/favourite, loop, "more like these", in-context playback), Look (3D: orbit, animations, clay/wireframe, scale figure, side-by-side; WebView `<model-viewer>` on mobile), Read (passage comments), Playtest (APK install + feedback form), Rank, Pitch, Request (upload/type/record), Timeline (genforge steps, redo from here) | Playwright (web) + Maestro or Detox (mobile) tests per type; on the S24 the owner answers one of each type and each agent reads its answer; PWA retired: inbox.ccez.uk serves only the API plus a redirect page |
+| P5 Links + resume + reset queue | Thread ↔ decision links (chip in the thread, link in the decision); Threads list marks threads with open decisions; the cz server polls `inbox resume-due` and starts resume threads with the decision attached; **"Run at next reset"** on the send button and the nightshift queue shown on Usage → Limits (nightshift stays the engine); resumes use the queue when quotas are spent | An agent submits a non-blocking Listen and ends its thread; the owner answers on the phone; a resume thread starts and continues with the kept sounds. A task sent with "Run at next reset" at night starts after the reset |
 | P6 Ship | Android release APK signed with the owner's key, installed on the S24, auto-update path (Play internal testing or in-app APK update); signed Mac desktop build; iOS later via TestFlight ($99/yr) | Owner uses only cz for 3 days; issues fixed |
 | P7 Upstream sync | Weekly agent task (nightshift): regenerate `upstream-cz` with the codemod, merge into `main`, resolve conflicts (extend the codemod when upstream adds new T3 names), run rename check + typecheck + tests + mobile static check, rebuild, log in `ccez/docs/upstream-sync.md`. Upstream changes to the relay or Connect are dropped | Two consecutive weekly syncs merged with all gates green |
+| P8 Push (optional, when the owner wants it) | Direct Firebase push from each cz server (thread finished, needs input) and from the inbox Worker (new blocking decision, daily digest), reusing the relay's FCM payload format; the owner's Firebase project | Pushes arrive on the S24 with the app backgrounded; tapping opens the thread or decision |
 
-Who: one Opus 5.5 thread builds P0-P6 in order without stopping between
+Who: one Opus 5.5 thread builds P0-P6 in order (P3 waits until the current ccez-inbox agent is done) without stopping between
 phases, except at P0 (owner's icon pick), before renaming the GitHub repo or
-local folder, and before any Cloudflare Access change (outward-facing: ask
+local folder, and before deploying inbox Worker auth changes (outward-facing: ask
 first). Muse runs P7 weekly.
 
 ## Rules
@@ -100,8 +103,7 @@ first). Muse runs P7 weekly.
 - Fork-only code goes in new files and packages where possible, so upstream
   merges stay small.
 - **Don't touch `~/SWE/ccez-inbox` from this plan's threads** while another
-  agent works there; changes to the inbox Worker (Access service tokens,
-  FCM) go in as PRs or after that agent finishes.
+  agent works there; inbox backend changes (P3) start after that agent finishes.
 - Worker auth changes, DNS, repo renames, and store submissions are
   outward-facing: ask the owner first. Never commit Firebase keys, Access
   tokens, or signing secrets.
