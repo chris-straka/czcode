@@ -32,7 +32,10 @@ describe("queuedRunStartLabel", () => {
     expect(queuedRunStartLabel(run({ dueReason: "chosen", dueAt: NOW + 60_000 }), NOW)).toMatch(
       /^starts in /,
     );
-    expect(queuedRunStartLabel(run({ dueReason: "unknown-reset" }), NOW)).toBe(
+    expect(queuedRunStartLabel(run({ dueReason: "chosen", dueAt: NOW + 4_000 }), NOW)).toBe(
+      "starts now",
+    );
+    expect(queuedRunStartLabel(run({ dueReason: "unknown-reset", dueAt: NOW + 4_000 }), NOW)).toBe(
       "starts now (this model reports no quota reset)",
     );
     expect(queuedRunStartLabel(run({ status: "failed" }), NOW)).toBe("couldn't start");

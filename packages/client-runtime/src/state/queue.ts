@@ -68,11 +68,9 @@ export function queuedRunStartLabel(run: QueuedRun, now: number): string {
   if (run.status === "started") return "started";
   if (run.status === "failed") return "couldn't start";
   if (run.status === "cancelled") return "cancelled";
-  if (run.dueAt <= now) {
-    return run.dueReason === "unknown-reset"
-      ? "starts now (this model reports no quota reset)"
-      : "starts now";
-  }
+  if (run.dueReason === "unknown-reset") return "starts now (this model reports no quota reset)";
+  // Within a minute is now: the server stamps due times by its clock, not this device's.
+  if (run.dueAt - now < 60_000) return "starts now";
   const wait = formatDuration(run.dueAt - now);
   return run.dueReason === "reset" ? `starts at the reset, in ${wait}` : `starts in ${wait}`;
 }

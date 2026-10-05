@@ -65,12 +65,24 @@ Built server, a sandbox copy of real data, browser driven by Playwright:
 | ------------------------------- | ----------------------------- |
 | ![](img/p5-4-composer-menu.png) | ![](img/p5-6-usage-queue.png) |
 
+On the S24 (release APK, `adb reverse` to a sandbox server):
+
+- A due queued run became a thread, and its agent replied (OpenCode free
+  model).
+- The list marker, thread banner, Answer, Open thread, the Usage queue,
+  and long-press "Run at next reset" all worked.
+- It caught one bug: the phone's clock trails the server's, so a run due
+  now read "starts in 0m". Anything due within a minute now reads "starts
+  now".
+
+| List marker                | Thread banner                | Usage queue                 | Long-press send                 |
+| -------------------------- | ---------------------------- | --------------------------- | ------------------------------- |
+| ![](img/p5-s24-1-home.png) | ![](img/p5-s24-2-thread.png) | ![](img/p5-s24-4-usage.png) | ![](img/p5-s24-5-longpress.png) |
+
 ## Not verified
 
-- **Android:** typechecked only. The long-press, queue section, banner,
-  and marker need an APK build on the S24.
-- **"Starts after the reset at night":** covered by tests with a fake
-  clock, not by waiting a night on real quota.
+- "Starts after the reset at night": covered by tests with a fake clock,
+  not by waiting a night on real quota.
 
 ## Deviations
 
