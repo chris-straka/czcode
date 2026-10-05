@@ -92,6 +92,6 @@ fork-only edits are on `main`.
   ![mac settings](img/p1-mac-desk-2.jpg)
   ![mac connections](img/p1-mac-desk-3.jpg)
 
-- Still open: notification screenshots (push is off until P8). Settings
+- Still open: notification screenshots (push is off until P9). Settings
   descriptions still use the name in about 60 sentences ("Restart czcode to
   finish…"); rewording every one would conflict on each upstream sync.

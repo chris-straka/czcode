@@ -23,7 +23,7 @@ self-hosted font. Do keep these interaction ideas from Darkroom (branch
 - **Answered card:** after deciding, the item shows what was chosen and the
   note, with undo for a short while.
 - **Loading skeletons** instead of spinners.
-- The **monochrome notification badge** idea, for when push arrives (P8).
+- The **monochrome notification badge** idea, for when push arrives (P9).
 
 ## Two places for the owner's attention
 
