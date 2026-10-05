@@ -27,6 +27,8 @@ if git rev-parse --verify --quiet upstream-cz >/dev/null; then
 else
   git worktree add --quiet -b upstream-cz "$wt" upstream/main
 fi
+# The codemod finishes with the repo's formatter, which needs upstream's deps.
+(cd "$wt" && { pnpm install --frozen-lockfile --ignore-scripts --offline || pnpm install --frozen-lockfile --ignore-scripts; } >/dev/null)
 node "$here/rename.ts" "$wt"
 git -C "$wt" add -A
 if git -C "$wt" diff --cached --quiet; then
