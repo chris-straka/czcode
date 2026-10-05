@@ -40,7 +40,7 @@ import { ProviderAdapterV2RuntimePolicy } from "../../orchestration-v2/ProviderA
 import * as ProviderCredentialStore from "../ProviderCredentialStore.ts";
 
 const testLayer = ServerConfig.layerTest(process.cwd(), {
-  prefix: "czcodex-driver-maintenance-",
+  prefix: "cz-codex-driver-maintenance-",
 }).pipe(
   Layer.provideMerge(NodeServices.layer),
   Layer.provideMerge(IdAllocator.layer),
@@ -273,7 +273,7 @@ it.layer(testLayer)("CodexDriver", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const tempDir = yield* fs
-          .makeTempDirectoryScoped({ prefix: "czcodex-driver-" })
+          .makeTempDirectoryScoped({ prefix: "cz-codex-driver-" })
           .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
         const sharedHome = NodePath.join(tempDir, "codex-home");
         const shadowHome = NodePath.join(tempDir, "codex-shadow");
@@ -317,7 +317,7 @@ it.layer(testLayer)("CodexDriver", (it) => {
         environment: [],
         config: {
           ...CodexDriver.defaultConfig(),
-          binaryPath: NodePath.join(NodeOS.tmpdir(), "czcodex-missing", "codex"),
+          binaryPath: NodePath.join(NodeOS.tmpdir(), "cz-codex-missing", "codex"),
         },
       });
       expect((yield* instance.snapshot.resolveMaintenance()).update).toBeNull();
@@ -350,7 +350,7 @@ it.layer(testLayer)("CodexDriver", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const tempDir = yield* fs
-          .makeTempDirectoryScoped({ prefix: "czcodex-installer-" })
+          .makeTempDirectoryScoped({ prefix: "cz-codex-installer-" })
           .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
         const installPath = NodePath.join(tempDir, ...fixture.installSegments);
         const realBinaryPath = NodePath.join(
@@ -409,7 +409,7 @@ it.layer(testLayer)("CodexDriver", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const tempDir = yield* fs
-          .makeTempDirectoryScoped({ prefix: `czcodex-mise-${layout}-` })
+          .makeTempDirectoryScoped({ prefix: `cz-codex-mise-${layout}-` })
           .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
         const binaryPath =
           layout === "direct"
@@ -486,7 +486,7 @@ it.layer(testLayer)("CodexDriver", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const tempDir = yield* fs
-          .makeTempDirectoryScoped({ prefix: "czcodex-mise-shim-" })
+          .makeTempDirectoryScoped({ prefix: "cz-codex-mise-shim-" })
           .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
         const brewPrefix = NodePath.join(tempDir, "homebrew");
         const brewPath = NodePath.join(brewPrefix, "bin", "brew");

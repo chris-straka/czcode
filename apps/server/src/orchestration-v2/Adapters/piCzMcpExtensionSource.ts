@@ -8,7 +8,7 @@
  * Do not import czcode modules from the string body. The Pi process resolves
  * `@earendil-works/pi-coding-agent` and `typebox` from the user's pi install.
  */
-import { czcode_ORCHESTRATION_INSTRUCTIONS } from "../../provider/CzOrchestrationInstructions.ts";
+import { CZ_ORCHESTRATION_INSTRUCTIONS } from "../../provider/CzOrchestrationInstructions.ts";
 
 export const PI_CZ_MCP_EXTENSION_FILENAME = "pi-cz-mcp-extension.ts";
 
@@ -29,7 +29,7 @@ import { Type } from "typebox";
 const URL_ENV = ${JSON.stringify(CZ_MCP_URL_ENV)};
 const TOKEN_ENV = ${JSON.stringify(CZ_MCP_BEARER_ENV)};
 const RUNTIME_MODE_ENV = ${JSON.stringify(CZ_PI_RUNTIME_MODE_ENV)};
-const ORCHESTRATION_INSTRUCTIONS = ${JSON.stringify(czcode_ORCHESTRATION_INSTRUCTIONS.trim())};
+const ORCHESTRATION_INSTRUCTIONS = ${JSON.stringify(CZ_ORCHESTRATION_INSTRUCTIONS.trim())};
 const PROTOCOL = "2025-06-18";
 const READ_ONLY_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const FILE_CHANGE_TOOLS = new Set(${JSON.stringify(PI_FILE_CHANGE_TOOLS)});

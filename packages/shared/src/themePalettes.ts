@@ -128,7 +128,7 @@ export type ThemeDefinition = Readonly<{
  * their real backdrops (canvas, or the sidebar for its rows) because theme
  * colors are stored as opaque OKLCH tokens.
  */
-export const czcode_LIGHT_THEME_COLORS: ThemeColors = {
+export const CZ_LIGHT_THEME_COLORS: ThemeColors = {
   canvas: "#fcfcfc",
   chrome: "#fcfcfc",
   toolbar: "#fcfcfc",
@@ -188,7 +188,7 @@ export const czcode_LIGHT_THEME_COLORS: ThemeColors = {
   terminalScrollbarHover: "#bdbdbd",
 };
 
-export const czcode_DARK_THEME_COLORS: ThemeColors = {
+export const CZ_DARK_THEME_COLORS: ThemeColors = {
   canvas: "#0a0a0a",
   chrome: "#0a0a0a",
   toolbar: "#0a0a0a",

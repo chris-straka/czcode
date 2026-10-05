@@ -9,8 +9,8 @@ import {
   IRIS_THEME,
   OCEAN_THEME,
   CZ_CHAT_THEME,
-  czcode_LIGHT_THEME_COLORS,
-  czcode_DARK_THEME_COLORS,
+  CZ_LIGHT_THEME_COLORS,
+  CZ_DARK_THEME_COLORS,
   RESERVED_THEME_IDS,
   THEME_COLOR_ROLES,
   type ThemeAppearance,
@@ -336,9 +336,9 @@ function legacyThemeMode(theme: ThemePreference): ThemeAppearance | null {
  */
 export function getStandardThemeColors(appearance: ThemeAppearance): ThemeColors {
   if (appearance === "dark") {
-    return (standardDarkThemeColors ??= decodeThemeColors(czcode_DARK_THEME_COLORS));
+    return (standardDarkThemeColors ??= decodeThemeColors(CZ_DARK_THEME_COLORS));
   }
-  return (standardLightThemeColors ??= decodeThemeColors(czcode_LIGHT_THEME_COLORS));
+  return (standardLightThemeColors ??= decodeThemeColors(CZ_LIGHT_THEME_COLORS));
 }
 
 type ThemeRgbColor = {

@@ -776,7 +776,7 @@ describe("CodexAdapterV2 process spawning", () => {
         Effect.provide(
           Layer.mergeAll(
             CodexAdapterV2.codexAppServerClientFactoryFromSettingsLayer,
-            ServerConfig.layerTest(process.cwd(), { prefix: "czcodex-binary-home-" }),
+            ServerConfig.layerTest(process.cwd(), { prefix: "cz-codex-binary-home-" }),
           ),
         ),
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),

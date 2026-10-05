@@ -1217,7 +1217,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
           }).pipe(
             Effect.provide(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "czcodex-retired-model-cache-",
+                prefix: "cz-codex-retired-model-cache-",
               }).pipe(Layer.provideMerge(NodeServices.layer)),
             ),
           ),

@@ -1,6 +1,6 @@
 import type { ProviderInteractionMode } from "@cz/contracts";
 
-export const czcode_ORCHESTRATION_INSTRUCTIONS = `
+export const CZ_ORCHESTRATION_INSTRUCTIONS = `
 
 ## czcode orchestration
 
@@ -30,7 +30,7 @@ Tool names may include a harness-normalized MCP prefix, such as \`mcp__czcode__d
 ACP fallback: some ACP agents accept the injected MCP server but fail to expose its tools. When the cz tools are absent and \`CZ_ACP_MCP_NODE\` is present, call the same tools through the terminal: \`ELECTRON_RUN_AS_NODE=1 "$CZ_ACP_MCP_NODE" \${CZ_ACP_MCP_ENTRYPOINT:+"$CZ_ACP_MCP_ENTRYPOINT"} acp-mcp-call orchestrator_capabilities '{}'\` (\`CZ_ACP_MCP_ENTRYPOINT\` is unset when cz runs as a standalone executable). Delegate with \`acp-mcp-call delegate_task '{"task":"...","target":{"providerInstanceId":"...","model":"..."},"mode":"async","clientRequestId":"..."}'\`. This is the supported cz transport fallback, not an ordinary shell-based substitute for delegation.
 `;
 
-export const czcode_BROWSER_TOOL_INSTRUCTIONS = `
+export const CZ_BROWSER_TOOL_INSTRUCTIONS = `
 
 ## czcode collaborative browser
 
@@ -41,11 +41,11 @@ For browser work, first call \`preview_status\`. If no automation-capable previe
 Do not switch to global browser skills, Chrome, Node REPL browser automation, standalone Playwright, or agent-browser merely because the preview is initially closed or a first call fails. Use an alternative browser system only when the cz preview tools are absent, the user explicitly requests another browser, or \`preview_open\` returns an explicit unsupported/unavailable error. A failed cz preview tool call should be inspected and retried with corrected arguments when the error is actionable.
 `;
 
-const czcode_ACP_DEFAULT_MODE_INSTRUCTIONS = `## czcode interaction mode: Default
+const CZ_ACP_DEFAULT_MODE_INSTRUCTIONS = `## czcode interaction mode: Default
 
 Prefer making reasonable assumptions and carrying out the user's request. Ask a concise question only when a missing user decision would materially change the result. Treat this mode as active until czcode supplies a different interaction-mode instruction.`;
 
-const czcode_ACP_PLAN_MODE_INSTRUCTIONS = `## czcode interaction mode: Plan
+const CZ_ACP_PLAN_MODE_INSTRUCTIONS = `## czcode interaction mode: Plan
 
 Investigate with read-only actions and do not edit files or otherwise execute the implementation. Resolve discoverable facts before asking questions. When the requirements are decision complete, return a concrete implementation plan and do not start implementing it. Treat this mode as active until czcode supplies a different interaction-mode instruction.`;
 
@@ -73,10 +73,10 @@ export function czAcpPromptWithInstructions(input: {
   }
   const instructions = [
     input.state.interactionMode === "plan"
-      ? czcode_ACP_PLAN_MODE_INSTRUCTIONS
-      : czcode_ACP_DEFAULT_MODE_INSTRUCTIONS,
+      ? CZ_ACP_PLAN_MODE_INSTRUCTIONS
+      : CZ_ACP_DEFAULT_MODE_INSTRUCTIONS,
     ...(input.state.hasCzMcp
-      ? [czcode_BROWSER_TOOL_INSTRUCTIONS.trim(), czcode_ORCHESTRATION_INSTRUCTIONS.trim()]
+      ? [CZ_BROWSER_TOOL_INSTRUCTIONS.trim(), CZ_ORCHESTRATION_INSTRUCTIONS.trim()]
       : []),
   ];
   return `<czcode_instructions>\n${instructions.join("\n\n")}\n</czcode_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
@@ -88,7 +88,7 @@ export function czAcpPromptWithInstructions(input: {
  * mistaken for text authored by the user.
  */
 function prependCzOrchestrationInstructions(prompt: string): string {
-  return `<czcode_orchestration_instructions>${czcode_ORCHESTRATION_INSTRUCTIONS.trim()}</czcode_orchestration_instructions>\n\n<user_request>\n${prompt}\n</user_request>`;
+  return `<czcode_orchestration_instructions>${CZ_ORCHESTRATION_INSTRUCTIONS.trim()}</czcode_orchestration_instructions>\n\n<user_request>\n${prompt}\n</user_request>`;
 }
 
 export function czOrchestrationPromptForFirstRun(input: {
@@ -102,5 +102,5 @@ export function czOrchestrationPromptForFirstRun(input: {
 }
 
 export function czOrchestrationSystemPrompt(hasCzMcp: boolean): string | undefined {
-  return hasCzMcp ? czcode_ORCHESTRATION_INSTRUCTIONS : undefined;
+  return hasCzMcp ? CZ_ORCHESTRATION_INSTRUCTIONS : undefined;
 }
