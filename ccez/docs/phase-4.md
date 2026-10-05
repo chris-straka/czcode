@@ -45,4 +45,9 @@ desktop, and Android.
 - Per-kind Playwright and Maestro test suites.
 - The owner answering one of each kind on the S24.
 - Retiring the ccez-inbox Worker, PWA, and DNS (approved). That happens at
-  switch-over, after the real import.
+  switch-over, after the real import. The `~/SWE/ccez-inbox` folder is
+  deleted (its history is on GitHub), so name the resources directly:
+  `npx wrangler delete --name ccez-inbox` (the Worker and inbox.ccez.uk),
+  `npx wrangler d1 delete ccez-inbox`, and empty then delete the R2 bucket
+  `ccez-inbox-media`. Then delete the Access application for
+  inbox.ccez.uk in the Zero Trust dashboard.
