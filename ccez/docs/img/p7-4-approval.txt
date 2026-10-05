@@ -1,0 +1,24 @@
+Reply with exactly: TUI-OK. Do not use any tools.  working
+? echo approval-test-456
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Approve command: echo approval-test-456?
+y yes · a yes for this session · n no
+
+i reply · s stop · m approval-required · pgup/pgdn · esc
+back
+

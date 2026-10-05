@@ -53,6 +53,7 @@
     "@cz/shared": "workspace:*",
     "@cz/ssh": "workspace:*",
     "@cz/tailscale": "workspace:*",
+    "@cz/tui": "workspace:*",
     "@cz/web": "workspace:*",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",

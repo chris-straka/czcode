@@ -1,0 +1,35 @@
+{
+  "name": "@cz/tui",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/entry.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./src/api.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@cz/client-runtime": "workspace:*",
+    "@cz/contracts": "workspace:*",
+    "@cz/shared": "workspace:*",
+    "@effect/atom-react": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "effect": "catalog:",
+    "ink": "8.0.0",
+    "react": "19.2.6"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "~19.3.0",
+    "vite-plus": "catalog:"
+  }
+}

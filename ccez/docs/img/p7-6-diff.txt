@@ -1,0 +1,24 @@
+diff --git a/tui-diff-test.txt b/tui-diff-test.txt
+new file mode 100644
+index 0000000..3e19a50
+--- /dev/null
++++ b/tui-diff-test.txt
+@@ -0,0 +1 @@
++hello from the tui
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1-8/8 · ]/[ file · space/pgdn · esc back
+
+

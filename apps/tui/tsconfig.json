@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        // A React UI like web's: list only the TUI-specific overrides here.
+        "diagnosticSeverity": {
+          "globalDate": "off",
+          "globalConsole": "off",
+          "globalTimers": "off",
+          "globalFetch": "off",
+          // Terminal glue (nvim RPC, f3d, mpv, adb) runs from React handlers, not Effect.
+          "nodeBuiltinImport": "off"
+        }
+      }
+    ]
+  },
+  "include": ["src"]
+}

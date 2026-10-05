@@ -1,0 +1,30 @@
+1 Threads  2 Decisions  3 Hosts  q quit
+
+› pick   hll          Blocking pick                      11m
+  pick   hll          Banner colour                      12m
+  rank   hll          Act order                          12m
+  ask    hll          Voice reference                    12m
+  review hll          Shrine concept                     12m
+  3D     hll          Cree model                         11m
+  read   hll          Lighthouse scene                   11m
+  play   hll          Build 4782                         11m
+  pitch  launchkit    Devlog series                      12m
+  listen ccez-synthf… Impact SFX                         12m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
