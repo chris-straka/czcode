@@ -4,6 +4,7 @@ import {
   DEFAULT_PROVIDER_INTERACTION_MODE,
   type EnvironmentId,
   MessageId,
+  RuntimeMode,
   type ThreadId,
 } from "@cz/contracts";
 import * as Option from "effect/Option";
@@ -54,6 +55,7 @@ export function ThreadScreen(props: {
   const [scroll, setScroll] = useState(0);
   const startTurn = useCommand(atoms.threadEnvironment.startTurn);
   const interrupt = useCommand(atoms.threadEnvironment.interruptTurn);
+  const setRuntimeMode = useCommand(atoms.threadEnvironment.setRuntimeMode);
   const respondToApproval = useCommand(atoms.threadEnvironment.respondToApproval);
   const respondToUserInput = useCommand(atoms.threadEnvironment.respondToUserInput);
 
@@ -107,6 +109,17 @@ export function ThreadScreen(props: {
       if (input === "k" || key.upArrow) return setScroll(Math.min(maxScroll, offset + 1));
       if (input === "j" || key.downArrow) return setScroll(Math.max(0, offset - 1));
       if (input === "G") return setScroll(0);
+      if (input === "m" && projection) {
+        const modes = RuntimeMode.literals;
+        const next = modes[(modes.indexOf(projection.thread.runtimeMode) + 1) % modes.length];
+        if (next) {
+          void setRuntimeMode({
+            environmentId: props.environmentId,
+            input: { threadId: props.threadId, runtimeMode: next },
+          });
+        }
+        return;
+      }
       if (input === "s" && running) {
         void interrupt({ environmentId: props.environmentId, input: { threadId: props.threadId } });
         return;
@@ -219,7 +232,7 @@ export function ThreadScreen(props: {
         : h(
             Text,
             { dimColor: true },
-            `i reply${running ? " · s stop" : ""} · pgup/pgdn scroll${offset > 0 ? ` (${offset} up, G end)` : ""} · esc back`,
+            `i reply${running ? " · s stop" : ""} · m ${projection?.thread.runtimeMode ?? "mode"} · pgup/pgdn${offset > 0 ? ` (${offset} up, G end)` : ""} · esc back`,
           ),
     ),
   );

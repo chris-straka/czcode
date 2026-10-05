@@ -3,7 +3,7 @@ import type { EnvironmentId, ThreadId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { Atom } from "effect/unstable/reactivity";
 import { Box, Text, useInput } from "ink";
-import { createElement as h, useMemo, useState } from "react";
+import { createElement as h, useMemo } from "react";
 
 import { age, type EnvironmentShell, threadRows, threadState } from "../model/threadList.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
@@ -13,6 +13,9 @@ export interface ThreadListProps {
   readonly atoms: TuiAtoms;
   readonly active: boolean;
   readonly onOpen: (environmentId: EnvironmentId, threadId: ThreadId) => void;
+  /** Kept by the parent so the selection survives opening a thread and coming back. */
+  readonly cursor: number;
+  readonly onCursor: (cursor: number) => void;
 }
 
 /** Every environment's shell, as one value the list can render from. */
@@ -33,11 +36,16 @@ export function environmentShellsAtom(atoms: TuiAtoms) {
   });
 }
 
-export function ThreadListScreen({ atoms, active, onOpen }: ThreadListProps) {
+export function ThreadListScreen({
+  atoms,
+  active,
+  onOpen,
+  cursor,
+  onCursor: setCursor,
+}: ThreadListProps) {
   const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
   const shells = useAtomValue(shellsAtom);
   const rows = useMemo(() => threadRows(shells), [shells]);
-  const [cursor, setCursor] = useState(0);
   const now = useNow(30_000);
   const { rows: height, columns } = useViewport();
   const visible = Math.max(3, height - 4);
@@ -81,10 +89,10 @@ export function ThreadListScreen({ atoms, active, onOpen }: ThreadListProps) {
       return h(
         Box,
         { key: `${row.environmentId}:${row.thread.id}` },
-        h(Text, { color: "cyan" }, isSelected ? "› " : "  "),
+        h(Box, { width: 2, flexShrink: 0 }, h(Text, { color: "cyan" }, isSelected ? "›" : " ")),
         h(
           Box,
-          { width: projectWidth, marginRight: 1 },
+          { width: projectWidth, marginRight: 1, flexShrink: 0 },
           h(Text, { dimColor: true, wrap: "truncate" }, project),
         ),
         h(
@@ -94,14 +102,18 @@ export function ThreadListScreen({ atoms, active, onOpen }: ThreadListProps) {
         ),
         h(
           Box,
-          { width: stateWidth },
+          { width: stateWidth, flexShrink: 0 },
           h(
             Text,
             { color: state === "needs you" ? "yellow" : state === "failed" ? "red" : "green" },
             state,
           ),
         ),
-        h(Box, { width: ageWidth, justifyContent: "flex-end" }, h(Text, { dimColor: true }, age(now, row.updatedAtMs))),
+        h(
+          Box,
+          { width: ageWidth, flexShrink: 0, justifyContent: "flex-end" },
+          h(Text, { dimColor: true }, age(now, row.updatedAtMs)),
+        ),
       );
     }),
   );

@@ -26,6 +26,7 @@ export function App({ atoms }: { readonly atoms: TuiAtoms }) {
   const { exit } = useApp();
   const [tab, setTab] = useState<Tab>("Threads");
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
+  const [listCursor, setListCursor] = useState(0);
   const [status, setStatusText] = useState("");
   const setStatus = useCallback((message: string) => setStatusText(message), []);
   useEffect(() => {
@@ -64,7 +65,13 @@ export function App({ atoms }: { readonly atoms: TuiAtoms }) {
   } else if (tab === "Hosts") {
     body = h(HostsScreen, { atoms, active: true });
   } else {
-    body = h(ThreadListScreen, { atoms, active: true, onOpen: openThread });
+    body = h(ThreadListScreen, {
+      atoms,
+      active: true,
+      onOpen: openThread,
+      cursor: listCursor,
+      onCursor: setListCursor,
+    });
   }
 
   return h(
