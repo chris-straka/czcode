@@ -1,3 +1,4 @@
+import { useSearch } from "@tanstack/react-router";
 import { filterChips, filterFeed } from "@cz/client-runtime/decisions/feed";
 import type { DecisionAnswerInput, DecisionKind, DecisionMediaRef } from "@cz/contracts";
 import { CheckIcon, InboxIcon, PlayIcon, UndoIcon } from "lucide-react";
@@ -43,7 +44,8 @@ export function DecisionsPage() {
   const uploadCommand = useAtomCommand(decisionEnvironment.upload, "upload decision media");
   const [projects, setProjects] = useState<string[]>([]);
   const [kinds, setKinds] = useState<string[]>([]);
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const search = useSearch({ from: "/_chat/decisions" });
+  const [openKey, setOpenKey] = useState<string | null>(search.open ?? null);
   const [session, setSession] = useState(false);
   const [pending, setPending] = useState<ReadonlyMap<string, PendingAnswer>>(new Map());
   const [sent, setSent] = useState<ReadonlyMap<string, { entry: DecisionEntry; summary: string }>>(

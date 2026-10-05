@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type {
   DecisionAnswerInput,
   DecisionMediaRef,
@@ -89,6 +90,15 @@ export function DecisionView({
             </Badge>
             <span>{item.project}</span>
             <span>· {entry.environmentLabel}</span>
+            {item.thread ? (
+              <Link
+                to="/$environmentId/$threadId"
+                params={{ environmentId: entry.environmentId, threadId: item.thread }}
+                className="underline-offset-2 hover:text-foreground hover:underline"
+              >
+                · Open thread
+              </Link>
+            ) : null}
             {item.blocking ? (
               <Badge variant="warning" size="sm">
                 Agent waiting

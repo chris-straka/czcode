@@ -55,8 +55,30 @@ export function useOpenDecisions(): DecisionFeed {
   return useAtomValue(openFeedAtom);
 }
 
-/** Open decisions asked from one thread (for the thread's decision chips). */
-export function useThreadDecisions(threadId: string | null): readonly DecisionEntry[] {
+/** Open decisions asked from one thread (the thread's banner links to them). */
+export function useThreadDecisions(
+  environmentId: EnvironmentId | null,
+  threadId: string | null,
+): readonly DecisionEntry[] {
   const feed = useOpenDecisions();
-  return threadId === null ? [] : feed.entries.filter((entry) => entry.item.thread === threadId);
+  return threadId === null
+    ? []
+    : feed.entries.filter(
+        (entry) => entry.environmentId === environmentId && entry.item.thread === threadId,
+      );
+}
+
+// Per thread, so a sidebar row re-renders only when its own count changes.
+const threadOpenDecisionCount = Atom.family((key: string) =>
+  Atom.make(
+    (get) =>
+      get(openFeedAtom).entries.filter(
+        (entry) => `${entry.environmentId}:${entry.item.thread}` === key,
+      ).length,
+  ),
+);
+
+/** How many open decisions a thread has asked (the sidebar marks those threads). */
+export function useThreadOpenDecisionCount(environmentId: EnvironmentId, threadId: string): number {
+  return useAtomValue(threadOpenDecisionCount(`${environmentId}:${threadId}`));
 }

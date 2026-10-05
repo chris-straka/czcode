@@ -39,7 +39,7 @@ import { feedbackBannerItem } from "./chat/ComposerFeedback";
 import { usageLimitsBannerItem } from "./chat/ComposerUsageLimits";
 import { getTerminalLabel } from "@cz/shared/terminalLabels";
 import * as Schema from "effect/Schema";
-import { Minimize2Icon } from "lucide-react";
+import { InboxIcon, Minimize2Icon } from "lucide-react";
 import {
   questionAttachmentDraftId,
   questionAttachmentDraftPrefix,
@@ -549,6 +549,7 @@ import { fileAttachmentCapabilityBlockReason } from "./chat/composerAttachmentFi
 import { assetEnvironment } from "../state/assets";
 import { readPreparedConnection } from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
+import { useThreadDecisions } from "../state/decisions";
 import { queueEnvironment } from "../state/queue";
 import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
@@ -7209,6 +7210,40 @@ export default function ChatView(props: ChatViewProps) {
       onDismiss: acknowledgeActiveThreadWoke,
     };
   }, [acknowledgeActiveThreadWoke, activeThread?.id, activeThreadWokeVisible]);
+  // Decisions this thread's agent asked and the owner hasn't answered yet.
+  const threadDecisions = useThreadDecisions(
+    isServerThread ? environmentId : null,
+    isServerThread ? (activeThread?.id ?? null) : null,
+  );
+  const firstThreadDecision = threadDecisions[0] ?? null;
+  const threadDecisionsBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
+    if (!firstThreadDecision) return null;
+    const count = threadDecisions.length;
+    return {
+      id: `thread-decisions:${firstThreadDecision.environmentId}:${firstThreadDecision.item.id}`,
+      variant: "warning",
+      priority: "notice",
+      icon: <InboxIcon />,
+      title: count === 1 ? "A decision is waiting on you" : `${count} decisions are waiting on you`,
+      description: firstThreadDecision.item.question,
+      actions: (
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() =>
+            void navigate({
+              to: "/decisions",
+              search: {
+                open: `${firstThreadDecision.environmentId}:${firstThreadDecision.item.id}`,
+              },
+            })
+          }
+        >
+          Answer
+        </Button>
+      ),
+    };
+  }, [firstThreadDecision, navigate, threadDecisions.length]);
   const parkedThreadBannerItem = useMemo<ComposerBannerStackItem | null>(() => {
     if (!activeThreadSnoozed && !activeThreadSettled) {
       return null;
@@ -7401,6 +7436,8 @@ export default function ChatView(props: ChatViewProps) {
       resumeCompactionBannerItem === null ? [] : [resumeCompactionBannerItem];
     const wokeThreadItems = wokeThreadBannerItem === null ? [] : [wokeThreadBannerItem];
     const parkedThreadItems = parkedThreadBannerItem === null ? [] : [parkedThreadBannerItem];
+    const threadDecisionItems =
+      threadDecisionsBannerItem === null ? [] : [threadDecisionsBannerItem];
     // The user asked for this one, so it leads the notice tier instead of trailing it.
     const usageLimitsItems = usageLimitsBanner === null ? [] : [usageLimitsBanner];
     const projectCloneItems = projectCloneBannerItem === null ? [] : [projectCloneBannerItem];
@@ -7415,6 +7452,7 @@ export default function ChatView(props: ChatViewProps) {
         ...resumeCompactionItems,
         ...wokeThreadItems,
         ...parkedThreadItems,
+        ...threadDecisionItems,
       ];
     }
     return [
@@ -7465,8 +7503,10 @@ export default function ChatView(props: ChatViewProps) {
         },
       },
       ...parkedThreadItems,
+      ...threadDecisionItems,
     ];
   }, [
+    threadDecisionsBannerItem,
     activeBranchMismatchKey,
     activeThreadShell,
     serverRuntime?.usageLimitResetAt,
