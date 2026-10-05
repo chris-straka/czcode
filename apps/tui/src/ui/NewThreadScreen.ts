@@ -11,7 +11,7 @@ import {
   type VcsStatusResult,
 } from "@cz/contracts";
 import { Box, Text, useInput } from "ink";
-import { createElement as h, useMemo, useState } from "react";
+import { createElement as h, useContext, useMemo, useState } from "react";
 import { randomBytes, randomUUID } from "node:crypto";
 import { buildTemporaryWorktreeBranchName } from "@cz/shared/git";
 import * as Option from "effect/Option";
@@ -20,7 +20,8 @@ import { AsyncResult, Atom } from "effect/unstable/reactivity";
 import { hostModels, liveProjects, newThreadModel } from "../model/hosts.ts";
 import { projectKey } from "../model/scope.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
-import { useCommand } from "./command.ts";
+import { StatusContext, useCommand } from "./command.ts";
+import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import { environmentShellsAtom } from "./ThreadListScreen.ts";
 import { TextInput } from "./TextInput.ts";
 
@@ -68,6 +69,8 @@ export function NewThreadScreen(props: {
   // null follows the project, then host setting; Tab flips it for this thread.
   const [envModeChoice, setEnvModeChoice] = useState<ThreadEnvMode | null>(null);
   const startTurn = useCommand(atoms.threadEnvironment.startTurn);
+  const enqueue = useCommand(atoms.queue.enqueue);
+  const setStatus = useContext(StatusContext);
 
   const scopedIndex = (environmentId: EnvironmentId) => {
     const list = liveProjects(
@@ -134,6 +137,7 @@ export function NewThreadScreen(props: {
     (_input, key) => {
       if (key.escape) return props.onCancel();
       if (key.tab) return setEnvModeChoice(envMode === "worktree" ? "local" : "worktree");
+      if (key.ctrl && _input === "r") return queueForReset(prompt);
       if ((key.upArrow || key.downArrow) && models.length > 0) {
         const current =
           modelIndex ??
@@ -150,6 +154,31 @@ export function NewThreadScreen(props: {
     },
     { isActive: props.active && step.kind === "prompt" },
   );
+
+  /** Queues the prompt to start as a thread when the model's quota resets. */
+  const queueForReset = (text: string) => {
+    if (step.kind !== "prompt" || text.trim() === "" || chosenModel === null) return;
+    const title = deriveThreadTitleSeed({ text, attachments: [] }).slice(0, 80) || "Queued task";
+    void enqueue({
+      environmentId: step.environmentId,
+      input: {
+        title,
+        prompt: text.trim(),
+        projectId: step.project.id,
+        modelSelection: chosenModel,
+        workspaceStrategy:
+          envMode === "worktree" && baseBranch !== null
+            ? { type: "worktree", baseRef: baseBranch }
+            : { type: "root" },
+        start: "reset",
+        source: "composer",
+      },
+    }).then((run) => {
+      if (run === null) return;
+      setStatus(`Queued: it ${queuedRunStartLabel(run, Date.now())}. See the Queue tab.`);
+      props.onCancel();
+    });
+  };
 
   const send = (text: string) => {
     if (step.kind !== "prompt" || text.trim() === "") return;
@@ -235,7 +264,7 @@ export function NewThreadScreen(props: {
       h(
         Text,
         { dimColor: true },
-        "enter send · alt+enter newline · ↑↓ model · tab worktree/local · esc",
+        "enter send · ctrl+r at next reset · ↑↓ model · tab worktree/local · esc",
       ),
     );
   }

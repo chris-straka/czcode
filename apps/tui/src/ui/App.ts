@@ -10,10 +10,11 @@ import { NewThreadScreen } from "./NewThreadScreen.ts";
 import { projectScope } from "../model/scope.ts";
 import { DecisionsScreen } from "./DecisionsScreen.ts";
 import { DiffScreen } from "./DiffScreen.ts";
+import { QueueScreen } from "./QueueScreen.ts";
 import { environmentShellsAtom, ThreadListScreen } from "./ThreadListScreen.ts";
 import { ThreadScreen } from "./ThreadScreen.ts";
 
-const TABS = ["Threads", "Decisions", "Hosts"] as const;
+const TABS = ["Threads", "Decisions", "Queue", "Hosts"] as const;
 type Tab = (typeof TABS)[number];
 
 type Overlay =
@@ -106,6 +107,8 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       scopeNames: allProjects || scope === null ? null : scope.names,
       onOpenChange: setDecisionOpen,
     });
+  } else if (tab === "Queue") {
+    body = h(QueueScreen, { atoms, active: true });
   } else if (tab === "Hosts") {
     body = h(HostsScreen, { atoms, active: true });
   } else {
@@ -128,28 +131,31 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       atTop
         ? h(
             Box,
-            { marginBottom: 1 },
-            ...TABS.map((name, index) =>
-              h(
-                Text,
-                {
-                  key: name,
-                  ...(name === tab ? { bold: true, color: "cyan" } : { dimColor: true }),
-                },
-                `${index + 1} ${name}  `,
+            { flexDirection: "column", marginBottom: 1 },
+            h(
+              Box,
+              null,
+              ...TABS.map((name, index) =>
+                h(
+                  Box,
+                  { key: name, marginRight: 2, flexShrink: 0 },
+                  h(
+                    Text,
+                    name === tab ? { bold: true, color: "cyan" } : { dimColor: true },
+                    `${index + 1} ${name}`,
+                  ),
+                ),
               ),
             ),
             h(
               Text,
-              { dimColor: true },
-              tab === "Threads"
-                ? `${scope ? (scopeKeys ? `${scope.title} · a all` : "all · a this project") : "all"} · n new · q quit`
-                : "q quit",
+              { dimColor: true, wrap: "truncate" },
+              `${scope ? (scopeKeys ? `${scope.title} · a all` : "all projects · a this project") : "all projects"}${tab === "Threads" ? " · n new" : ""} · q quit`,
             ),
           )
         : null,
       body,
-      status ? h(Text, { color: "red", wrap: "truncate" }, status) : null,
+      status ? h(Text, { color: "yellow", wrap: "truncate" }, status) : null,
     ),
   );
 }
