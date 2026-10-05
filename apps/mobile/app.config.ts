@@ -239,9 +239,10 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: variant.assets.appIcon,
   userInterfaceStyle: "automatic",
+  // Over-the-air updates are off unless a self-hosted update server is set.
   updates: {
-    enabled: repoEnv.CZ_MOBILE_UPDATES_ENABLED !== "0",
-    url: "https://u.expo.dev/d763fcb8-d37c-41ea-a773-b54a0ab4a454",
+    enabled: Boolean(repoEnv.CZ_MOBILE_UPDATES_URL),
+    ...(repoEnv.CZ_MOBILE_UPDATES_URL ? { url: repoEnv.CZ_MOBILE_UPDATES_URL } : {}),
     checkAutomatically: "ON_LOAD",
     fallbackToCacheTimeout: 0,
   },
@@ -471,9 +472,6 @@ const config: ExpoConfig = {
       tracesUrl: repoEnv.EXPO_PUBLIC_OTLP_TRACES_URL ?? null,
       tracesDataset: repoEnv.EXPO_PUBLIC_OTLP_TRACES_DATASET ?? null,
       tracesToken: repoEnv.EXPO_PUBLIC_OTLP_TRACES_TOKEN ?? null,
-    },
-    eas: {
-      projectId: "d763fcb8-d37c-41ea-a773-b54a0ab4a454",
     },
   },
   owner: "chris-straka",

@@ -1,8 +1,9 @@
 # Decisions in cz: what agents can ask the owner, and when
 
 Design, 2026-10-04. Replaces the "Inbox tab = port the PWA" idea in
-`PLAN.md`. Backend: the existing ccez-inbox Worker + D1 + R2 and the `inbox`
-CLI/MCP (`~/SWE/ccez-inbox`), extended as below.
+`PLAN.md`. Backend: a decision service in the cz server (czcode is the
+inbox; ccez-inbox's items are imported once and its Worker retired), with
+MCP tools and a `cz inbox` CLI, as below.
 
 ## Look and feel
 
@@ -26,12 +27,12 @@ self-hosted font. Do keep these interaction ideas from Darkroom (branch
 
 ## Two places for the owner's attention
 
-| | **Threads** (T3 as it is) | **Decisions** (new) |
-|---|---|---|
-| What | A live conversation with one agent on one task | A judgment call with media, from any project, that waits for the owner |
-| Agent | Usually blocked until the owner replies | Usually not blocked: it moves on or ends, and work resumes when the owner answers |
-| Media | Text, simple multiple choice, files the owner attaches | Images, 3D, audio sets, video, builds, long text, made for judging |
-| Lifetime | The thread's lifetime | Kept forever as the owner's taste history |
+|          | **Threads** (T3 as it is)                              | **Decisions** (new)                                                               |
+| -------- | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| What     | A live conversation with one agent on one task         | A judgment call with media, from any project, that waits for the owner            |
+| Agent    | Usually blocked until the owner replies                | Usually not blocked: it moves on or ends, and work resumes when the owner answers |
+| Media    | Text, simple multiple choice, files the owner attaches | Images, 3D, audio sets, video, builds, long text, made for judging                |
+| Lifetime | The thread's lifetime                                  | Kept forever as the owner's taste history                                         |
 
 A thread stuck on a decision shows a chip that opens it; a decision links
 back to its thread.
@@ -86,6 +87,7 @@ voice note, plus **"none of these, try again"** with a note.
 ## When agents should ask (rules for every agent)
 
 Ask when:
+
 - It's a **taste call**: art, animation, sound, music, story, names, game
   feel, UI look.
 - It **spends money** or is **outward-facing** (publishing, deploying,
@@ -97,12 +99,14 @@ Ask when:
 - Only the owner has the input (Request).
 
 Don't ask when:
+
 - A sensible default exists for a technical choice: decide, and log it in
   the repo's `docs/decisions.md`.
 - It's a status update: that belongs in the thread.
 - A check could answer it (tests, rfcheck, weightforge, screenshots).
 
 How to ask:
+
 - **Batch:** one Listen with 8 sounds, not 8 decisions. At most ~5 open
   decisions per project; further ones wait in the agent's queue.
 - **Don't block if anything else can be done.** Submit, then continue other
@@ -123,21 +127,22 @@ How to ask:
 ## After the owner answers
 
 - **The agent is still waiting** (`blocking`): it gets the answer through
-  `inbox wait` and continues.
+  `cz inbox wait` (or the MCP wait tool) and continues.
 - **The agent has moved on or ended:** the cz server sees the answer and
   starts a **resume thread** in the same project with the decision, the
   owner's note, and the agent's resume prompt attached. If quotas are spent,
   the resume goes into the reset queue.
 - **Taste history:** every decision, pick, and note is stored and searchable
-  by agents (`inbox history --project hll --type listen`). genforge's judge
+  by agents (`cz inbox history --project hll --kind listen`). genforge's judge
   and every agent read it before proposing ("the owner rejected retro
   sounds for HLL; avoid square-wave tails"). Over time agents ask fewer
   questions because they know the owner's taste.
 
 ## Reset queue ("run when my quota resets")
 
-T3 has no scheduler. nightshift (`~/SWE/nightshift`) stays the engine, and
-cz gets a front end for it:
+T3 has no scheduler. nightshift's queue moves into the cz server, which
+already tracks each provider's quota and reset time:
+
 - **"Run at next reset"** on the send button: the thread is created now but
   starts when the chosen provider's window resets (or when spare allowance
   would expire unused).
@@ -153,7 +158,7 @@ cz gets a front end for it:
   part moves to Usage → Limits as above.
 - The inbox **PWA**, once the Decisions tab covers every type above.
 
-## Backend changes (in `~/SWE/ccez-inbox`, after its current agent finishes)
+## Backend (decision service in the cz server)
 
 - New kinds: `review`, `listen`, `look`, `read`, `playtest`, `request`,
   `timeline` (existing `pick`, `approve` → `review`, `rank`, `freeform` →
@@ -162,7 +167,7 @@ cz gets a front end for it:
   redline storage for Review; passage comments for Read; uploads for Request.
 - Fields: `blocking`, `default`, `expires_at`, `cost_note`, `resume`
   (`{thread_id?, project, prompt, provider?}`), `thread`.
-- `inbox history` (CLI + MCP) for taste lookup; `inbox resume-due` for the cz
-  server to fetch answered items that need a resume thread.
+- `cz inbox history` (CLI + MCP) for taste lookup; the server itself finds
+  answered items whose agent moved on and starts their resume threads.
 - MCP tool descriptions carry the "when to ask" rules above, so every agent
   sees them at the moment it's about to ask.
