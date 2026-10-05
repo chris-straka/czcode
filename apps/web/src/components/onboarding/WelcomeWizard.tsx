@@ -68,7 +68,6 @@ import { buildProviderInstanceUpdatePatch } from "../settings/SettingsPanels.log
 import { TerminalViewport } from "../ThreadTerminalDrawer";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { CzWordmark } from "../CzWordmark";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -213,17 +212,7 @@ export function WelcomeWizard({
         showCloseButton={false}
         initialFocus={() => document.getElementById("onboarding-pairing-url") ?? true}
       >
-        <WizardHeader
-          title="Set up czcode"
-          identity={
-            <div className="flex items-baseline gap-1.5" role="img" aria-label="czcode">
-              <CzWordmark className="h-4 w-auto shrink-0" aria-hidden />
-              <span className="text-2xl font-medium tracking-tight text-muted-foreground">
-                Code
-              </span>
-            </div>
-          }
-        >
+        <WizardHeader title="Set up this machine">
           <WizardSteps
             steps={ONBOARDING_STAGES}
             currentStep={stageIndex}
@@ -494,9 +483,9 @@ function ConnectAccountOption({
             <p className="text-sm text-muted-foreground">
               Run this on each computer you want to connect.
             </p>
-            <CommandBlock command="npx cz connect" className="mt-3" />
+            <CommandBlock command="cz connect" className="mt-3" />
             <p className="mt-3 text-xs text-muted-foreground">
-              Keep czcode running. Select the computers you want to set up above.
+              Keep the server running. Select the computers you want to set up above.
             </p>
           </div>
         </CollapsiblePanel>
@@ -608,9 +597,9 @@ function PairingForm({
             <p className="pt-3 text-sm text-muted-foreground">
               Run this on the computer with your code.
             </p>
-            <CommandBlock command="npx cz pair" className="mt-2" />
+            <CommandBlock command="cz pair" className="mt-2" />
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Start czcode first, or run <code className="font-mono">npx cz serve</code>. Add{" "}
+              Start the desktop app first, or run <code className="font-mono">cz serve</code>. Add{" "}
               <code className="font-mono">--tailscale</code> to use your tailnet.
             </p>
           </CollapsiblePanel>

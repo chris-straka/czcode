@@ -2290,7 +2290,7 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("Received 1 update and ran 1 command");
   });
 
-  it("renders cz MCP dynamic tools with the product logo and pretty name", async () => {
+  it("renders cz MCP dynamic tools with the app glyph and pretty name", async () => {
     activityTestState.expanded = true;
     const { MessagesTimeline } = await import("./MessagesTimeline");
     const item = {
@@ -2360,7 +2360,7 @@ describe("MessagesTimeline", () => {
     );
 
     // The cz wordmark replaces the generic tool icon for cz MCP calls.
-    expect(markup).toContain('viewBox="15.5309 37 94.3941 56.96"');
+    expect(markup).toContain('viewBox="0 0 16 16"');
     expect(markup).toContain("Read a cz thread");
     expect(markup).not.toContain("mcp__czcode__cz_thread_read");
   });

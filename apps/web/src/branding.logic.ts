@@ -4,7 +4,8 @@ export function formatAppDisplayName(input: {
   readonly baseName: string;
   readonly stageLabel: string;
 }): string {
-  if (input.stageLabel.trim().toLowerCase() === "latest") {
+  // Release builds show the plain name; only dev and nightly get a suffix.
+  if (["latest", "alpha"].includes(input.stageLabel.trim().toLowerCase())) {
     return input.baseName;
   }
 

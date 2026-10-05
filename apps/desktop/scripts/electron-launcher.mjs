@@ -15,7 +15,7 @@ const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 const devBundleIdSuffix = NodePath.basename(repoRoot)
   .toLowerCase()
   .replaceAll(/[^a-z0-9]+/g, "");
-const APP_DISPLAY_NAME = isDevelopment ? "czcode (Dev)" : "czcode (Alpha)";
+const APP_DISPLAY_NAME = isDevelopment ? "czcode (Dev)" : "czcode";
 const APP_BUNDLE_ID = isDevelopment
   ? `uk.ccez.cz.dev.${devBundleIdSuffix || "local"}`
   : "uk.ccez.cz";

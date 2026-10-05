@@ -250,7 +250,7 @@ export const czcode_DARK_THEME_COLORS: ThemeColors = {
 
 export const CZ_CHAT_THEME: ThemeDefinition = {
   id: "cz-chat",
-  label: "cz Chat",
+  label: "Chat",
   appearance: "light",
   colors: {
     canvas: "oklch(0.982446 0.010114 325.653)",

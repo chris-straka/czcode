@@ -3365,7 +3365,7 @@ export function GeneralSettingsPanel() {
         />
         <SettingsRow
           {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by czcode."
+          description="Notices for dependencies, assets, and optional tools used by this app."
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}
