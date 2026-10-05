@@ -95,11 +95,6 @@ export class DecisionService extends Context.Service<
     readonly expireDue: Effect.Effect<number, DecisionStorageError>;
     /** Ids of items as they are submitted or closed (answered, withdrawn, expired). */
     readonly changes: Stream.Stream<string>;
-    /** Inserts an item (and answer) as-is, keeping its id and times. Skips ids already present. */
-    readonly importItem: (
-      item: DecisionItem,
-      answer: DecisionAnswer | null,
-    ) => Effect.Effect<boolean, DecisionStorageError>;
   }
 >()("cz/decisions/DecisionService") {}
 
@@ -476,18 +471,6 @@ const make = Effect.gen(function* () {
     return rows.length;
   });
 
-  const importItem: DecisionService["Service"]["importItem"] = (item, answer) =>
-    sql
-      .withTransaction(
-        Effect.gen(function* () {
-          const existing = yield* sql`SELECT id FROM decision_items WHERE id = ${item.id}`;
-          if (existing.length > 0) return false;
-          yield* writeItem(item, answer);
-          return true;
-        }),
-      )
-      .pipe(storage("import"));
-
   yield* Effect.forkScoped(
     Effect.forever(
       Effect.sleep(EXPIRY_SWEEP_INTERVAL).pipe(
@@ -509,7 +492,6 @@ const make = Effect.gen(function* () {
     mediaPath,
     expireDue,
     changes: Stream.fromPubSub(changes),
-    importItem,
   });
 });
 

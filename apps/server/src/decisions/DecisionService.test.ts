@@ -276,32 +276,4 @@ it.layer(TestLayer)("DecisionService", (it) => {
       assert.equal((yield* decisions.get(later.id)).item.status, "open");
     }),
   );
-
-  it.effect("imports an item once, keeping its id and answer", () =>
-    Effect.gen(function* () {
-      const decisions = yield* DecisionService.DecisionService;
-      const item = {
-        ...(yield* decisions.submit(pick({ project: "import-source" }))),
-        id: "legacy-1",
-        project: "imported",
-        status: "answered" as const,
-        answered_at: 5,
-      };
-      const answer = {
-        item_id: "legacy-1",
-        choice: null,
-        option_ids: ["a"],
-        rank: null,
-        comment: "from the PWA",
-        voice_key: null,
-        decided_by: "owner",
-        decided_at: 5,
-      };
-      assert.isTrue(yield* decisions.importItem(item, answer));
-      assert.isFalse(yield* decisions.importItem(item, answer));
-      const read = yield* decisions.get("legacy-1");
-      assert.equal(read.item.project, "imported");
-      assert.equal(read.answer?.comment, "from the PWA");
-    }),
-  );
 });

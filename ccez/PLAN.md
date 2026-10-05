@@ -51,9 +51,9 @@ script, and the upstream sync log.
   and a `cz inbox` CLI (`submit`, `wait`, `get`, `list`, `history`);
   callers of the old `inbox` CLI move to it (no alias). Devices see decisions
   from every paired host in one feed, using the pairing they already have:
-  no Cloudflare Worker, Access, or extra tokens. Existing ccez-inbox items
-  and media are imported once, then the Worker, PWA, and inbox.ccez.uk are
-  retired (owner approved, 2026-10-05). The Darkroom branch is dropped; its
+  no Cloudflare Worker, Access, or extra tokens. The Worker, PWA, and
+  inbox.ccez.uk are retired with nothing imported (owner, 2026-10-05: never
+  used it, nothing worth keeping). The Darkroom branch is dropped; its
   interaction ideas are already in DECISIONS.md.
 - **nightshift folds into the cz server** (owner, 2026-10-04): the reset
   queue becomes a server service that uses the quotas and reset times cz

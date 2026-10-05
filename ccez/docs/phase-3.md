@@ -1,7 +1,6 @@
 # P3: Decisions in the cz server
 
-Agents ask the owner through cz itself; ccez-inbox's Worker is no longer
-needed once its items are imported.
+Agents ask the owner through cz itself. ccez-inbox's Worker is shut down.
 
 ## Built
 
@@ -30,25 +29,21 @@ needed once its items are imported.
     `wait_for_decision`, `get_decision`, `decision_history`, and
     `withdraw_decision`. Their descriptions carry the "when to ask" rules,
     and `ask_owner` stamps the calling thread.
-  - **CLI:** `cz inbox submit|wait|get|list|history|withdraw|import`. It
+  - **CLI:** `cz inbox submit|wait|get|list|history|withdraw`. It
     works on the local store with or without a running server. `wait` exits
     0 when answered, 2 when closed, and 3 on timeout.
-- **Import:** `cz inbox import` copies inbox.ccez.uk items, answers, and
-  media, keeping their ids and times. It skips ids it already has, so it is
-  safe to re-run.
 
 ## Gate results
 
 - Server, CLI, and MCP tests cover submit validation, every kind's answer
-  rules, wait, expiry defaults, media, import, and CLI exit codes.
-- A trial import into a sandbox home loaded the Worker's items, which the
-  P4 screenshots show. The real import runs at switch-over, once cz owns
-  `~/.cz`, because creating it early would skip the `~/.t3` migration.
+  rules, wait, expiry defaults, media, and CLI exit codes.
+- A trial import of the Worker's items into a sandbox home fed the P4
+  screenshots. The owner had never answered an item, so there was no real
+  import: the import command was removed and the Worker shut down
+  (2026-10-05).
 
 ## Not done
 
-- Comparing imported counts against the Worker's, item for item. Do this at
-  the real import, before shutting the Worker down.
 - An agent submitting one of each kind through MCP inside a live thread.
   The tools are tested against the service, not end to end with a
   provider.

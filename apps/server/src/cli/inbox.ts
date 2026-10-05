@@ -6,8 +6,6 @@
  * @module InboxCli
  */
 import {
-  type DecisionAnswer,
-  type DecisionItem,
   type DecisionItemWithAnswer,
   DecisionKind,
   DecisionItemStatus,
@@ -26,8 +24,6 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { Argument, Command, Flag, GlobalFlag } from "effect/unstable/cli";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import * as ServerConfig from "../config.ts";
 import * as DecisionService from "../decisions/DecisionService.ts";
@@ -324,208 +320,6 @@ const withdrawCommand = Command.make("withdraw", { baseDir: baseDirFlag, id: idA
   ),
 );
 
-// --- One-time import from the retired ccez-inbox Worker -------------------
-
-const LegacyMedia = Schema.Struct({
-  type: Schema.String,
-  r2_key: Schema.String,
-  name: Schema.String,
-  mime: Schema.String,
-  caption: Schema.optionalKey(Schema.String),
-});
-type LegacyMedia = typeof LegacyMedia.Type;
-const LegacyItem = Schema.Struct({
-  id: Schema.String,
-  project: Schema.String,
-  kind: Schema.String,
-  title: Schema.String,
-  question: Schema.String,
-  body_md: Schema.String,
-  media: Schema.Array(LegacyMedia),
-  options: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      label: Schema.String,
-      media_idx: Schema.NullOr(Schema.Number),
-    }),
-  ),
-  priority: Schema.Number,
-  created_by: Schema.String,
-  thread_url: Schema.NullOr(Schema.String),
-  status: Schema.String,
-  created_at: Schema.Number,
-  updated_at: Schema.Number,
-  answered_at: Schema.NullOr(Schema.Number),
-});
-const LegacyDecision = Schema.Struct({
-  choice: Schema.NullOr(Schema.String),
-  option_ids: Schema.NullOr(Schema.Array(Schema.String)),
-  rank: Schema.NullOr(Schema.Array(Schema.String)),
-  comment: Schema.NullOr(Schema.String),
-  voice_r2_key: Schema.NullOr(Schema.String),
-  decided_at: Schema.Number,
-});
-const decodeLegacyList = Schema.decodeUnknownEffect(
-  Schema.Struct({ items: Schema.Array(LegacyItem) }),
-);
-const decodeLegacyDetail = Schema.decodeUnknownEffect(
-  Schema.Struct({ decision: Schema.NullOr(LegacyDecision) }),
-);
-
-const LEGACY_MEDIA_TYPES = new Set(["image", "glb", "audio", "video", "voice", "apk", "file"]);
-
-/** A pitch's old verdicts were approve/reject. */
-function legacyChoice(kind: string, choice: string | null): string | null {
-  if (kind !== "trend" || choice === null) return choice;
-  return choice === "approve" ? "yes" : choice === "reject" ? "never" : choice;
-}
-
-const readKeychainToken = Effect.gen(function* () {
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  return yield* spawner
-    .string(
-      ChildProcess.make("security", [
-        "find-generic-password",
-        "-s",
-        "ccez-inbox",
-        "-a",
-        "agent",
-        "-w",
-      ]),
-    )
-    .pipe(
-      Effect.map((out) => out.trim()),
-      Effect.orElseSucceed(() => ""),
-    );
-});
-
-const importCommand = Command.make("import", {
-  baseDir: baseDirFlag,
-  from: Flag.String("from").pipe(Flag.withDefault("https://inbox.ccez.uk")),
-  token: Flag.String("token").pipe(
-    Flag.withDescription(
-      "Agent token; defaults to INBOX_TOKEN, then the ccez-inbox Keychain item.",
-    ),
-    Flag.optional,
-  ),
-}).pipe(
-  Command.withDescription(
-    "Copy every item, answer, and file from the old ccez-inbox Worker into this machine's decisions. Safe to re-run.",
-  ),
-  Command.withHandler((flags) =>
-    withDecisions(flags.baseDir, (decisions) =>
-      Effect.gen(function* () {
-        const http = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
-        const token = Option.isSome(flags.token)
-          ? flags.token.value
-          : process.env.INBOX_TOKEN || (yield* readKeychainToken);
-        if (!token) return yield* fail("No ccez-inbox token: pass --token or set INBOX_TOKEN.");
-        const base = flags.from.replace(/\/+$/, "");
-        const getJson = (url: string) =>
-          http
-            .execute(
-              HttpClientRequest.get(`${base}${url}`).pipe(HttpClientRequest.bearerToken(token)),
-            )
-            .pipe(Effect.flatMap((response) => response.json));
-        const getBytes = (key: string) =>
-          http
-            .execute(
-              HttpClientRequest.get(`${base}/api/media/${key}`).pipe(
-                HttpClientRequest.bearerToken(token),
-              ),
-            )
-            .pipe(
-              Effect.flatMap((response) => response.arrayBuffer),
-              Effect.map((buffer) => new Uint8Array(buffer)),
-            );
-        const copyMedia = (ref: LegacyMedia) =>
-          getBytes(ref.r2_key).pipe(
-            Effect.flatMap((bytes) =>
-              decisions.putMedia(
-                {
-                  name: ref.name,
-                  mime: ref.mime,
-                  type: (LEGACY_MEDIA_TYPES.has(ref.type) ? ref.type : "file") as DecisionMediaType,
-                  ...(ref.caption ? { caption: ref.caption } : {}),
-                },
-                bytes,
-              ),
-            ),
-          );
-
-        let imported = 0;
-        let skipped = 0;
-        for (const status of ["open", "answered", "expired", "withdrawn"]) {
-          const listed = yield* getJson(`/api/items?status=${status}&limit=500`).pipe(
-            Effect.flatMap(decodeLegacyList),
-          );
-          for (const legacy of listed.items) {
-            const kind = normalizeDecisionKind(legacy.kind);
-            if (!kind) {
-              skipped += 1;
-              continue;
-            }
-            const existing = yield* decisions.get(legacy.id).pipe(Effect.option);
-            if (Option.isSome(existing)) continue;
-            const { decision } = yield* getJson(`/api/items/${legacy.id}`).pipe(
-              Effect.flatMap(decodeLegacyDetail),
-            );
-            const media = yield* Effect.forEach(legacy.media, copyMedia);
-            const item: DecisionItem = {
-              id: legacy.id,
-              project: legacy.project,
-              kind,
-              title: legacy.title,
-              question: legacy.question,
-              body_md: legacy.body_md,
-              media,
-              options: legacy.options,
-              max_choices: 1,
-              steps: [],
-              context_media_idx: null,
-              priority: legacy.priority,
-              created_by: legacy.created_by,
-              thread: legacy.thread_url,
-              blocking: false,
-              default: null,
-              expires_at: null,
-              cost_note: null,
-              resume: null,
-              status: isDecisionItemStatus(legacy.status) ? legacy.status : "open",
-              created_at: legacy.created_at,
-              updated_at: legacy.updated_at,
-              answered_at: legacy.answered_at,
-            };
-            const answer: DecisionAnswer | null = decision
-              ? {
-                  item_id: legacy.id,
-                  choice: legacyChoice(legacy.kind, decision.choice),
-                  option_ids: decision.option_ids,
-                  rank: decision.rank,
-                  comment: decision.comment,
-                  voice_key: decision.voice_r2_key
-                    ? (yield* copyMedia({
-                        type: "voice",
-                        r2_key: decision.voice_r2_key,
-                        name: "voice-note.webm",
-                        mime: "audio/webm",
-                      })).key
-                    : null,
-                  decided_by: "owner",
-                  decided_at: decision.decided_at,
-                }
-              : null;
-            if (yield* decisions.importItem(item, answer)) imported += 1;
-          }
-        }
-        yield* Console.log(
-          `inbox import: ${imported} imported${skipped ? `, ${skipped} skipped (kinds with no cz equivalent)` : ""}.`,
-        );
-      }).pipe(Effect.provide(FetchHttpClient.layer)),
-    ),
-  ),
-);
-
 export const inboxCommand = Command.make("inbox").pipe(
   Command.withDescription("Ask the owner and read their answers (the Decisions tab)."),
   Command.withSubcommands([
@@ -535,6 +329,5 @@ export const inboxCommand = Command.make("inbox").pipe(
     listingCommand("list"),
     listingCommand("history"),
     withdrawCommand,
-    importCommand,
   ]),
 );
