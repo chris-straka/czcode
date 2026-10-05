@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 
 import {
-  czcode_ORCHESTRATION_INSTRUCTIONS,
+  CZ_ORCHESTRATION_INSTRUCTIONS,
   czAcpPromptWithInstructions,
   czOrchestrationPromptForFirstRun,
   czOrchestrationSystemPrompt,
@@ -9,21 +9,18 @@ import {
 
 describe("cz orchestration provider instructions", () => {
   it("distinguishes delegated subagents from ordinary top-level threads", () => {
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, "Use `delegate_task`");
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, "ordinary top-level cz conversations");
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, "Never use them merely");
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, "cross-provider");
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, "call `delegate_task` again");
-    assert.include(
-      czcode_ORCHESTRATION_INSTRUCTIONS,
-      "Do not use `cz_thread_send` on `childThreadId`",
-    );
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "Use `delegate_task`");
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "ordinary top-level cz conversations");
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "Never use them merely");
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "cross-provider");
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "call `delegate_task` again");
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "Do not use `cz_thread_send` on `childThreadId`");
   });
 
   it("documents structured schedules instead of JSON strings", () => {
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, "structured object, never as JSON text");
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, '"everyMs":3600000');
-    assert.include(czcode_ORCHESTRATION_INSTRUCTIONS, "bindToCurrentThread=false");
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "structured object, never as JSON text");
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, '"everyMs":3600000');
+    assert.include(CZ_ORCHESTRATION_INSTRUCTIONS, "bindToCurrentThread=false");
   });
 
   it("injects prompt fallback only for an MCP-enabled first run", () => {
@@ -48,7 +45,7 @@ describe("cz orchestration provider instructions", () => {
 
   it("only exposes the system prompt when the cz MCP server is attached", () => {
     assert.equal(czOrchestrationSystemPrompt(false), undefined);
-    assert.equal(czOrchestrationSystemPrompt(true), czcode_ORCHESTRATION_INSTRUCTIONS);
+    assert.equal(czOrchestrationSystemPrompt(true), CZ_ORCHESTRATION_INSTRUCTIONS);
   });
 
   it("gives ACP sessions provider-neutral mode, browser, and orchestration guidance", () => {

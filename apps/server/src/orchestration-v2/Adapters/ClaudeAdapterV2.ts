@@ -114,7 +114,7 @@ import {
 } from "../../provider/Layers/claudeUsageLimits.ts";
 import type { ServerProviderShape } from "../../provider/Services/ServerProvider.ts";
 import { mergeProviderInstanceEnvironment } from "../../provider/ProviderInstanceEnvironment.ts";
-import { czcode_ORCHESTRATION_INSTRUCTIONS } from "../../provider/CzOrchestrationInstructions.ts";
+import { CZ_ORCHESTRATION_INSTRUCTIONS } from "../../provider/CzOrchestrationInstructions.ts";
 import { buildRuntimeInstructions } from "../../provider/RuntimeInstructions.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import * as IdAllocator from "../IdAllocator.ts";
@@ -909,7 +909,7 @@ export function makeClaudeQueryOptions(input: {
       preset: "claude_code" as const,
       append:
         buildRuntimeInstructions({ harness: "Claude Code" }) +
-        (input.mcpServers === undefined ? "" : czcode_ORCHESTRATION_INSTRUCTIONS),
+        (input.mcpServers === undefined ? "" : CZ_ORCHESTRATION_INSTRUCTIONS),
     },
     ...(Object.keys(extraArgs).length === 0 ? {} : { extraArgs }),
   };

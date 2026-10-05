@@ -3,8 +3,8 @@ import {
   BUILT_IN_THEME_IDS,
   BUILT_IN_THEMES,
   CZ_CHAT_THEME,
-  czcode_LIGHT_THEME_COLORS,
-  czcode_DARK_THEME_COLORS,
+  CZ_LIGHT_THEME_COLORS,
+  CZ_DARK_THEME_COLORS,
   MOBILE_THEME_IDS,
   getThemeColorsForAppearance,
 } from "@cz/shared/themePalettes";
@@ -82,8 +82,8 @@ describe("mobile themes", () => {
       const colors = theme
         ? getThemeColorsForAppearance(theme, appearance)!
         : appearance === "dark"
-          ? czcode_DARK_THEME_COLORS
-          : czcode_LIGHT_THEME_COLORS;
+          ? CZ_DARK_THEME_COLORS
+          : CZ_LIGHT_THEME_COLORS;
       const variables =
         themeId === DEFAULT_MOBILE_THEME_ID
           ? readDefaultMobileThemeVariables(appearance)
@@ -201,7 +201,7 @@ describe("mobile themes", () => {
     "slightly strengthens default %s messages and separates fallback materials",
     (appearance) => {
       const variables = getMobileThemeVariables("czcode", appearance);
-      const desktop = appearance === "dark" ? czcode_DARK_THEME_COLORS : czcode_LIGHT_THEME_COLORS;
+      const desktop = appearance === "dark" ? CZ_DARK_THEME_COLORS : CZ_LIGHT_THEME_COLORS;
       const bubbleContrast = contrastRatio(
         variables["--color-user-bubble"],
         variables["--color-screen"],

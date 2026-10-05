@@ -363,7 +363,7 @@ describe("ProviderInstanceRegistryLive — multi-instance codex slice", () => {
             driver: ProviderDriverKind.make("codex"),
             enabled: true,
             environment: [
-              { name: "czcodeX_COLLAB_SCRIPT", value: fixtures.codexScriptPath, sensitive: false },
+              { name: "CZ_CODEX_COLLAB_SCRIPT", value: fixtures.codexScriptPath, sensitive: false },
             ],
             config: makeCodexConfig({ enabled: true, binaryPath: fixtures.codexBinaryPath }),
           },
@@ -391,7 +391,7 @@ describe("ProviderInstanceRegistryLive — multi-instance codex slice", () => {
           enabled: true,
           environment: [
             {
-              name: "czcodeX_COLLAB_SCRIPT",
+              name: "CZ_CODEX_COLLAB_SCRIPT",
               value: fixtures.codexScriptPath,
               sensitive: false,
             },
