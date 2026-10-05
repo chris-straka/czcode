@@ -101,7 +101,7 @@ cp assets/prod/cz-black-web-apple-touch-180.png apps/web/public/apple-touch-icon
 m=apps/mobile/assets
 mark_png 432 1 "$m/android-icon-foreground.png"
 mark_png 432 1.5 "$m/android-icon-mark.png"
-mark_png 96 2.2 "$m/android-notification-icon.png"
+mark_png 96 1.7 "$m/android-notification-icon.png"
 magick -size 432x432 "xc:$DEV_BG" "$m/android-icon-background-dev.png"
 magick -size 432x432 "xc:$NIGHTLY_BG" "$m/android-icon-background-nightly.png"
 for v in dev nightly prod; do magick -size 1152x1152 xc:none "$m/android-splash-icon-$v.png"; done
