@@ -6,6 +6,8 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
+import { LEGACY_PROJECT_FILE_NAME } from "@cz/shared/legacyNames";
+
 import * as CzProjectFileLoader from "./CzProjectFileLoader.ts";
 
 const TestLayer = Layer.empty.pipe(
@@ -20,10 +22,14 @@ const makeTempDir = Effect.gen(function* () {
   });
 });
 
-const writeProjectFile = Effect.fn("writeProjectFile")(function* (cwd: string, contents: string) {
+const writeProjectFile = Effect.fn("writeProjectFile")(function* (
+  cwd: string,
+  contents: string,
+  name: string = "cz.json",
+) {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  yield* fileSystem.writeFileString(path.join(cwd, "cz.json"), contents).pipe(Effect.orDie);
+  yield* fileSystem.writeFileString(path.join(cwd, name), contents).pipe(Effect.orDie);
 });
 
 it.layer(TestLayer)("CzProjectFileLoader", (it) => {
@@ -48,6 +54,21 @@ it.layer(TestLayer)("CzProjectFileLoader", (it) => {
           expect(loaded.value.iconPath).toBe("assets/logo.svg");
           expect(loaded.value.scripts).toEqual([{ name: "Dev", command: "pnpm dev" }]);
         }
+      }),
+    );
+
+    it.effect("falls back to the pre-rename project file, and prefers cz.json", () =>
+      Effect.gen(function* () {
+        const loader = yield* CzProjectFileLoader.CzProjectFileLoader;
+        const cwd = yield* makeTempDir;
+        yield* writeProjectFile(cwd, `{ "iconPath": "legacy.svg" }`, LEGACY_PROJECT_FILE_NAME);
+
+        const legacy = yield* loader.load(cwd);
+        expect(Option.map(legacy, (file) => file.iconPath)).toEqual(Option.some("legacy.svg"));
+
+        yield* writeProjectFile(cwd, `{ "iconPath": "current.svg" }`);
+        const current = yield* loader.load(cwd);
+        expect(Option.map(current, (file) => file.iconPath)).toEqual(Option.some("current.svg"));
       }),
     );
 

@@ -18,6 +18,7 @@ import * as Schema from "effect/Schema";
 
 import { CZ_PROJECT_FILE_NAME, type CzProjectFile } from "@cz/contracts";
 import { CzProjectFileFromJson } from "@cz/shared/czProjectFile";
+import { LEGACY_PROJECT_FILE_NAME } from "@cz/shared/legacyNames";
 
 const decodeCzProjectFileJson = Schema.decodeEffect(CzProjectFileFromJson);
 
@@ -66,7 +67,14 @@ export const make = Effect.gen(function* () {
 
   const load: CzProjectFileLoader["Service"]["load"] = Effect.fn("CzProjectFileLoader.load")(
     function* (workspaceRoot) {
-      const filePath = path.join(workspaceRoot, CZ_PROJECT_FILE_NAME);
+      // Repos set up before the rename still carry the old project file name.
+      const current = path.join(workspaceRoot, CZ_PROJECT_FILE_NAME);
+      const legacy = path.join(workspaceRoot, LEGACY_PROJECT_FILE_NAME);
+      const filePath =
+        !(yield* fileSystem.exists(current).pipe(Effect.orElseSucceed(() => true))) &&
+        (yield* fileSystem.exists(legacy).pipe(Effect.orElseSucceed(() => false)))
+          ? legacy
+          : current;
       const raw = yield* fileSystem.readFileString(filePath).pipe(
         Effect.asSome,
         Effect.catchTags({

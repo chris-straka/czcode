@@ -5,6 +5,12 @@ import * as Layer from "effect/Layer";
 import { Argument, Command } from "effect/unstable/cli";
 import * as CliError from "effect/unstable/cli/CliError";
 
+import {
+  adoptLegacyEnv,
+  LEGACY_HOME_MIGRATED_MESSAGE,
+  legacyEnvWarning,
+  migrateLegacyHome,
+} from "@cz/shared/legacyNames";
 import * as NetService from "@cz/shared/Net";
 import packageJson from "../package.json" with { type: "json" };
 import { acpMcpBridgeCommand, acpMcpCallCommand } from "./cli/acpMcpBridge.ts";
@@ -84,9 +90,17 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
 export const cli = makeCli();
 
 export function runCli() {
-  Command.run(cli, { version: packageJson.version }).pipe(
-    Effect.scoped,
-    Effect.provide(CliRuntimeLayer),
-    NodeRuntime.runMain,
-  );
+  // Before any Config read: pre-rename env vars become their CZ_* names, and
+  // the first run with the default data dir copies the old data dir to ~/.cz.
+  const adopted = adoptLegacyEnv();
+  const defaultHome =
+    !process.env.CZ_HOME?.trim() &&
+    !process.argv.some((arg) => arg === "--base-dir" || arg.startsWith("--base-dir="));
+  Effect.gen(function* () {
+    if (adopted.length > 0) yield* Effect.logWarning(legacyEnvWarning(adopted));
+    if (defaultHome && (yield* Effect.sync(() => migrateLegacyHome())) === "migrated") {
+      yield* Effect.logWarning(LEGACY_HOME_MIGRATED_MESSAGE);
+    }
+    return yield* Command.run(cli, { version: packageJson.version });
+  }).pipe(Effect.scoped, Effect.provide(CliRuntimeLayer), NodeRuntime.runMain);
 }

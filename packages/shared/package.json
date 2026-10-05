@@ -386,6 +386,10 @@
     "./codexAuthHandoff": {
       "types": "./src/codexAuthHandoff.ts",
       "import": "./src/codexAuthHandoff.ts"
+    },
+    "./legacyNames": {
+      "types": "./src/legacyNames.ts",
+      "import": "./src/legacyNames.ts"
     }
   },
   "scripts": {
