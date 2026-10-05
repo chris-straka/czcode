@@ -150,8 +150,8 @@ step "Sign in: Claude"
 if [ -s "$HOME/.claude/.credentials.json" ]; then
   echo "Already signed in."
 else
-  echo "Claude opens next. Type /login, finish in the browser, then type /exit."
-  claude
+  # Finish in this PC's browser: Claude shows a code to paste back here.
+  claude auth login
 fi
 
 step "Sign in: Codex"
