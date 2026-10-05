@@ -119,7 +119,5 @@ free model), text captures in `img/p7-*.txt`:
   steps. The keys are built, and the rules are shared.
 - **Usage limits weren't tried live:** the sandbox's only provider (OpenCode
   free) reports none.
-- **`ct` works once this branch is merged** and the Mac app is rebuilt
-  (`ccez/release/mac.sh --install`). The installed `cz` predates `tui`.
 - **The nvim and zsh edits are uncommitted** in their own dotfile repos.
   This worktree agent can't run git outside czcode.
