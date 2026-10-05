@@ -3,7 +3,7 @@
 Answers now lead somewhere: a thread shows the decisions it asked, a
 decision links back to its thread, and an answer to an agent that moved on
 starts a resume thread. nightshift's queue now lives in the server as the
-reset queue. `~/SWE/nightshift` is deleted; its history is on GitHub.
+reset queue. `~/SWE/nightshift` and its GitHub repo are deleted.
 
 ## Built
 
