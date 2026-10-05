@@ -35,10 +35,20 @@ if ! have gh; then
   sudo apt-get update -qq && sudo apt-get install -y -qq gh > /dev/null
 fi
 
-step "Vite+ (vp), which also provides Node"
+step "Node 24 and Vite+ (vp)"
+if ! node --version 2> /dev/null | grep -q '^v24\.'; then
+  curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+  sudo apt-get install -y -qq nodejs > /dev/null
+fi
+# Global npm tools (the coding agents) go to ~/.local, so no sudo.
+npm config set prefix "$HOME/.local"
+export PATH="$HOME/.local/bin:$PATH"
+grep -q '.local/bin' "$HOME/.bashrc" || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
 [ -x "$HOME/.local/share/vite-plus/bin/vp" ] || curl -fsSL https://vite.plus | bash
 # shellcheck disable=SC1091
 . "$HOME/.config/vite-plus/env"
+# Node comes from apt above; vp only builds.
+vp env off > /dev/null 2>&1 || true
 
 step "Tailscale"
 have tailscale || curl -fsSL https://tailscale.com/install.sh | sh
@@ -62,8 +72,7 @@ mkdir -p "$HOME/.local/bin"
 cat > "$HOME/.local/bin/cz" << SHIM
 #!/usr/bin/env bash
 # The cz CLI from $CHECKOUT (ccez/hosts/linux.sh). Update by re-running that script.
-. "\$HOME/.config/vite-plus/env"
-exec node "$CHECKOUT/apps/server/dist/bin.mjs" "\$@"
+exec /usr/bin/node "$CHECKOUT/apps/server/dist/bin.mjs" "\$@"
 SHIM
 chmod +x "$HOME/.local/bin/cz"
 
@@ -76,6 +85,8 @@ After=network-online.target
 
 [Service]
 Environment=CZ_TAILSCALE_SERVE=1
+# systemd's default PATH lacks the agents installed in your home.
+Environment=PATH=$HOME/.local/bin:$HOME/.opencode/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=%h
 ExecStart=$HOME/.local/bin/cz serve --no-browser
 Restart=on-failure

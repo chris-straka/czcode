@@ -27,7 +27,7 @@ No store, no Apple Developer ID, no GitHub releases.
     installs WSL2 with Ubuntu, turns on systemd, and keeps WSL running
     after logon. Then it runs `linux.sh` inside WSL.
   - `linux.sh` also works alone on plain Ubuntu. It installs git, `gh`,
-    Vite+ (which brings Node), and Tailscale. It builds cz from this repo
+    Node 24 (apt), Vite+ (the build tool), and Tailscale. It builds cz from this repo
     and runs `cz serve` as the systemd user service `cz-host`, on the
     tailnet through Tailscale Serve.
   - It installs Claude Code, Codex, and OpenCode, walks through each login,
