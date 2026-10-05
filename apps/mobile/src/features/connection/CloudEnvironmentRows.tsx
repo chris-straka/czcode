@@ -1,5 +1,4 @@
 import { ConnectionTraceId } from "./ConnectionTraceId";
-import { useAuth } from "@clerk/expo";
 import { SymbolView } from "../../components/AppSymbol";
 import {
   connectionStatusText,
@@ -23,7 +22,6 @@ import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
 import type { ConnectedEnvironmentSummary } from "../../state/remote-runtime-types";
 import { serverEnvironment } from "../../state/server";
 import { availableCloudEnvironmentPresentation } from "../cloud/cloudEnvironmentPresentation";
-import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { ConnectionStatusDot } from "./ConnectionStatusDot";
 import { type RelayEnvironmentView, useConnectionController } from "./useConnectionController";
 
@@ -59,17 +57,8 @@ export function CloudEnvironmentRows(props: CloudEnvironmentRowsProps) {
   if (props.showcaseSignedIn !== undefined) {
     return props.showcaseSignedIn ? <CloudEnvironmentRowsContent {...props} /> : null;
   }
-  // No cloud config means no `ClerkProvider` either, so `useAuth` would throw.
-  if (!hasCloudPublicConfig()) {
-    return <ConnectedOnlyCloudEnvironmentRows {...props} />;
-  }
-  return <SignedInCloudEnvironmentRows {...props} />;
-}
-
-function SignedInCloudEnvironmentRows(props: CloudEnvironmentRowsProps) {
-  const { isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
-  if (!isSignedIn) return <ConnectedOnlyCloudEnvironmentRows {...props} />;
-  return <CloudEnvironmentRowsContent {...props} />;
+  // No Connect account: only environments already connected are listed.
+  return <ConnectedOnlyCloudEnvironmentRows {...props} />;
 }
 
 function ConnectedOnlyCloudEnvironmentRows(props: CloudEnvironmentRowsProps) {

@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { AuthAccessWriteScope } from "@cz/contracts";
 
-import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { isElectron } from "~/env";
 import { isLocalEnvironmentDisabled } from "~/localEnvironment";
 import { desktopWslStateAtom } from "~/state/desktopWslState";
@@ -34,7 +33,8 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
     () =>
       filterAvailableSettingsSearchItems({
         localEnvironmentDisabled,
-        hasCloudPublicConfig: hasCloudPublicConfig(),
+        // No Connect: cloud-only settings never show.
+        hasCloudPublicConfig: false,
         hasEnvironment: environments.some((environment) => environment.serverConfig !== null),
         hasProviderSettingsEnvironment: environments.some((environment) =>
           isProviderSettingsEnvironmentAvailable({

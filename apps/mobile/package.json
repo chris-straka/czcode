@@ -46,7 +46,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clerk/expo": "catalog:",
     "@cz/client-runtime": "workspace:*",
     "@cz/contracts": "workspace:*",
     "@cz/mobile-markdown-text": "file:./modules/cz-markdown-text",

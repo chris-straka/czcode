@@ -23,13 +23,6 @@ allowBuilds:
   workerd: false
 
 catalog:
-  "@clerk/backend": 3.18.1
-  "@clerk/clerk-js": 6.32.1
-  "@clerk/electron": 0.0.44
-  "@clerk/electron-passkeys": 0.0.3
-  "@clerk/expo": 4.6.8
-  "@clerk/react": 6.16.1
-  "@clerk/shared": 4.33.0
   "@effect/atom-react": 4.0.0-rc.115
   "@effect/openapi-generator": 4.0.0-rc.115
   "@effect/platform-node": 4.0.0-rc.115
@@ -58,12 +51,6 @@ minimumReleaseAgeExclude:
   - expo-glass-effect@58.0.3
   - expo-blur@58.0.3
   - expo-audio@58.0.4
-  - "@clerk/backend@3.18.1"
-  - "@clerk/clerk-js@6.32.1"
-  - "@clerk/electron@0.0.44"
-  - "@clerk/expo@4.6.8"
-  - "@clerk/react@6.16.1"
-  - "@clerk/shared@4.33.0"
   - "@distilled.cloud/aws@1.0.0-rc.12"
   - "@distilled.cloud/axiom@1.0.0-rc.12"
   - "@distilled.cloud/cloudflare@1.0.0-rc.12"
@@ -165,19 +152,6 @@ overrides:
   "@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-linux-x64-musl": "-"
   "@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-arm64": "-"
   "@anthropic-ai/claude-agent-sdk>@anthropic-ai/claude-agent-sdk-win32-x64": "-"
-  "@clerk/backend": "catalog:"
-  "@clerk/clerk-js": "catalog:"
-  "@clerk/clerk-js>@base-org/account": "-"
-  "@clerk/clerk-js>@coinbase/wallet-sdk": "-"
-  "@clerk/clerk-js>@solana/wallet-adapter-base": "-"
-  "@clerk/clerk-js>@solana/wallet-adapter-react": "-"
-  "@clerk/clerk-js>@solana/wallet-standard": "-"
-  "@clerk/clerk-js>@wallet-standard/core": "-"
-  "@clerk/electron": "catalog:"
-  "@clerk/electron-passkeys": "catalog:"
-  "@clerk/expo": "catalog:"
-  "@clerk/react": "catalog:"
-  "@clerk/shared": "catalog:"
   "@effect/atom-react": "catalog:"
   "@effect/platform-node": "catalog:"
   "@effect/platform-node-shared": "catalog:"
@@ -211,9 +185,6 @@ overrides:
   yaml: "catalog:"
 
 packageExtensions:
-  "@clerk/expo@*":
-    dependencies:
-      "@expo/config-plugins": 58.0.4
   "@effect/vitest@*":
     dependencies:
       vite-plus: "catalog:"
@@ -228,7 +199,6 @@ patchedDependencies:
   expo-glass-effect@58.0.3: patches/expo-glass-effect@58.0.3.patch
   expo-blur@58.0.3: patches/expo-blur@58.0.3.patch
   expo-audio@58.0.4: patches/expo-audio@58.0.4.patch
-  "@clerk/expo@4.6.8": patches/@clerk__expo@4.6.8.patch
   "@effect/vitest@4.0.0-rc.115": patches/@effect__vitest@4.0.0-rc.115.patch
   "@expo/metro-config@58.0.6": patches/@expo__metro-config@58.0.6.patch
   expo-sharing@58.0.13: patches/expo-sharing@58.0.13.patch

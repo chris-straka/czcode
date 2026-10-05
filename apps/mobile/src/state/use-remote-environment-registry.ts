@@ -168,23 +168,6 @@ export function useRemoteConnections() {
           void controller.removeEnvironment(environmentId);
         },
       } as const;
-      // Removing a cz Connect environment here leaves its account registration
-      // and host space, so point to where it can be deregistered.
-      if (environment.isRelayManaged) {
-        Alert.alert(
-          "Remove from this device?",
-          `Forget ${environment.environmentLabel} and its cached threads on this device.\n\nIt stays on your cz Connect account and keeps its host space. Deregister it under cz Account → cz Connect to free it.`,
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Open cz Account",
-              onPress: () => navigation.navigate("SettingsSheet", { screen: "SettingsAuth" }),
-            },
-            remove,
-          ],
-        );
-        return;
-      }
       Alert.alert(
         "Remove from this device?",
         `Forget ${environment.environmentLabel} and its cached threads on this device. Switch it off instead to keep it saved.`,

@@ -202,7 +202,7 @@ function namedProjectReadme(name: string): string {
     "",
     `# ${name}`,
     "",
-    "Created in [czcode](https://cz.ccez.uk).",
+    "Created in czcode.",
     "",
   ].join("\n");
 }

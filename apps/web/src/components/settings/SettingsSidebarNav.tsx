@@ -1,6 +1,4 @@
 import {
-  lazy,
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -62,17 +60,6 @@ const SnapShotIcon = createLucideIcon("snap-shot", [
   ["rect", { width: "10", height: "8", x: "7", y: "8", rx: "2", key: "window" }],
   ["circle", { cx: "12", cy: "12", r: "1.5", key: "lens" }],
 ]);
-
-const CzConnectSidebarSignIn = lazy(() =>
-  import("../clerk/CzConnectSidebarSignIn").then((module) => ({
-    default: module.CzConnectSidebarSignIn,
-  })),
-);
-const CzConnectSidebarAvatar = lazy(() =>
-  import("../clerk/CzConnectSidebarSignIn").then((module) => ({
-    default: module.CzConnectSidebarAvatar,
-  })),
-);
 
 const SETTINGS_SECTION_ICONS: Readonly<
   Record<SettingsPath, ComponentType<{ className?: string }>>
@@ -350,17 +337,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <Suspense fallback={null}>
-          <CzConnectSidebarSignIn />
-        </Suspense>
-        <div className="flex items-center gap-1">
-          <div className="min-w-0 flex-1">
-            <SidebarUtilityMenu />
-          </div>
-          <Suspense fallback={null}>
-            <CzConnectSidebarAvatar />
-          </Suspense>
-        </div>
+        <SidebarUtilityMenu />
       </SidebarFooter>
     </>
   );
