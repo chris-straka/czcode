@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Copy this line into an Ubuntu terminal (on Windows: the Ubuntu app, i.e. WSL):
+# WINDOWS, FIRST TIME ONLY: open PowerShell, run `wsl --install`, restart the
+# PC, open "Ubuntu" from the Start menu, and pick a username and password.
+#
+# Then copy this line into the Ubuntu terminal (right-click pastes):
 #
 # curl -fsSL https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh -o /tmp/cz-host.sh && bash /tmp/cz-host.sh
 #
@@ -8,10 +11,8 @@
 # Codex, and OpenCode logins (each prints a link or code to open on any
 # device). Safe to re-run: finished steps are skipped, and re-running updates cz.
 #
-# Windows without Ubuntu yet: in PowerShell run `wsl --install`, restart, open
-# Ubuntu from the Start menu, pick a username and password, then run the line
-# above in it. On WSL this script also turns on systemd and keeps WSL running
-# after you log in to Windows.
+# On WSL it also turns on systemd, keeps WSL running after you log in to
+# Windows, and stops Windows from sleeping while plugged in.
 set -euo pipefail
 
 REPO_URL=https://github.com/chris-straka/czcode.git
@@ -71,7 +72,8 @@ step "Tailscale"
 have tailscale || curl -fsSL https://tailscale.com/install.sh | sh
 if ! tailscale status > /dev/null 2>&1; then
   echo "Sign this machine into your tailnet with the link below."
-  sudo tailscale up
+  # --ssh lets you (and agents on the Mac) open a shell here over the tailnet.
+  sudo tailscale up --ssh
 fi
 # Lets cz configure Tailscale Serve without root.
 sudo tailscale set --operator="$USER"
@@ -128,6 +130,13 @@ if $in_wsl; then
     "$WSL_DISTRO_NAME" > "$startup/cz-wsl-keepalive.vbs"
   (cd /mnt/c && /mnt/c/Windows/System32/wscript.exe "$(wslpath -w "$startup/cz-wsl-keepalive.vbs")")
   echo "Added $startup/cz-wsl-keepalive.vbs"
+
+  step "Never sleep while plugged in"
+  # A sleeping PC drops its agents mid-turn. The screen can still turn off.
+  for setting in standby-timeout-ac hibernate-timeout-ac; do
+    (cd /mnt/c && /mnt/c/Windows/System32/powercfg.exe /change "$setting" 0)
+  done
+  echo "Sleep and hibernate are off on AC power."
 fi
 
 step "Coding agents"
@@ -157,12 +166,21 @@ opencode auth list || true
 read -r -p "Add an OpenCode login now? [Y/n] " answer < /dev/tty
 case "$answer" in [nN]*) ;; *) opencode auth login ;; esac
 
+step "GitHub (so agents here can push)"
+git config --global user.name > /dev/null || git config --global user.name "Chris Straka"
+git config --global user.email > /dev/null || git config --global user.email "c@z.local"
+if ! gh auth status > /dev/null 2>&1; then
+  gh auth login --hostname github.com --git-protocol https --web
+fi
+gh auth setup-git
+
 step "Pair your phone and desktop"
 systemctl --user --no-pager --lines=0 status "$UNIT" | head -3
 cz pair --tailscale || echo "Pairing failed; check: journalctl --user -u $UNIT"
 cat << DONE
 
 Done. This host is $tailscale_name.
+Hardware: $(nproc) cores, $(free -g | awk '/^Mem:/ {print $2}') GB memory, $(df -h --output=avail "$HOME" | tail -1 | tr -d ' ') free disk.
 - Open the pairing link above on each device that should use this host.
 - Copy ~/SWE/AGENTS.md from the Mac to the same path here, and clone your
   projects under ~/SWE with the same git origins.
