@@ -118,6 +118,7 @@ export const droppedPaths: readonly string[] = [
   "infra/relay",
   ".github/workflows/deploy-relay.yml",
   "patches/alchemy@2.0.0-beta.79.patch",
+  ".repos/alchemy-effect",
   "docs/internals/cz-connect.md",
   "docs/operations/connect-setup.md",
   "docs/operations/relay-observability.md",

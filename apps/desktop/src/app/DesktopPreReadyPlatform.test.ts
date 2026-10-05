@@ -117,7 +117,7 @@ describe("DesktopPreReadyPlatform", () => {
         const identity = yield* Effect.promise(() => portalIdentity);
         assert.equal(identity.desktopName, "uk.ccez.cz.desktop");
         assert.include(identity.desktopEntry ?? "", 'Exec="/Applications/current.AppImage" %U');
-        assert.include(identity.desktopEntry ?? "", "Name=czcode (Alpha)");
+        assert.include(identity.desktopEntry ?? "", "Name=czcode");
         assert.include(identity.desktopEntry ?? "", "MimeType=x-scheme-handler/czcode;");
         assert.include(identity.desktopEntry ?? "", "Icon=/xdg/icons/uk.ccez.cz.desktop.png");
         assert.isTrue(identity.iconInstalled);

@@ -8,7 +8,7 @@ import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
-import { referenceRepos } from "./lib/reference-repos.ts";
+import { referenceRepos, type ReferenceRepo } from "./lib/reference-repos.ts";
 import {
   planReferenceRepoSync,
   resolveReferenceRepoRef,
@@ -17,7 +17,17 @@ import {
 
 const encoder = new TextEncoder();
 const effectSmol = referenceRepos[0]!;
-const alchemyEffect = referenceRepos[1]!;
+// A package-pinned reference repo. czcode's list only has effect-smol now, so
+// the package-version paths are exercised with a fixture.
+const alchemyEffect: ReferenceRepo = {
+  id: "alchemy-effect",
+  prefix: ".repos/alchemy-effect",
+  repository: "https://github.com/alchemy-run/alchemy-effect.git",
+  latestRef: "main",
+  versionSourcePath: "infra/relay/package.json",
+  packageVersionPath: ["dependencies", "alchemy"],
+  versionTagPrefix: "v",
+};
 
 function mockHandle(
   options: {
@@ -251,7 +261,7 @@ it.layer(NodeServices.layer)("sync-reference-repos", (it) => {
         assert.fail(`Unexpected error: ${error._tag}`);
       }
       assert.equal(error.repoId, "missing");
-      assert.deepStrictEqual(error.expectedRepoIds, ["effect-smol", "alchemy-effect"]);
+      assert.deepStrictEqual(error.expectedRepoIds, ["effect-smol"]);
       assert.ok(!("cause" in error));
     }),
   );
