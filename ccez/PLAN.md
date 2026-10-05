@@ -10,7 +10,7 @@ services.
 
 This folder (`ccez/`) holds everything fork-specific that isn't product code:
 this plan, phase logs (`ccez/docs/phase-N.md`), brand sources, the rename
-script, and the upstream sync log.
+and the rename script.
 
 ## What exists today
 
@@ -78,7 +78,7 @@ script, and the upstream sync log.
 - **Desktop: T3's Electron app, rebranded to cz** (owner's call,
   2026-10-04, after weighing Tauri). It keeps Chromium rendering, the
   built-in Node that runs the server, the web-preview browser and cookie
-  import, and every upstream desktop improvement through the weekly sync.
+  import, and every upstream desktop improvement when upstream is merged in.
   Only names, icons, IDs, and the update feed change.
 - **No branding, anywhere (owner, 2026-10-04): a clean, invisible look.**
   No logo, wordmark, or app name inside the UI: not in the sidebar, header,
@@ -118,7 +118,8 @@ hostnames, file and folder names, and docs. It runs over upstream code before
 it's merged:
 
 - Branch `upstream-cz` = the codemod applied to `upstream/main`, regenerated
-  on every sync. Because the script is deterministic, each regenerated
+  on every sync. Syncs happen only when the owner asks (owner,
+  2026-10-05: no scheduled sync); see the Upstream section of `AGENTS.md`. Because the script is deterministic, each regenerated
   snapshot differs from the last one only by upstream's own changes, already
   renamed.
 - `main` merges `upstream-cz`, so upstream updates arrive pre-renamed and
@@ -140,11 +141,10 @@ it's merged:
 | P5 Links + resume + reset queue | Thread ↔ decision links (chip in the thread, link in the decision); Threads list marks threads with open decisions; the cz server starts resume threads with the decision attached when an answer arrives for an agent that moved on; the reset queue ported from nightshift into the server (**"Run at next reset"** on the send button, the queue on Usage → Limits, `cz queue`), callers moved off `ns`, then `~/SWE/nightshift` deleted (owner approved); resumes use the queue when quotas are spent                                                                                                          | An agent submits a non-blocking Listen and ends its thread; the owner answers on the phone; a resume thread starts and continues with the kept sounds. A task sent with "Run at next reset" at night starts after the reset                                                                                                                                                                                   |
 | P6 Ship                         | Android release APK signed with czcode's own release key (`ccez/release/android.sh`; key in `~/.config/czcode`, password in Keychain), installed on the S24, auto-update path (Play internal testing or in-app APK update); unsigned Mac desktop build (no Apple Developer ID, owner 2026-10-05: first launch needs right-click → Open); no iOS                                                                                                                                                                                                                                                                    | Owner uses only cz for 3 days; issues fixed                                                                                                                                                                                                                                                                                                                                                                   |
 | P7 Terminal app                 | `cz tui` and the `ct` alias: threads (list, open, live output, reply, approvals, diffs), Decisions (all 10 kinds: images inline, redlines by mouse, 3D, audio, playtest installs), the reset queue, and usage, with parity to the desktop app; the owner's nvim image hook                                                                                                                                                                                                                                                                                                                                         | In a toggleterm float on the Mac, the owner runs a thread end to end and answers one decision of each kind; images render and follow the float; the same thread and answers show on the phone                                                                                                                                                                                                                 |
-| P8 Upstream sync                | Weekly agent task (the cz reset queue): regenerate `upstream-cz` with the codemod, merge into `main`, resolve conflicts (extend the codemod when upstream adds new T3 names), run rename check + typecheck + tests + mobile static check, rebuild, log in `ccez/docs/upstream-sync.md`. Upstream changes to the relay or Connect are dropped                                                                                                                                                                                                                                                                       | Two consecutive weekly syncs merged with all gates green                                                                                                                                                                                                                                                                                                                                                      |
 
 Who: one Opus 5.5 thread builds P0-P7 in order without stopping between
 phases; the owner approved retiring the ccez-inbox Worker, inbox.ccez.uk,
-and nightshift once their replacements work (2026-10-05). Muse runs P8 weekly.
+and nightshift once their replacements work (2026-10-05).
 
 ## Rules
 

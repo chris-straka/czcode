@@ -161,3 +161,9 @@ Architecture and its constraints: `docs/internals/overview.md`. Glossary: `docs/
 
 - Don't verify with browsers or computer use unless the user explicitly agrees or requests it.
 - Security is important, but should not be over-indexed on, especially for dev mode/maintainer-only features.
+
+## Upstream
+
+czcode is a fork of T3 Code (the `upstream` remote). Last synced: upstream `a1d9d72aef` on 2026-10-04, merged into main as `upstream-cz` `0cd7be2f2e`. Sync only when the owner asks; there is no scheduled sync.
+
+To sync, run `ccez/rename/sync.sh` on a clean main. It regenerates `upstream-cz` (the rename codemod over `upstream/main`) and merges it. Resolve conflicts; when upstream adds a T3 name the rules miss, fix the rule in `ccez/rename/map.ts`, not the output. Then run `ccez/rename/check` plus typecheck and tests for what changed, rebuild (`ccez/release/mac.sh --install`), and update the "Last synced" line above.
