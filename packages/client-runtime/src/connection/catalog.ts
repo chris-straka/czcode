@@ -1,4 +1,4 @@
-import { DesktopSshEnvironmentTargetSchema, EnvironmentId } from "@t3tools/contracts";
+import { DesktopSshEnvironmentTargetSchema, EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -43,6 +43,8 @@ export interface ConnectionCatalogEntry {
   readonly enabled: boolean;
   /** Discovery rejection stays visible while the saved connection is switched off. */
   readonly unsupportedReason?: string;
+  /** The rejection came from an outdated host, which can still be updated remotely. */
+  readonly serverUpdateRequired?: boolean;
 }
 
 export class BearerConnectionCredential extends Schema.TaggedClass<BearerConnectionCredential>()(

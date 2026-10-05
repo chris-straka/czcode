@@ -46,7 +46,7 @@ export class RelayConfiguration extends Context.Service<
     readonly managedEndpointNamespace: string | undefined;
     readonly managedEndpointCleanupMode?: ManagedEndpointCleanupMode;
   }
->()("t3code-relay/Config/RelayConfiguration") {}
+>()("czcode-relay/Config/RelayConfiguration") {}
 
 export const make = (configuration: RelayConfiguration["Service"]) =>
   RelayConfiguration.of(configuration);

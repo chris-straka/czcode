@@ -5,7 +5,7 @@ import type {
   PullRequestDetailView,
   PullRequestRef,
   ScopedThreadRef,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import {
   ChevronDownIcon,
   ExternalLinkIcon,

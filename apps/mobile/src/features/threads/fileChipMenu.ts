@@ -1,8 +1,8 @@
-import { fileBasename } from "@t3tools/client-runtime/markdown-links";
-import type { ThreadId } from "@t3tools/contracts";
-import { resolveMarkdownLinkPresentation } from "@t3tools/mobile-markdown-text/links";
-import type { MarkdownFileContextMenu } from "@t3tools/mobile-markdown-text/types";
-import { hostPreviewMimeTypeFromExtension } from "@t3tools/shared/filePreview";
+import { fileBasename } from "@cz/client-runtime/markdown-links";
+import type { ThreadId } from "@cz/contracts";
+import { resolveMarkdownLinkPresentation } from "@cz/mobile-markdown-text/links";
+import type { MarkdownFileContextMenu } from "@cz/mobile-markdown-text/types";
+import { hostPreviewMimeTypeFromExtension } from "@cz/shared/filePreview";
 
 import {
   isAbsolutePath,

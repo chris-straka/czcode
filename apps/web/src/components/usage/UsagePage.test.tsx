@@ -1,5 +1,5 @@
-import { EnvironmentId, UsageDay, USAGE_CONTRACT_VERSION } from "@t3tools/contracts";
-import { mergeUsage } from "@t3tools/shared/usageMerge";
+import { EnvironmentId, UsageDay, USAGE_CONTRACT_VERSION } from "@cz/contracts";
+import { mergeUsage } from "@cz/shared/usageMerge";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";

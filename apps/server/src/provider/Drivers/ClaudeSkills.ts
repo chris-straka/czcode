@@ -15,13 +15,13 @@
  */
 import * as NodeOS from "node:os";
 
-import type { ClaudeSettings, ServerProviderSkill } from "@t3tools/contracts";
+import type { ClaudeSettings, ServerProviderSkill } from "@cz/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { fromLenientJson } from "@t3tools/shared/schemaJson";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
+import { fromLenientJson } from "@cz/shared/schemaJson";
 import { parse as parseYamlDocument } from "yaml";
 
 import { expandHomePath } from "../../pathExpansion.ts";
@@ -75,11 +75,28 @@ function parseSkillFrontmatter(contents: string): SkillFrontmatter {
     return { kind: "missing" };
   }
 
+  const frontmatter = match[1] ?? "";
   let parsed: unknown;
   try {
-    parsed = parseYamlDocument(match[1] ?? "");
+    parsed = parseYamlDocument(frontmatter);
   } catch {
-    return { kind: "malformed" };
+    // Claude Code accepts plain scalars containing `: `. Repair only those,
+    // leaving comments and YAML structure for the full-document parser.
+    const repaired = frontmatter.replace(
+      /^([\w-]+:[ \t]*)([^\r\n]*)/gm,
+      (line, prefix: string, value: string) => {
+        const scalar = value.split(/[ \t]+#/)[0] ?? "";
+        if (!/:[ \t]/.test(scalar) || /^(?:["'[\]{}|>&*!#%@`]|[-?:](?:[ \t]|$))/.test(scalar)) {
+          return line;
+        }
+        return `${prefix}${JSON.stringify(scalar)}${value.slice(scalar.length)}`;
+      },
+    );
+    try {
+      parsed = parseYamlDocument(repaired);
+    } catch {
+      return { kind: "malformed" };
+    }
   }
   if (typeof parsed !== "object" || parsed === null) {
     return { kind: "malformed" };

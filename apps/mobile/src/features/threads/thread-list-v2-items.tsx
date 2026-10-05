@@ -12,13 +12,10 @@ import { CustomSnoozeSheet } from "./CustomSnoozeSheet";
 import { appAtomRegistry } from "../../state/atom-registry";
 import { threadArrangementOpenAtom } from "../../state/thread-order";
 import type { ThreadMoveDestination } from "./threadOrder";
-import type {
-  EnvironmentProject,
-  EnvironmentThreadShell,
-} from "@t3tools/client-runtime/state/shell";
-import type { EnvironmentThreadSearchMatch } from "@t3tools/client-runtime/state/thread-search";
-import type { EnvironmentMachineKind } from "@t3tools/contracts";
-import { canSnooze, resolveSnoozePresets } from "@t3tools/client-runtime/state/thread-settled";
+import type { EnvironmentProject, EnvironmentThreadShell } from "@cz/client-runtime/state/shell";
+import type { EnvironmentThreadSearchMatch } from "@cz/client-runtime/state/thread-search";
+import type { EnvironmentMachineKind } from "@cz/contracts";
+import { canSnooze, resolveSnoozePresets } from "@cz/client-runtime/state/thread-settled";
 import type { MenuAction } from "@react-native-menu/menu";
 import { memo, useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
 import { Alert, Pressable, useWindowDimensions, View } from "react-native";
@@ -120,7 +117,7 @@ function ThreadListV2Section(props: {
     <>
       <Text
         className={cn(
-          "text-xs font-t3-medium",
+          "text-xs font-cz-medium",
           sidebarPane
             ? "text-drawer-foreground-muted"
             : snoozed
@@ -191,10 +188,12 @@ type ThreadListV2ShelfHeaderProps = {
   readonly pane?: "screen" | "sidebar";
 };
 
+const SHELF_LABEL = { working: "Working", snoozed: "Snoozed", settled: "Settled" } as const;
+
 function ThreadListV2ShelfHeader(
-  props: ThreadListV2ShelfHeaderProps & { readonly kind: "snoozed" | "settled" },
+  props: ThreadListV2ShelfHeaderProps & { readonly kind: keyof typeof SHELF_LABEL },
 ) {
-  const label = props.kind === "snoozed" ? "Snoozed" : "Settled";
+  const label = SHELF_LABEL[props.kind];
   return (
     <ThreadListV2Section
       label={props.expanded ? label : `${label} (${props.count})`}
@@ -210,6 +209,12 @@ function ThreadListV2ShelfHeader(
     />
   );
 }
+
+export const ThreadListV2WorkingShelfHeader = memo(function ThreadListV2WorkingShelfHeader(
+  props: ThreadListV2ShelfHeaderProps,
+) {
+  return <ThreadListV2ShelfHeader {...props} kind="working" />;
+});
 
 export const ThreadListV2SnoozedShelfHeader = memo(function ThreadListV2SnoozedShelfHeader(
   props: ThreadListV2ShelfHeaderProps,
@@ -239,8 +244,8 @@ export const ThreadListV2ShowMoreRow = memo(function ThreadListV2ShowMoreRow(pro
       <Text
         className={
           props.pane === "sidebar"
-            ? "text-xs font-t3-medium text-drawer-foreground-muted"
-            : "text-xs font-t3-medium text-foreground-muted"
+            ? "text-xs font-cz-medium text-drawer-foreground-muted"
+            : "text-xs font-cz-medium text-foreground-muted"
         }
       >
         Show more ({props.hiddenCount} settled hidden)
@@ -307,7 +312,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
         ) : null}
         <Text
           className={cn(
-            "flex-1 text-sm font-t3-medium text-foreground-muted",
+            "flex-1 text-sm font-cz-medium text-foreground-muted",
             sidebarPane && "text-drawer-foreground-muted",
           )}
           numberOfLines={1}
@@ -340,7 +345,7 @@ export const ThreadListV2PendingRow = memo(function ThreadListV2PendingRow(props
           second line is usually a stray word or emoji rather than meaning. */}
       <Text
         className={cn(
-          "mt-1 text-base font-t3-medium text-foreground",
+          "mt-1 text-base font-cz-medium text-foreground",
           sidebarPane && "text-drawer-foreground",
         )}
         numberOfLines={1}
@@ -926,7 +931,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
         ) : null}
         <Text
           className={cn(
-            "flex-1 text-sm font-t3-medium",
+            "flex-1 text-sm font-cz-medium",
             selected
               ? selectedThreadRowColors.mutedForegroundClassName
               : rowAppearance.mutedForegroundClassName,
@@ -958,7 +963,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
       </View>
       <Text
         className={cn(
-          "mt-1 text-base font-t3-medium",
+          "mt-1 text-base font-cz-medium",
           selected
             ? selectedThreadRowColors.foregroundClassName
             : rowAppearance.foregroundClassName,

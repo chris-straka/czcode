@@ -1,10 +1,10 @@
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@cz/contracts";
 import {
   RelayAuthInvalidError,
   type RelayClientDeviceRecord,
   type RelayClientEnvironmentRecord,
   type RelayEnvironmentStatusResponse,
-} from "@t3tools/contracts/relay";
+} from "@cz/contracts/relay";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";

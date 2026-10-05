@@ -2,14 +2,15 @@ import type {
   ThreadPendingApproval,
   ThreadPendingUserInput,
   ThreadUserInputQuestion,
-} from "@t3tools/client-runtime/state/thread-requests";
-import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
-import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
-import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-log/tool-presentation";
+} from "@cz/client-runtime/state/thread-requests";
+import { turnItemIsWorkspacePreparation } from "@cz/client-runtime/state/turn-item-presentation";
+import { formatSubagentDisplayTitle } from "@cz/client-runtime/state/subagent-display";
+import { extractToolActivityPresentation } from "@cz/client-runtime/work-log/tool-presentation";
 import {
-  commandDisplayText,
-  commandProgramName,
-} from "@t3tools/client-runtime/work-log/command-label";
+  turnItemHasDetail,
+  turnItemNeedsDetailFetch,
+} from "@cz/client-runtime/work-log/item-detail";
+import { commandDisplayText, commandProgramName } from "@cz/client-runtime/work-log/command-label";
 import {
   contextCompactionLabel,
   toolItemForDisplay,
@@ -22,13 +23,13 @@ import {
   type ToolGroupSummaryKind,
   type WorkLogPresentationEntry,
   type WorkLogToolLifecycleStatus,
-} from "@t3tools/client-runtime/work-log/presentation";
+} from "@cz/client-runtime/work-log/presentation";
 import {
-  resolveT3McpToolDefinition,
-  resolveT3McpToolPresentation,
-  type T3McpToolLogo,
-  type T3McpToolPresentation,
-} from "@t3tools/shared/t3McpToolPresentation";
+  resolveCzMcpToolDefinition,
+  resolveCzMcpToolPresentation,
+  type CzMcpToolLogo,
+  type CzMcpToolPresentation,
+} from "@cz/shared/czMcpToolPresentation";
 import type {
   ChatAttachment,
   MessageId,
@@ -43,17 +44,17 @@ import type {
   OrchestrationV2UserMessageInputIntent,
   RunAttemptId,
   ScheduledTaskId,
-} from "@t3tools/contracts";
-import { RunId, ThreadId } from "@t3tools/contracts";
+} from "@cz/contracts";
+import { RunId, ThreadId } from "@cz/contracts";
 import {
   classifyToolActivity,
   collectToolFilePaths,
-  computerUseToolTitle,
+  dynamicToolTitle,
   formatReadToolLabel,
   formatSearchToolLabel,
-} from "@t3tools/shared/toolActivity";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
-import { compactDynamicToolOutput } from "@t3tools/shared/toolOutput";
+} from "@cz/shared/toolActivity";
+import { formatDuration } from "@cz/shared/orchestrationTiming";
+import { compactDynamicToolOutput } from "@cz/shared/toolOutput";
 import * as DateTime from "effect/DateTime";
 
 export type PendingApproval = ThreadPendingApproval;
@@ -74,6 +75,8 @@ export interface ThreadFeedActivity {
   readonly summary: string;
   readonly detail: string | null;
   readonly canExpand: boolean;
+  /** Expanding fetches the withheld input and output with getTurnItem. */
+  readonly fetchesDetail: boolean;
   readonly getFullDetail: () => string | null;
   readonly getCopyText: () => string;
   readonly icon:
@@ -93,7 +96,7 @@ export interface ThreadFeedActivity {
     | "warning"
     | "wrench"
     | "zap";
-  readonly logo: T3McpToolLogo | null;
+  readonly logo: CzMcpToolLogo | null;
   readonly toolLike: boolean;
   readonly prominent: boolean;
   readonly status: "success" | "failure" | "neutral" | null;
@@ -105,7 +108,7 @@ export interface ThreadFeedActivity {
 }
 
 export interface ThreadFeedMessage {
-  readonly context?: import("@t3tools/contracts").OrchestrationMessageContext | undefined;
+  readonly context?: import("@cz/contracts").OrchestrationMessageContext | undefined;
   readonly id: MessageId;
   readonly role: "user" | "assistant";
   readonly text: string;
@@ -174,7 +177,7 @@ type ThreadFeedEntryContent =
       readonly summaryKind: ToolGroupSummaryKind;
       readonly toolSurface?: WorkLogPresentationEntry["toolSurface"];
       readonly toolIcon?: WorkLogPresentationEntry["toolIcon"];
-      readonly summaryToolIcon?: "browser" | "device" | "t3-code" | "pull-request";
+      readonly summaryToolIcon?: "browser" | "device" | "czcode" | "pull-request";
       readonly hasFailure: boolean;
       readonly live: boolean;
       readonly shimmer: boolean;
@@ -525,22 +528,22 @@ function itemIcon(item: OrchestrationV2TurnItem): ThreadFeedActivity["icon"] {
   }
 }
 
-function itemToolPresentation(item: OrchestrationV2TurnItem): T3McpToolPresentation | null {
+function itemToolPresentation(item: OrchestrationV2TurnItem): CzMcpToolPresentation | null {
   if (item.type !== "dynamic_tool") {
     return null;
   }
-  return resolveT3McpToolPresentation(item.toolName) ?? resolveT3McpToolPresentation(item.title);
+  return resolveCzMcpToolPresentation(item.toolName) ?? resolveCzMcpToolPresentation(item.title);
 }
 
 function itemSummary(
   item: OrchestrationV2TurnItem,
-  toolPresentation: T3McpToolPresentation | null = null,
+  toolPresentation: CzMcpToolPresentation | null = null,
 ): string {
   if (item.type === "notification") return item.summary;
   if (item.type === "system_notice") return item.message;
   if (item.type === "compaction") return contextCompactionLabel(item);
   const title =
-    (item.type === "dynamic_tool" ? computerUseToolTitle(item.toolName, item.input) : undefined) ??
+    (item.type === "dynamic_tool" ? dynamicToolTitle(item.toolName, item.input) : undefined) ??
     item.title?.trim();
   if (item.type === "subagent") return formatSubagentDisplayTitle(title || "Subagent");
   if (title) return toolPresentation?.displayName ?? capitalizePhrase(title);
@@ -721,6 +724,23 @@ function toWorkLogEntry(
   }
 }
 
+/** Expanded detail for a row, from its wire item or the full item from getTurnItem. */
+export function formatItemFullDetail(
+  row: OrchestrationV2ProjectedTurnItem,
+  item: OrchestrationV2TurnItem,
+): string {
+  return JSON.stringify(
+    {
+      visibility: row.visibility,
+      sourceThreadId: row.sourceThreadId,
+      sourceItemId: row.sourceItemId,
+      item: toolItemForDisplay(item),
+    },
+    null,
+    2,
+  );
+}
+
 function toFeedActivity(
   row: OrchestrationV2ProjectedTurnItem,
   attemptId: RunAttemptId | null,
@@ -735,21 +755,9 @@ function toFeedActivity(
     item.type === "dynamic_tool" && toolGroupAction(workEntry) === "read"
       ? collectToolFilePaths(item)
       : null;
-  const getFullDetail = memoizeValue(() => {
-    if (readPaths) {
-      return readPaths.join("\n") || null;
-    }
-    return JSON.stringify(
-      {
-        visibility: row.visibility,
-        sourceThreadId: row.sourceThreadId,
-        sourceItemId: row.sourceItemId,
-        item: toolItemForDisplay(item),
-      },
-      null,
-      2,
-    );
-  });
+  const getFullDetail = memoizeValue(() =>
+    readPaths ? readPaths.join("\n") || null : formatItemFullDetail(row, item),
+  );
   const getCopyText = memoizeValue(() =>
     [summary, detail, getFullDetail()]
       .filter(
@@ -765,7 +773,13 @@ function toFeedActivity(
     attemptId,
     summary,
     detail,
-    canExpand: !(item.type === "error" && item.status === "failed") && (readPaths?.length ?? 1) > 0,
+    canExpand:
+      !(item.type === "error" && item.status === "failed") &&
+      (readPaths
+        ? readPaths.length > 0 || turnItemNeedsDetailFetch(item)
+        : turnItemHasDetail(item) || workEntry.questionAnswer !== undefined),
+    // Read rows show their paths, then the fetched file contents.
+    fetchesDetail: turnItemNeedsDetailFetch(item),
     getFullDetail,
     getCopyText,
     icon: workEntry.toolSurface ?? itemIcon(item),
@@ -849,7 +863,7 @@ function groupAdjacentActivities(entries: ReadonlyArray<RawThreadFeedEntry>): Th
         item.type === "dynamic_tool" &&
         item.runId !== null &&
         (item.status === "running" || item.status === "completed") &&
-        resolveT3McpToolDefinition(item.toolName)?.summaryAction === "delegate" &&
+        resolveCzMcpToolDefinition(item.toolName)?.summaryAction === "delegate" &&
         !workEntryDisplayIndicatesToolFailure(entry.activity.workEntry)
       ) {
         const output = compactDynamicToolOutput(item.output);
@@ -972,13 +986,14 @@ export function failedFeedRunIds(
 }
 
 /**
- * A thread without runs (a provider-native subagent) folds each prompt's
- * response like a run; `isWorking` keeps its latest response open.
+ * A prompt without a run (a provider-native subagent, or a turn imported from
+ * V1) folds its response like a run. `runlessWorkActive` keeps the latest
+ * runless response open; V2 work must not reopen imported turns.
  */
 function deriveThreadFeedRunFolds(
   feed: ReadonlyArray<ThreadFeedEntry>,
   latestRun: ThreadFeedLatestRun | null,
-  isWorking: boolean,
+  runlessWorkActive: boolean,
 ): ReadonlyMap<string, ThreadFeedRunFold> {
   const firstAssistantMessageIdByRun = new Map<RunId, string>();
   const terminalAssistantMessageIdByRun = new Map<RunId, string>();
@@ -988,14 +1003,15 @@ function deriveThreadFeedRunFolds(
     RunId,
     { entries: ThreadFeedEntry[]; startBoundary: string | null }
   >();
-  // Fold state is keyed by run, so each prompt of a runless thread lends its
-  // response a stable key of its own.
+  // Fold state is keyed by run, so each runless prompt lends its response a
+  // stable key of its own. Decide per prompt, not per thread: a V1 thread's
+  // first V2 run must not unfold every imported turn above it.
   let runlessKey: RunId | null = null;
   let pendingUserBoundary: string | null = null;
   for (const entry of feed) {
     if (entry.type === "message" && entry.message.role === "user") {
       pendingUserBoundary = entry.message.createdAt;
-      runlessKey = latestRun === null ? RunId.make(`runless:${entry.id}`) : null;
+      runlessKey = entry.message.runId == null ? RunId.make(`runless:${entry.id}`) : null;
       continue;
     }
     const runId =
@@ -1038,7 +1054,7 @@ function deriveThreadFeedRunFolds(
   for (const [runId, group] of groupsByRunId) {
     if (
       runId === activeRunId ||
-      (isWorking && runId === runlessKey) ||
+      (runlessWorkActive && runId === runlessKey) ||
       interruptedRunIds.has(runId) ||
       failedRunIds.has(runId) ||
       group.entries.some((entry) => entry.type === "message" && entry.message.streaming)
@@ -1161,7 +1177,11 @@ export function deriveThreadFeedPresentation(
   const activeTailGroup = sourceFeed.at(-1);
   const activeRunId = unsettledRunId(latestRun);
   const isWorking = activeWorkStartedAt !== null && latestRun?.status !== "preparing";
-  const foldsByAnchorId = deriveThreadFeedRunFolds(sourceFeed, latestRun, isWorking);
+  const foldsByAnchorId = deriveThreadFeedRunFolds(
+    sourceFeed,
+    latestRun,
+    isWorking && runlessWorkActive,
+  );
   const collapsedEntryIds = new Set<string>();
   for (const fold of foldsByAnchorId.values()) {
     if (!expandedRunIds.has(fold.runId)) {

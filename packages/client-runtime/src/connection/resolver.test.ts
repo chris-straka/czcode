@@ -2,8 +2,8 @@ import {
   EnvironmentId,
   ORCHESTRATION_PROTOCOL_VERSION,
   type DesktopSshEnvironmentTarget,
-} from "@t3tools/contracts";
-import { RelayClientTracer } from "@t3tools/shared/relayTracing";
+} from "@cz/contracts";
+import { RelayClientTracer } from "@cz/shared/relayTracing";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -201,7 +201,7 @@ describe("ConnectionResolver", () => {
       const error = yield* Effect.flip(broker.prepare(catalogEntry(target)));
 
       expect(error).toMatchObject({ reason: "unsupported" });
-      expect(error.message).toContain("Update T3 Code on Compatible environment");
+      expect(error.message).toContain("Update czcode on Compatible environment");
     }),
   );
 
@@ -444,8 +444,9 @@ describe("ConnectionResolver", () => {
     }),
   );
 
-  for (const scenario of ["unchanged", "changed", "revocation-failed"] as const) {
-    it.effect(`handles ${scenario} SSH routing consent before saving or authorizing`, () =>
+  it.effect.each(["unchanged", "changed", "revocation-failed"] as const)(
+    "handles %s SSH routing consent before saving or authorizing",
+    (scenario) =>
       Effect.gen(function* () {
         const calls: string[] = [];
         const target = new SshConnectionTarget({
@@ -537,8 +538,7 @@ describe("ConnectionResolver", () => {
         }
         expect(yield* permissions.get(entry)).toBe(scenario === "changed" ? "off" : "read-write");
       }),
-    );
-  }
+  );
 
   it.effect("preserves relay authorization failure classification and trace details", () =>
     Effect.gen(function* () {

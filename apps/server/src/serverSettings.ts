@@ -30,7 +30,7 @@ import {
   ServerSettings,
   ServerSettingsError,
   type ServerSettingsPatch,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Cache from "effect/Cache";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -52,17 +52,18 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { writeFileStringAtomically } from "./atomicWrite.ts";
+import { resolveSymlinkTarget } from "@cz/shared/symlink";
 import * as ServerConfig from "./config.ts";
-import { type DeepPartial, deepMerge } from "@t3tools/shared/Struct";
-import { fromJsonStringPretty, fromLenientJson } from "@t3tools/shared/schemaJson";
+import { type DeepPartial, deepMerge } from "@cz/shared/Struct";
+import { fromJsonStringPretty, fromLenientJson } from "@cz/shared/schemaJson";
 import {
   applyServerSettingsPatch,
   deriveLegacyProjectOverrides,
   isModelSelectionProviderEnabled,
-} from "@t3tools/shared/serverSettings";
+} from "@cz/shared/serverSettings";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
 
-export { resolveSourceControlWriterModelSelection } from "@t3tools/shared/serverSettings";
+export { resolveSourceControlWriterModelSelection } from "@cz/shared/serverSettings";
 
 const encodeServerSettings = Schema.encodeEffect(ServerSettings);
 const encodeServerSettingsJson = Schema.encodeUnknownEffect(fromJsonStringPretty(ServerSettings));
@@ -277,7 +278,7 @@ export class ServerSettingsService extends Context.Service<
      */
     readonly subscribeChanges: Effect.Effect<Stream.Stream<ServerSettings>, never, Scope.Scope>;
   }
->()("t3/serverSettings/ServerSettingsService") {
+>()("cz/serverSettings/ServerSettingsService") {
   /** @deprecated Import and use `layerTest` from this module. */
   static readonly layerTest = (overrides: DeepPartial<ServerSettings> = {}) => layerTest(overrides);
 }
@@ -1181,10 +1182,24 @@ const make = Effect.gen(function* () {
     }),
   );
 
+  const watchFileChanges = (filePath: string) => {
+    const directory = pathService.dirname(filePath);
+    const fileName = pathService.basename(filePath);
+    const resolvedFilePath = pathService.resolve(filePath);
+    return fs
+      .watch(directory)
+      .pipe(
+        Stream.filter(
+          (event) =>
+            event.path === fileName ||
+            event.path === filePath ||
+            pathService.resolve(directory, event.path) === resolvedFilePath,
+        ),
+      );
+  };
+
   const startWatcher = Effect.gen(function* () {
     const settingsDir = pathService.dirname(settingsPath);
-    const settingsFile = pathService.basename(settingsPath);
-    const settingsPathResolved = pathService.resolve(settingsPath);
 
     yield* fs.makeDirectory(settingsDir, { recursive: true }).pipe(
       Effect.mapError(
@@ -1199,19 +1214,43 @@ const make = Effect.gen(function* () {
 
     const revalidateAndEmitSafely = revalidateAndEmit.pipe(Effect.ignoreCause({ log: true }));
 
+    // A symlinked settings file is rewritten in its destination's directory,
+    // which a watch on the link's directory never sees. The link is resolved
+    // again whenever it changes, so repointing it moves the watch along.
+    const watchLinkTarget = Effect.gen(function* () {
+      const linkTargetPath = yield* resolveSymlinkTarget(settingsPath).pipe(
+        Effect.provideService(FileSystem.FileSystem, fs),
+        Effect.provideService(Path.Path, pathService),
+      );
+      if (linkTargetPath === pathService.resolve(settingsPath)) {
+        return Option.none<string>();
+      }
+      yield* fs
+        .makeDirectory(pathService.dirname(linkTargetPath), { recursive: true })
+        .pipe(Effect.ignore({ log: true }));
+      return Option.some(linkTargetPath);
+    }).pipe(Effect.orElseSucceed(() => Option.none<string>()));
+
+    const initialLinkTarget = yield* watchLinkTarget;
+    const linkTargetEvents = Stream.make(initialLinkTarget).pipe(
+      Stream.concat(watchFileChanges(settingsPath).pipe(Stream.mapEffect(() => watchLinkTarget))),
+      Stream.changes,
+      Stream.switchMap(
+        Option.match({
+          onNone: () => Stream.empty,
+          onSome: (linkTargetPath) =>
+            watchFileChanges(linkTargetPath).pipe(Stream.ignore({ log: true })),
+        }),
+      ),
+    );
+
     // Debounce watch events so the file is fully written before we read it.
     // Editors emit multiple events per save (truncate, write, rename) and
     // `fs.watch` can fire before the content has been flushed to disk.
-    const debouncedSettingsEvents = fs.watch(settingsDir).pipe(
-      Stream.filter((event) => {
-        return (
-          event.path === settingsFile ||
-          event.path === settingsPath ||
-          pathService.resolve(settingsDir, event.path) === settingsPathResolved
-        );
-      }),
-      Stream.debounce(Duration.millis(100)),
-    );
+    const debouncedSettingsEvents = Stream.merge(
+      watchFileChanges(settingsPath),
+      linkTargetEvents,
+    ).pipe(Stream.debounce(Duration.millis(100)));
 
     yield* Stream.runForEach(debouncedSettingsEvents, () => revalidateAndEmitSafely).pipe(
       Effect.ignoreCause({ log: true }),

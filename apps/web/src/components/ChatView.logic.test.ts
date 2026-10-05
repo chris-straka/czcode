@@ -4,11 +4,7 @@ import {
   rememberCheckoutIsRepo,
   threadShellHasStarted,
 } from "./ChatView.logic";
-import {
-  ANTIGRAVITY_DEFAULT_MODEL,
-  ProviderDriverKind,
-  type ServerProvider,
-} from "@t3tools/contracts";
+import { ANTIGRAVITY_DEFAULT_MODEL, ProviderDriverKind, type ServerProvider } from "@cz/contracts";
 import { deriveProviderInstanceEntries, NO_PROVIDER_MODEL_SELECTION } from "../providerInstances";
 import type { RightPanelSurface } from "../rightPanelStore";
 import {
@@ -23,8 +19,8 @@ import {
   TurnItemId,
   type OrchestrationV2ProjectedTurnItem,
   type WorktreeSetupSnapshot,
-} from "@t3tools/contracts";
-import type { CodexArtifactTemplate } from "@t3tools/client-runtime/codex-artifact-templates";
+} from "@cz/contracts";
+import type { CodexArtifactTemplate } from "@cz/client-runtime/codex-artifact-templates";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
@@ -269,7 +265,7 @@ describe("resolveThreadMetadataUpdateForNextTurn", () => {
 describe("deriveComposerSendState", () => {
   it("treats expired terminal pills as non-sendable content", () => {
     const state = deriveComposerSendState({
-      prompt: "[Terminal 1](t3-context://v1/terminal/ctx-expired)",
+      prompt: "[Terminal 1](cz-context://v1/terminal/ctx-expired)",
       imageCount: 0,
       terminalContexts: [
         {
@@ -293,7 +289,7 @@ describe("deriveComposerSendState", () => {
 
   it("keeps text sendable while excluding expired terminal pills", () => {
     const state = deriveComposerSendState({
-      prompt: `yoo [Terminal 1](t3-context://v1/terminal/ctx-expired) waddup`,
+      prompt: `yoo [Terminal 1](cz-context://v1/terminal/ctx-expired) waddup`,
       imageCount: 0,
       terminalContexts: [
         {
@@ -626,6 +622,30 @@ describe("hasServerAcknowledgedLocalDispatch", () => {
         threadError: null,
       }),
     ).toBe(true);
+  });
+
+  it("holds a first send while the thread shell still reports a preparing run", () => {
+    // The draft had no run. The server thread's shell shows the new run before
+    // the detail projection behind `phase` loads.
+    const localDispatch = createLocalDispatchSnapshot(makeThread());
+    const preparingRun = {
+      ...completedTurn,
+      status: "preparing" as const,
+      startedAt: null,
+      completedAt: null,
+    };
+
+    expect(
+      hasServerAcknowledgedLocalDispatch({
+        localDispatch,
+        phase: "disconnected",
+        latestRun: preparingRun,
+        runtime: { ...readySession, status: "preparing", activeRunId: preparingRun.runId },
+        hasPendingApproval: false,
+        hasPendingUserInput: false,
+        threadError: null,
+      }),
+    ).toBe(false);
   });
 
   it("waits for the matching running turn before acknowledging", () => {
@@ -1871,20 +1891,20 @@ describe("threadShellHasStarted", () => {
 it("follows a changed server PR link without replacing an unrelated open panel", () => {
   const previous = {
     projectId: ProjectId.make("project-1"),
-    repository: "pingdotgg/t3code",
+    repository: "chris-straka/czcode",
     number: 42,
-    url: "https://github.com/pingdotgg/t3code/pull/42",
+    url: "https://github.com/chris-straka/czcode/pull/42",
   };
   const current = {
     ...previous,
     number: 43,
-    url: "https://github.com/pingdotgg/t3code/pull/43",
+    url: "https://github.com/chris-straka/czcode/pull/43",
   };
   const surface = {
     id: "pull-request:previous",
     kind: "pull-request",
     projectId: previous.projectId,
-    repository: "PingDotGG/T3Code",
+    repository: "chris-straka/Czcode",
     number: previous.number,
   } satisfies RightPanelSurface;
 

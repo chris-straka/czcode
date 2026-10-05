@@ -90,7 +90,7 @@ export async function readCursorAccountUsage(
         : typeof credentialSource === "string"
           ? "Cursor credentials could not be read."
           : cause instanceof CursorKeychainTimeoutError
-            ? "Allow Keychain access on the Mac running T3 Code, then refresh."
+            ? "Allow Keychain access on the Mac running czcode, then refresh."
             : "Cursor Keychain credentials could not be read.",
     };
   }
@@ -253,7 +253,7 @@ export async function readCursorAccountUsage(
           sessionId,
           totals,
           reportedCostUsd,
-          fast: false,
+          speed: "standard",
           dedupeKey: `cursor-account:${accountKey}:${key}:${occurrence}`,
         });
       }

@@ -6,7 +6,7 @@
  * Pi state (sessions, settings, extensions, auth) lives in the user's own
  * `~/.pi/agent`, so continuation identity uses the default instance grouping.
  */
-import { PiSettings, ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
+import { PiSettings, ProviderDriverKind, type ServerProvider } from "@cz/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -53,7 +53,8 @@ const DRIVER_KIND = ProviderDriverKind.make("pi");
 const UPDATE = makePackageManagedProviderMaintenanceResolver({
   provider: DRIVER_KIND,
   npmPackageName: "@earendil-works/pi-coding-agent",
-  nativeUpdate: null,
+  // Pi's updater covers its own installer and npm, pnpm, yarn, and bun globals.
+  nativeUpdate: { args: ["update", "--self"] },
 });
 
 export type PiDriverEnv =

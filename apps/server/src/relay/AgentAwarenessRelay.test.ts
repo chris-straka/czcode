@@ -13,8 +13,8 @@ import {
   RunId,
   ThreadId,
   TurnItemId,
-} from "@t3tools/contracts";
-import { RelayAgentActivityState } from "@t3tools/contracts/relay";
+} from "@cz/contracts";
+import { RelayAgentActivityState } from "@cz/contracts/relay";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -194,6 +194,7 @@ const makeTestRelay = Effect.fnUntraced(function* (
     dispatch: unused,
     getTimelinePage: () => Effect.die("Unused timeline read"),
     getMessageCount: () => Effect.die("unused message count"),
+    getTurnItem: () => Effect.die("unused turn item read"),
     getThreadRecords: () => Effect.die("unused record read"),
     getThreadProjection: unused,
     getCheckpointContext: unused,
@@ -206,6 +207,8 @@ const makeTestRelay = Effect.fnUntraced(function* (
     waitForThread: unused,
     interruptThread: unused,
     getThreadEventSequence: unused,
+    recoverDelegatedTask: unused,
+    delegatedTaskResultPending: unused,
     streamStoredEvents: Stream.empty,
     streamStoredEventsFrom: () => Stream.empty,
     streamDomainEvents: options.domainEvents ?? Stream.empty,
@@ -659,6 +662,30 @@ describe("AgentAwarenessRelay", () => {
     }),
   );
 
+  it.effect.each([
+    { label: "live", archived: false },
+    { label: "archived", archived: true },
+  ])("never publishes tombstones for $label subagent threads", ({ archived }) =>
+    Effect.gen(function* () {
+      const { relay, currentShell, publications } = yield* makeTestRelay();
+      yield* Ref.set(
+        currentShell,
+        shell({
+          lineage: {
+            rootThreadId: THREAD_ID,
+            parentThreadId: THREAD_ID,
+            relationshipToParent: "subagent",
+          },
+          ...(archived ? { archivedAt: yield* DateTime.now } : {}),
+        }),
+      );
+      yield* relay.publishThread(THREAD_ID);
+      yield* TestClock.adjust("5 seconds");
+      yield* relay.drain;
+      assert.equal(publications.length, 0);
+    }),
+  );
+
   it.effect("confirms a first completed state and respects disabling during confirmation", () =>
     Effect.gen(function* () {
       const { relay, secrets, currentShell, publications } = yield* makeTestRelay();
@@ -905,7 +932,7 @@ describe("startup catch-up", { concurrent: false }, () => {
       yield* TestClock.adjust("10 minutes");
       assert.equal(catchUp.shellSnapshotReads, 0);
 
-      // `t3 connect publish` writes the opt-in without waking this process.
+      // `cz connect publish` writes the opt-in without waking this process.
       yield* enablePublishing(secrets);
       yield* TestClock.adjust("5 seconds");
       assert.equal(catchUp.shellSnapshotReads, 1);

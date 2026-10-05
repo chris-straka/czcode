@@ -31,6 +31,21 @@ const baseProviderSnapshot = {
 };
 
 describe("ServerProvider", () => {
+  it.each([undefined, true, false])("decodes workspace command discovery pending=%s", (pending) => {
+    const workspace = {
+      cwd: "/workspace/project",
+      checkedAt: baseProviderSnapshot.checkedAt,
+      slashCommands: [{ name: "compact" }],
+      ...(pending === undefined ? {} : { slashCommandsPending: pending }),
+      skills: [{ name: "project", path: "/workspace/project/SKILL.md", enabled: true }],
+    };
+    const parsed = decodeServerProvider({
+      ...baseProviderSnapshot,
+      workspaceSnapshots: [workspace],
+    });
+    expect(parsed.workspaceSnapshots).toEqual([workspace]);
+  });
+
   it("defaults capability arrays when decoding provider snapshots", () => {
     const parsed = decodeServerProvider({
       instanceId: "codex",
@@ -184,7 +199,7 @@ describe("server config forward compatibility", () => {
 describe("ServerObservability", () => {
   it("reads a server from before the log signal as exporting no logs", () => {
     const parsed = decodeServerObservability({
-      logsDirectoryPath: "/tmp/t3/logs",
+      logsDirectoryPath: "/tmp/cz/logs",
       localTracingEnabled: true,
       otlpTracesUrl: "https://collector.example.com/v1/traces",
       otlpTracesEnabled: true,

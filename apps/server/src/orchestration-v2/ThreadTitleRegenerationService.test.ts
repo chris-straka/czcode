@@ -8,7 +8,7 @@ import {
   ProviderInstanceId,
   ThreadId,
   TextGenerationError,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
@@ -438,8 +438,9 @@ describe("ThreadTitleRegenerationService", () => {
   );
 });
 
-for (const outcome of ["success", "exhausted", "stale", "interrupted"] as const) {
-  it.effect(`initial title retry: ${outcome}`, () =>
+it.effect.each(["success", "exhausted", "stale", "interrupted"] as const)(
+  "initial title retry: %s",
+  (outcome) =>
     Effect.gen(function* () {
       const attempted = yield* Deferred.make<void>();
       let attempts = 0;
@@ -502,5 +503,4 @@ for (const outcome of ["success", "exhausted", "stale", "interrupted"] as const)
         else assert.isNotOk(projection.thread.titleRegeneration);
       }).pipe(Effect.provide(harness.layer));
     }),
-  );
-}
+);

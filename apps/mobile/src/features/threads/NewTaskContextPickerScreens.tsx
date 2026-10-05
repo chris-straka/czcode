@@ -1,14 +1,12 @@
 import { MaterialListRow } from "../../components/MaterialListRow";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import type { VcsRef } from "@t3tools/client-runtime/state/vcs";
-import { type EnvironmentId, resolveEnvironmentMachineKind } from "@t3tools/contracts";
-import * as Cause from "effect/Cause";
-import { AsyncResult } from "effect/unstable/reactivity";
+import type { EnvironmentProject } from "@cz/client-runtime/state/shell";
+import type { VcsRef } from "@cz/client-runtime/state/vcs";
+import { resolveEnvironmentMachineKind } from "@cz/contracts";
 import { LegendList } from "@legendapp/list/react-native";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@cz/client-runtime/state/runtime";
 import * as Haptics from "expo-haptics";
 import { useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -31,8 +29,7 @@ import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSym
 import { ThemedSwitch } from "../../components/ThemedSwitch";
 import { cn } from "../../lib/cn";
 import { NativeHeaderToolbar, NativeStackScreenOptions } from "../../native/StackHeader";
-import { useServerConfigs, waitForProject } from "../../state/entities";
-import { projectEnvironment } from "../../state/projects";
+import { useServerConfigs } from "../../state/entities";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { vcsEnvironment } from "../../state/vcs";
 import {
@@ -105,7 +102,7 @@ function SelectionRow(props: {
         (props.icon ?? null)
       )}
       <View className="min-w-0 flex-1 gap-0.5">
-        <Text className="text-base font-t3-medium text-foreground" numberOfLines={1}>
+        <Text className="text-base font-cz-medium text-foreground" numberOfLines={1}>
           {props.title}
         </Text>
         {props.subtitle ? (
@@ -137,7 +134,7 @@ function ToggleRow(props: {
       <Text
         className={cn(
           "min-w-0 flex-1 text-base text-foreground",
-          Platform.OS !== "android" && "font-t3-medium",
+          Platform.OS !== "android" && "font-cz-medium",
         )}
         numberOfLines={1}
       >
@@ -208,39 +205,6 @@ export function NewTaskEnvironmentPickerRouteScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const serverConfigs = useServerConfigs();
-  const ensureScratch = useAtomCommand(projectEnvironment.ensureScratch, {
-    reportFailure: false,
-  });
-  const [movingToEnvironmentId, setMovingToEnvironmentId] = useState<EnvironmentId | null>(null);
-
-  // A thread without a project moves to the other machine's own Scratch
-  // project, which is created there first if it does not exist yet.
-  async function moveScratchDraft(environmentId: EnvironmentId): Promise<void> {
-    setMovingToEnvironmentId(environmentId);
-    try {
-      const result = await ensureScratch({ environmentId, input: {} });
-      if (AsyncResult.isFailure(result)) {
-        const error = Cause.squash(result.cause);
-        Alert.alert(
-          "Could not switch machine",
-          error instanceof Error
-            ? error.message
-            : "The folder for threads without a project could not be created.",
-        );
-        return;
-      }
-      const project = await waitForProject({ environmentId, projectId: result.value.projectId });
-      if (project === null) {
-        Alert.alert("Could not switch machine", "It has not reached this device yet. Try again.");
-        return;
-      }
-      flow.setProject(project);
-      navigation.goBack();
-    } finally {
-      setMovingToEnvironmentId(null);
-    }
-  }
-
   return (
     <View className="flex-1 bg-sheet" collapsable={false}>
       <NativeStackScreenOptions
@@ -280,18 +244,12 @@ export function NewTaskEnvironmentPickerRouteScreen() {
                   />
                 }
                 isLast={index === flow.environments.length - 1}
-                disabled={movingToEnvironmentId !== null}
+                disabled={flow.switchingToEnvironmentId !== null}
                 onPress={() => {
                   void Haptics.selectionAsync();
-                  if (flow.isScratchDraft) {
-                    if (environment.environmentId !== flow.selectedEnvironmentId) {
-                      void moveScratchDraft(environment.environmentId);
-                      return;
-                    }
-                  } else {
-                    flow.selectEnvironment(environment.environmentId);
-                  }
-                  navigation.goBack();
+                  void flow.switchEnvironment(environment.environmentId).then((switched) => {
+                    if (switched) navigation.goBack();
+                  });
                 }}
                 selected={flow.selectedEnvironmentId === environment.environmentId}
                 title={environment.environmentLabel}
@@ -532,7 +490,7 @@ export function BranchPickerScreen(props: {
               className="rounded-full bg-card px-4 py-2 active:opacity-70"
               onPress={props.onRefresh}
             >
-              <Text className="text-sm font-t3-medium text-foreground">Try again</Text>
+              <Text className="text-sm font-cz-medium text-foreground">Try again</Text>
             </Pressable>
           ) : null}
         </View>

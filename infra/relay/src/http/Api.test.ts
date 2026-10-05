@@ -3,7 +3,7 @@ import {
   RelayClientAuth,
   RelayClientPrincipal,
   type RelayClientDeviceRecord,
-} from "@t3tools/contracts/relay";
+} from "@cz/contracts/relay";
 import * as EnvironmentLinker from "../environments/EnvironmentLinker.ts";
 import * as RelayTokens from "../auth/RelayTokens.ts";
 import * as Devices from "../agentActivity/Devices.ts";
@@ -31,13 +31,9 @@ import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 import * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
-import { EnvironmentId } from "@t3tools/contracts";
-import {
-  RelayEnvironmentAuth,
-  RelayEnvironmentPrincipal,
-  RelayApi,
-} from "@t3tools/contracts/relay";
-import { RELAY_MANAGED_TUNNEL_RECOVERY_TYP, signRelayJwt } from "@t3tools/shared/relayJwt";
+import { EnvironmentId } from "@cz/contracts";
+import { RelayEnvironmentAuth, RelayEnvironmentPrincipal, RelayApi } from "@cz/contracts/relay";
+import { RELAY_MANAGED_TUNNEL_RECOVERY_TYP, signRelayJwt } from "@cz/shared/relayJwt";
 
 import {
   RELAY_HTTP_ROUTER_CONFIG,
@@ -78,12 +74,12 @@ const relaySettings: RelayConfiguration.RelayConfiguration["Service"] = {
     teamId: "apns-team",
     keyId: "apns-key",
     privateKey: Redacted.make("apns-private-key"),
-    bundleId: "com.example.t3",
+    bundleId: "com.example.cz",
     environment: "sandbox",
   },
   clerkSecretKey: Redacted.make("clerk-secret-key"),
   clerkPublishableKey: "pk_test_test",
-  clerkJwtAudience: "t3-code-relay",
+  clerkJwtAudience: "czcode-relay",
   apnsDeliveryJobSigningSecret: Redacted.make("apns-delivery-secret"),
   cloudMintPrivateKey: Redacted.make("cloud-mint-private-key"),
   cloudMintPublicKey: "cloud-mint-public-key",
@@ -369,7 +365,7 @@ const linkedEnvironmentRecord = {
 } as const;
 
 describe("relay managed tunnel recovery", () => {
-  it.effect("binds recovery requests to the host, cloud user, and T3 service origin", () =>
+  it.effect("binds recovery requests to the host, cloud user, and cz service origin", () =>
     Effect.gen(function* () {
       const keyPair = NodeCrypto.generateKeyPairSync("ed25519", {
         privateKeyEncoding: { format: "pem", type: "pkcs8" },
@@ -381,7 +377,7 @@ describe("relay managed tunnel recovery", () => {
         privateKey: keyPair.privateKey,
         typ: RELAY_MANAGED_TUNNEL_RECOVERY_TYP,
         payload: {
-          iss: "t3-env:environment-1",
+          iss: "cz-env:environment-1",
           aud: "https://relay.example.test",
           sub: "environment-1",
           jti: "recovery-proof",
@@ -444,7 +440,7 @@ describe("relay managed tunnel recovery", () => {
         privateKey: keyPair.privateKey,
         typ: RELAY_MANAGED_TUNNEL_RECOVERY_TYP,
         payload: {
-          iss: "t3-env:environment-1",
+          iss: "cz-env:environment-1",
           aud: "https://relay.example.test",
           sub: "environment-1",
           jti: "registration-origin-proof",

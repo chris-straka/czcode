@@ -916,7 +916,7 @@ layer("GitHubPullRequestCli.layer", (it) => {
       yield* cli.searchPullRequests({
         cwd: "/w",
         host: "github.com",
-        repositories: ["acme/web", "pingdotgg/t3code"],
+        repositories: ["acme/web", "chris-straka/czcode"],
         state: "closed",
         involvement: "reviewing",
         viewer: "bilal",
@@ -932,7 +932,7 @@ layer("GitHubPullRequestCli.layer", (it) => {
       assert.strictEqual(
         searchQueryOfCall(0),
         'is:pr is:closed is:unmerged review-requested:bilal "pull requests page" ' +
-          "updated:<=2026-07-02T00:00:00Z sort:updated-desc repo:acme/web repo:pingdotgg/t3code",
+          "updated:<=2026-07-02T00:00:00Z sort:updated-desc repo:acme/web repo:chris-straka/czcode",
       );
     }),
   );
@@ -1013,7 +1013,7 @@ layer("GitHubPullRequestCli.layer", (it) => {
         Effect.succeed(
           searchPage([
             searchItem(7, "acme/web", "2026-07-03T00:00:00Z"),
-            searchItem(9, "pingdotgg/t3code", "2026-07-02T00:00:00Z"),
+            searchItem(9, "chris-straka/czcode", "2026-07-02T00:00:00Z"),
             // Not a pull request, which `is:pr` excludes and a decode skips rather than fails on.
             {},
           ]),
@@ -1024,7 +1024,7 @@ layer("GitHubPullRequestCli.layer", (it) => {
       const batch = yield* cli.searchPullRequests({
         cwd: "/w",
         host: "github.com",
-        repositories: ["acme/web", "pingdotgg/t3code"],
+        repositories: ["acme/web", "chris-straka/czcode"],
         state: "open",
         involvement: "all",
         viewer: "bilal",
@@ -1035,7 +1035,7 @@ layer("GitHubPullRequestCli.layer", (it) => {
         batch.items.map((item) => [item.repository, item.number, item.author?.avatarUrl]),
         [
           ["acme/web", 7, "https://avatars/octocat"],
-          ["pingdotgg/t3code", 9, "https://avatars/octocat"],
+          ["chris-straka/czcode", 9, "https://avatars/octocat"],
         ],
       );
       // The listing leaves the line counts to a read of their own.
@@ -3612,7 +3612,14 @@ layer("GitHubPullRequestCli.layer", (it) => {
     Effect.gen(function* () {
       // A host that never runs out of pages: the walk has to end itself.
       mockedExecute.mockReturnValue(
-        Effect.succeed(output(reviewThreadsPage([thread("PRRT_1", "c1")], "Y3Vyc29yOjE"))),
+        Effect.succeed(
+          output(
+            reviewThreadsPage(
+              [{ ...thread("PRRT_1", "c1"), comments: threadComments(["c1"], "Y3Vyc29yOjI", 3) }],
+              "Y3Vyc29yOjE",
+            ),
+          ),
+        ),
       );
       const cli = yield* GitHubPullRequestCli.GitHubPullRequestCli;
 
@@ -3625,6 +3632,7 @@ layer("GitHubPullRequestCli.layer", (it) => {
 
       assert.strictEqual(mockedExecute.mock.calls.length, 10);
       assert.isTrue(conversation.truncated);
+      assert.isTrue(conversation.reviewThreadsTruncated);
     }),
   );
 
@@ -3656,6 +3664,7 @@ layer("GitHubPullRequestCli.layer", (it) => {
         nextCommentsCursor: "Y3Vyc29yOjI",
       });
       assert.isTrue(conversation.truncated);
+      assert.isFalse(conversation.reviewThreadsTruncated);
     }),
   );
 

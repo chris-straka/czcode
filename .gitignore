@@ -15,7 +15,7 @@ build/
 .logs/
 release/
 release-mock/
-.t3
+.cz
 .idea/
 apps/web/.playwright
 apps/web/playwright-report

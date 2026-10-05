@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
-import type { PullRequestReaction } from "@t3tools/contracts";
+import type { PullRequestReaction } from "@cz/contracts";
 
 import { decodePullRequestDetailJson } from "./gitHubPullRequestJson.ts";
 import * as GitHubCli from "../sourceControl/GitHubCli.ts";
@@ -882,6 +882,7 @@ describe("getChangeRequest commits", () => {
     reviewThreads: [],
     commentCount: 0,
     truncated: false,
+    reviewThreadsTruncated: false,
     reactions: [],
     reactionsById: new Map<string, ReadonlyArray<PullRequestReaction>>(),
     reviewers: [],
@@ -967,6 +968,7 @@ describe("getChangeRequestActivity dismissed reviews", () => {
     reviewThreads: [],
     commentCount: 0,
     truncated: false,
+    reviewThreadsTruncated: false,
     reactions: [],
     reactionsById: new Map(),
     reviewers: [],

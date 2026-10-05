@@ -1,10 +1,6 @@
-import {
-  type ModelSelection,
-  type ProviderSetupError,
-  TextGenerationError,
-} from "@t3tools/contracts";
-import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@t3tools/shared/git";
-import { extractJsonObject } from "@t3tools/shared/schemaJson";
+import { type ModelSelection, type ProviderSetupError, TextGenerationError } from "@cz/contracts";
+import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@cz/shared/git";
+import { extractJsonObject } from "@cz/shared/schemaJson";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -138,7 +134,7 @@ export const makeAntigravityTextGeneration = Effect.fn("makeAntigravityTextGener
           });
         }
 
-        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-antigravity-text-" });
+        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "cz-antigravity-text-" });
         let sessionId: string | undefined;
         yield* Effect.addFinalizer(() =>
           removeAntigravitySessionFiles({

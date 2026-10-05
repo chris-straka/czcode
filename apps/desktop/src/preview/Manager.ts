@@ -9,7 +9,7 @@ import * as NodeCrypto from "node:crypto";
 import {
   DesktopPreviewRecordingInputSchema,
   DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import type {
   DesktopPreviewAnnotationTheme,
   DesktopPreviewAutomationStatus,
@@ -34,9 +34,9 @@ import type {
   PreviewAutomationSnapshot,
   PreviewAutomationTypeInput,
   PreviewAutomationWaitForInput,
-} from "@t3tools/contracts";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { normalizePreviewUrl } from "@t3tools/shared/preview";
+} from "@cz/contracts";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
+import { normalizePreviewUrl } from "@cz/shared/preview";
 import {
   BrowserWindow,
   ClipboardItem,
@@ -1303,6 +1303,17 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
       > => {
         const existing = sessions.get(wc.id);
         if (existing) return Effect.succeed([existing, sessions] as const);
+        // A guest can be destroyed while it waits for this lock, and its native
+        // methods throw once it is.
+        if (wc.isDestroyed()) {
+          return Effect.fail(
+            new PreviewOperationError({
+              operation: "ensureControlSession",
+              webContentsId: wc.id,
+              cause: new Error("WebContents was destroyed"),
+            }),
+          );
+        }
         if (wc.isDevToolsOpened()) {
           return Effect.fail(
             new PreviewAutomationDevToolsOpenError({
@@ -1409,6 +1420,21 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
               wcDebugger.on("message", onMessage);
               wcDebugger.attach("1.3");
             });
+            // Electron gives `<webview>` guests a transparent base background, and
+            // Chromium only paints a dark canvas for dark color-scheme pages over an
+            // opaque base. Without this, dark-scheme pages with no background of
+            // their own (text/plain, e.g. .md files) render white text on white.
+            // White matches the webview's existing white backing, so light pages look
+            // the same; Chromium still swaps in its dark canvas for dark-scheme pages.
+            // Sent first because a document that paints before it arrives keeps the
+            // transparent base until its next load.
+            yield* attemptPromise(
+              { operation: "initializeDebugger.defaultBackground", webContentsId: wc.id },
+              () =>
+                wcDebugger.sendCommand("Emulation.setDefaultBackgroundColorOverride", {
+                  color: { r: 255, g: 255, b: 255, a: 1 },
+                }),
+            );
             yield* Effect.forEach(
               ["Runtime.enable", "Accessibility.enable", "Network.enable", "Log.enable"],
               (method) =>
@@ -1417,19 +1443,6 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
                   () => wcDebugger.sendCommand(method),
                 ),
               { concurrency: "unbounded", discard: true },
-            );
-            // Electron gives `<webview>` guests a transparent base background, and
-            // Chromium only paints a dark canvas for dark color-scheme pages over an
-            // opaque base. Without this, dark-scheme pages with no background of
-            // their own (text/plain, e.g. .md files) render white text on white.
-            // White matches the webview's existing white backing, so light pages look
-            // the same; Chromium still swaps in its dark canvas for dark-scheme pages.
-            yield* attemptPromise(
-              { operation: "initializeDebugger.defaultBackground", webContentsId: wc.id },
-              () =>
-                wcDebugger.sendCommand("Emulation.setDefaultBackgroundColorOverride", {
-                  color: { r: 255, g: 255, b: 255, a: 1 },
-                }),
             );
             return [
               control,
@@ -1649,7 +1662,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     const installed = yield* evaluateWithDebugger<boolean>(
       tabId,
       send,
-      "Boolean(globalThis.__t3PlaywrightInjected)",
+      "Boolean(globalThis.__czPlaywrightInjected)",
       true,
     );
     if (installed) return;
@@ -2412,6 +2425,30 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     return yield* withTabLifecycleLock(
       tabId,
       registerWebviewUnlocked(tabId, webContentsId, expectedGeneration),
+    );
+  });
+
+  // Called when a guest attaches to the window, before its first document
+  // paints. A tab opened straight to a URL often paints before the renderer
+  // gets to registerWebview, which would leave that page on the transparent
+  // base. registerWebview reuses the session opened here.
+  const prepareWebview = Effect.fn("PreviewManager.prepareWebview")(function* (
+    wc: Electron.WebContents,
+  ) {
+    const webContentsId = wc.id;
+    // A guest destroyed before any tab claims it has no other cleanup path.
+    wc.once("destroyed", () => {
+      runFork(detachControlSession(webContentsId));
+    });
+    // Runs detached from the attach event, so nothing may escape. registerWebview
+    // opens the session again if this one did not.
+    yield* ensureControlSession(wc).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logDebug("Preview webview control session was not opened on attach.", {
+          webContentsId,
+          cause,
+        }),
+      ),
     );
   });
 
@@ -3836,7 +3873,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
       send,
       `(() => {
           try {
-            const injected = globalThis.__t3PlaywrightInjected;
+            const injected = globalThis.__czPlaywrightInjected;
             const parsed = injected.parseSelector(${locatorJson});
             const element = injected.querySelector(parsed, document, true);
             if (!element) return { notFound: true };
@@ -3982,7 +4019,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
       send,
       `(() => {
           try {
-            const element = ${locatorJson ? `(() => { const injected = globalThis.__t3PlaywrightInjected; return injected.querySelector(injected.parseSelector(${locatorJson}), document, true); })()` : "document.activeElement"};
+            const element = ${locatorJson ? `(() => { const injected = globalThis.__czPlaywrightInjected; return injected.querySelector(injected.parseSelector(${locatorJson}), document, true); })()` : "document.activeElement"};
             if (!element) return { notFound: true };
             const textControl =
               element instanceof HTMLTextAreaElement ||
@@ -4096,7 +4133,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     const { frames, receiptKey } = yield* Effect.acquireRelease(
       attempt(context, () => ({
         frames: wc.mainFrame.framesInSubtree,
-        receiptKey: JSON.stringify(`__t3NativeKey_${NodeCrypto.randomUUID()}`),
+        receiptKey: JSON.stringify(`__czNativeKey_${NodeCrypto.randomUUID()}`),
       })),
       ({ frames, receiptKey }) =>
         Effect.forEach(
@@ -4246,7 +4283,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
           "Page.createIsolatedWorld",
           {
             frameId,
-            worldName: "t3-preview-key-target",
+            worldName: "cz-preview-key-target",
           },
           sessionId,
         )) as { executionContextId?: number };
@@ -4354,7 +4391,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
         );
         const selectionKey = yield* encodeJson(
           context,
-          `__t3EditingSelection_${NodeCrypto.randomUUID()}`,
+          `__czEditingSelection_${NodeCrypto.randomUUID()}`,
         );
         // Editing requires an active document. Preserve the target
         // and selection across focus handlers without focusing the desktop.
@@ -4446,7 +4483,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
       send,
       `(() => {
         try {
-          const target = ${locatorJson ? `(() => { const injected = globalThis.__t3PlaywrightInjected; return injected.querySelector(injected.parseSelector(${locatorJson}), document, true); })()` : "window"};
+          const target = ${locatorJson ? `(() => { const injected = globalThis.__czPlaywrightInjected; return injected.querySelector(injected.parseSelector(${locatorJson}), document, true); })()` : "window"};
           if (!target) return { notFound: true };
           target.scrollBy({ left: ${input.deltaX ?? 0}, top: ${input.deltaY ?? 0}, behavior: "instant" });
           return { ok: true };
@@ -4549,7 +4586,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
         send,
         `(() => {
               try {
-                const selectorMatched = ${locatorJson ? `(() => { const injected = globalThis.__t3PlaywrightInjected; return injected.querySelector(injected.parseSelector(${locatorJson}), document, false) !== null; })()` : "true"};
+                const selectorMatched = ${locatorJson ? `(() => { const injected = globalThis.__czPlaywrightInjected; return injected.querySelector(injected.parseSelector(${locatorJson}), document, false) !== null; })()` : "true"};
                 const textMatched = ${
                   textJson ? `(document.body?.innerText || "").includes(${textJson})` : "true"
                 };
@@ -4675,6 +4712,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     openPictureInPicture,
     openDevTools,
     pickElement,
+    prepareWebview,
     reapplyZoom,
     refresh,
     registerWebview,
@@ -5011,6 +5049,7 @@ export class PreviewManager extends Context.Service<
       tabId: string,
       webContentsId: number,
     ) => Effect.Effect<void, PreviewManagerError>;
+    readonly prepareWebview: (webContents: Electron.WebContents) => Effect.Effect<void>;
     readonly navigate: (tabId: string, url: string) => Effect.Effect<void, PreviewManagerError>;
     readonly goBack: (tabId: string) => Effect.Effect<void, PreviewManagerError>;
     readonly goForward: (tabId: string) => Effect.Effect<void, PreviewManagerError>;
@@ -5107,7 +5146,7 @@ export class PreviewManager extends Context.Service<
       listener: RecordingFrameListener,
     ) => Effect.Effect<void, never, Scope.Scope>;
   }
->()("@t3tools/desktop/preview/Manager/PreviewManager") {}
+>()("@cz/desktop/preview/Manager/PreviewManager") {}
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.gen(function* PreviewManagerMake() {
@@ -5137,6 +5176,7 @@ export const make = Effect.gen(function* PreviewManagerMake() {
     createTab: operations.createTab,
     closeTab: operations.closeTab,
     registerWebview: operations.registerWebview,
+    prepareWebview: operations.prepareWebview,
     navigate: operations.navigate,
     goBack: operations.goBack,
     goForward: operations.goForward,

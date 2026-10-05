@@ -2,7 +2,7 @@
 
 The environment issues its own sessions and enforces their capabilities. Cloud
 identity and relay credentials belong to a separate trust boundary, described in
-[T3 Connect](./t3-connect.md). A relay token is never an environment login.
+[cz Connect](./cz-connect.md). A relay token is never an environment login.
 
 ## Authority survives transport changes
 
@@ -28,7 +28,8 @@ Bearer and DPoP clients obtain short-lived WebSocket tickets through authenticat
 HTTP so long-lived tokens stay out of socket URLs. Browser sessions can
 authenticate the upgrade with their cookie. A successful handshake grants no
 extra authority: [every RPC declares a required
-scope](../../apps/server/src/auth/RpcAuthorization.ts).
+scope](../../apps/server/src/auth/RpcAuthorization.ts), and the WebSocket RPC
+group's `RpcScopeAuthorization` middleware checks it before any handler runs.
 
 Desktop restarts forget the previous local bearer token, so its reusable
 bootstrap grant replaces earlier sessions for the same subject and method.
@@ -39,7 +40,7 @@ do not follow this replacement rule.
 
 ### Reusable dev credential
 
-Web development environments can accept one `T3CODE_DEV_AUTH_TOKEN` across
+Web development environments can accept one `CZ_DEV_AUTH_TOKEN` across
 worktrees and ports on one hostname. The token and startup URLs that contain it
 grant administrative access. Desktop and non-development servers ignore it. See
 the [development runbook](../operations/development.md#reusable-dev-credential)

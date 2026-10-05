@@ -1,11 +1,5 @@
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  MousePointer2Icon,
-  PaintbrushIcon,
-  PlusIcon,
-  XIcon,
-} from "lucide-react";
+import { MousePointer2Icon, PaintbrushIcon, PlusIcon, XIcon } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide";
 import {
   useCallback,
   useEffect,
@@ -36,6 +30,7 @@ import {
 } from "../../themePalette";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
+import { MorphIcon } from "~/components/MorphIcon";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
@@ -237,7 +232,7 @@ function getThemeEditorColorFamily(role: ThemeColorRole): ThemeEditorColorFamily
 type ThemeEditorColors = ThemeColors;
 type ThemeEditorColorsByAppearance = Record<ThemeAppearance, ThemeEditorColors>;
 
-// A draft with no source theme starts as the standard T3 Code look — the
+// A draft with no source theme starts as the standard czcode look — the
 // palette on screen when no theme is installed — so creating from the default
 // theme changes nothing until the user edits a color.
 function getThemeEditorDefaults(appearance: ThemeAppearance): ThemeEditorColors {
@@ -1221,7 +1216,7 @@ export function ThemeEditorPanel({
           variant="ghost"
           onClick={() => setIsMinimized(!isMinimized)}
         >
-          {isMinimized ? <ChevronUpIcon /> : <ChevronDownIcon />}
+          <MorphIcon icon={isMinimized ? ChevronUp : ChevronDown} />
         </Button>
         <Button
           aria-label="Close the theme editor"

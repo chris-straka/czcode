@@ -18,9 +18,9 @@ import {
   type OrchestrationV2RunAttempt,
   type OrchestrationV2ProjectedTurnItem,
   type OrchestrationV2TurnItem,
-} from "@t3tools/contracts";
-import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
-import { summarizeToolGroup } from "@t3tools/client-runtime/work-log/presentation";
+} from "@cz/contracts";
+import { resolveUserMessagePresentation } from "@cz/client-runtime/user-message";
+import { summarizeToolGroup } from "@cz/client-runtime/work-log/presentation";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -269,6 +269,35 @@ describe("buildThreadFeed", () => {
     expect(activities[1]?.getFullDetail()).toContain("keep input");
     expect(activities[2]?.detail).toBe("src/example.ts");
     expect(items[0]).toMatchObject({ output: rawOutput });
+  });
+
+  it("expands tool rows only when they have detail or withheld output", () => {
+    const items: OrchestrationV2TurnItem[] = [
+      { ...command(), input: "", outputOmitted: true },
+      {
+        ...base("dynamic-empty", "2026-06-20T00:00:03.000Z", 2),
+        type: "dynamic_tool",
+        toolName: "example",
+        input: {},
+      },
+      {
+        ...base("read-omitted", "2026-06-20T00:00:04.000Z", 3),
+        type: "dynamic_tool",
+        toolName: "Read",
+        input: { path: "src/env.ts" },
+        outputOmitted: true,
+      },
+    ];
+    const activities = buildThreadFeed(items.map((item, index) => projected(item, index))).flatMap(
+      (entry) => (entry.type === "activity-group" ? entry.activities : []),
+    );
+    expect(
+      activities.map(({ canExpand, fetchesDetail }) => ({ canExpand, fetchesDetail })),
+    ).toEqual([
+      { canExpand: true, fetchesDetail: true },
+      { canExpand: false, fetchesDetail: false },
+      { canExpand: true, fetchesDetail: true },
+    ]);
   });
 
   it("recognizes automation attribution after projecting a user message", () => {
@@ -1085,6 +1114,62 @@ describe("buildThreadFeed", () => {
     ]);
   });
 
+  it("keeps imported V1 turns folded once the thread's first V2 run starts", () => {
+    const imported = <T extends OrchestrationV2TurnItem>(item: T, id: string) => ({
+      ...item,
+      id: TurnItemId.make(id),
+      runId: null,
+    });
+    const presented = (start: OrchestrationV2TurnItem) =>
+      deriveThreadFeedPresentation(
+        buildThreadFeed(
+          [
+            imported(userMessage("2026-06-20T00:00:00.000Z"), "imported-prompt"),
+            imported(
+              {
+                ...assistantMessage("2026-06-20T00:00:02.000Z"),
+                messageId: MessageId.make("update"),
+              },
+              "imported-update",
+            ),
+            imported(command("2026-06-20T00:00:04.000Z"), "imported-ls"),
+            imported(
+              {
+                ...assistantMessage("2026-06-20T00:00:08.000Z"),
+                messageId: MessageId.make("answer"),
+              },
+              "imported-answer",
+            ),
+            start,
+          ].map((item, position) => projected(item, position)),
+        ),
+        { runId, status: "running", startedAt: "2026-06-20T00:01:00.000Z", completedAt: null },
+        new Set(),
+        new Set(),
+        "2026-06-20T00:01:00.000Z",
+      )
+        .slice(0, 4)
+        .map((entry) => (entry.type === "message" ? entry.message.role : entry.type));
+
+    // A sent prompt and an automatic wake both start V2 work below the import.
+    expect(
+      presented({
+        ...userMessage("2026-06-20T00:01:00.000Z"),
+        id: TurnItemId.make("new-prompt"),
+        messageId: MessageId.make("new-prompt"),
+      }),
+    ).toEqual(["user", "assistant", "run-fold", "assistant"]);
+    expect(
+      presented({
+        ...base("wake", "2026-06-20T00:01:00.000Z", 4),
+        type: "notification",
+        source: { kind: "background_task" },
+        outcome: "completed",
+        summary: "Background task finished",
+      }),
+    ).toEqual(["user", "assistant", "run-fold", "assistant"]);
+  });
+
   it("keeps a provider-native subagent's runless tool call live while it works", () => {
     const startedAt = "2026-06-20T00:00:01.000Z";
     const { exitCode: _exitCode, ...completedCommand } = command();
@@ -1116,9 +1201,10 @@ describe("buildThreadFeed", () => {
     expect(presented.some((entry) => entry.type === "thinking")).toBe(false);
   });
 
-  it("keeps a runless tail settled while a normal thread waits for its sent run", () => {
+  it("keeps a runless tail folded while a normal thread waits for its sent run", () => {
     // Right after a send the local clock runs before the server creates the
-    // run, and the latest run may still be queued: neither is runless work.
+    // run, and the latest run may still be queued: neither is runless work,
+    // so the settled tail must not reopen and shift the feed.
     const startedAt = "2026-06-20T00:00:05.000Z";
     const feed = buildThreadFeed([
       projected({ ...userMessage(), runId: null }, 0),
@@ -1135,9 +1221,7 @@ describe("buildThreadFeed", () => {
         new Set(),
         startedAt,
       );
-      const toggle = presented.find((entry) => entry.type === "work-toggle");
-      expect(toggle).toMatchObject({ live: false, shimmer: false });
-      expect(presented.at(-1)?.type).toBe("thinking");
+      expect(presented.map((entry) => entry.type)).toEqual(["message", "run-fold", "thinking"]);
     }
   });
 
@@ -1181,6 +1265,7 @@ describe("buildThreadFeed", () => {
       summary: `Tool ${id}`,
       detail: null,
       canExpand: false,
+      fetchesDetail: false,
       getFullDetail: () => null,
       getCopyText: () => id,
       icon: "command",
@@ -1262,11 +1347,11 @@ describe("buildThreadFeed", () => {
     expect(activity?.workEntry.viewedImagePath).toBe("/workspace/reference.png");
   });
 
-  it("pretty prints T3 MCP dynamic tool activities and attaches the product logo", () => {
+  it("pretty prints cz MCP dynamic tool activities and attaches the product logo", () => {
     const toolItem: OrchestrationV2TurnItem = {
-      ...base("item-t3-tool", "2026-06-20T00:00:04.000Z", 3),
+      ...base("item-cz-tool", "2026-06-20T00:00:04.000Z", 3),
       type: "dynamic_tool",
-      toolName: "mcp__t3-code__t3_thread_read",
+      toolName: "mcp__czcode__cz_thread_read",
       input: { threadId: "thread-child" },
       output: { messages: [] },
     };
@@ -1274,9 +1359,9 @@ describe("buildThreadFeed", () => {
     const feed = buildThreadFeed([projected(toolItem, 0)]);
     const activity = feed[0]?.type === "activity-group" ? feed[0].activities[0] : null;
 
-    expect(activity?.summary).toBe("Read a T3 thread");
-    expect(activity?.logo).toBe("t3-code");
-    expect(activity?.getCopyText().split("\n")[0]).toBe("Read a T3 thread");
+    expect(activity?.summary).toBe("Read a cz thread");
+    expect(activity?.logo).toBe("czcode");
+    expect(activity?.getCopyText().split("\n")[0]).toBe("Read a cz thread");
   });
 
   it("uses the CUA action title in the mobile feed", () => {
@@ -1291,10 +1376,10 @@ describe("buildThreadFeed", () => {
     expect(activity?.summary).toBe("Inspect Saga music screen");
   });
 
-  it("uses canonical T3 orchestration summaries in compact work groups", () => {
+  it("uses canonical cz orchestration summaries in compact work groups", () => {
     const rows = [
       projected(command("2026-06-20T00:00:01.000Z"), 0),
-      ...["mcp__t3-code__t3_thread_send", "t3_code.t3_thread_send", "t3_thread_send"].map(
+      ...["mcp__czcode__cz_thread_send", "czcode.cz_thread_send", "cz_thread_send"].map(
         (toolName, index) =>
           projected(
             {
@@ -1339,7 +1424,7 @@ describe("buildThreadFeed", () => {
         ...base("list", "2026-09-19T00:00:01.000Z", 1),
         type: "dynamic_tool",
         title: "Custom provider title",
-        toolName: "T3-code.t3_project_list",
+        toolName: "czcode.cz_project_list",
         input: {},
         output: { projects: [] },
       },
@@ -1347,7 +1432,7 @@ describe("buildThreadFeed", () => {
         ...base("clone", "2026-09-19T00:00:02.000Z", 2),
         type: "dynamic_tool",
         title: "Custom provider title",
-        toolName: "mcp__t3_code__t3_project_clone",
+        toolName: "mcp__czcode__cz_project_clone",
         input: {},
         output: { cwd: "/tmp/repo" },
       },
@@ -1355,7 +1440,7 @@ describe("buildThreadFeed", () => {
         ...base("failed-clone", "2026-09-19T00:00:03.000Z", 3),
         type: "dynamic_tool",
         title: "Custom provider title",
-        toolName: "t3_project_clone",
+        toolName: "cz_project_clone",
         input: {},
         output: { isError: true },
       },
@@ -1367,7 +1452,7 @@ describe("buildThreadFeed", () => {
     expect(workEntryRowLabel(activities[0]!.workEntry)).toBe("Listed projects");
     expect(workEntryRowLabel(activities[1]!.workEntry)).toBe("Cloned a repository");
     expect(workEntryRowLabel(activities[2]!.workEntry)).toBe("Failed to clone a repository");
-    expect(activities.every((activity) => activity.logo === "t3-code")).toBe(true);
+    expect(activities.every((activity) => activity.logo === "czcode")).toBe(true);
     const presented = deriveThreadFeedPresentation(
       feed,
       { runId, status: "running", startedAt: null, completedAt: null },
@@ -1628,7 +1713,7 @@ describe("retained v2 feed presentation", () => {
             ...base("preview-click", "2026-06-20T00:00:02.000Z", 1),
             type: "dynamic_tool",
             status,
-            toolName: "mcp__t3-code__preview_click",
+            toolName: "mcp__czcode__preview_click",
             input: { element: "button" },
             output: null,
           },
@@ -1681,7 +1766,7 @@ describe("retained v2 feed presentation", () => {
           {
             ...base(id, "2026-06-20T00:00:02.000Z", index),
             type: "dynamic_tool",
-            toolName: "t3-code.delegate_task",
+            toolName: "czcode.delegate_task",
             input: { task: "Identical task" },
             output,
             ...overrides,

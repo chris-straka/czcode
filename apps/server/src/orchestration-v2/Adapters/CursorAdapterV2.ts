@@ -8,8 +8,8 @@ import type {
   SettingSource,
   ToolCall,
 } from "@cursor/sdk";
-import { formatReadToolLabel, formatSearchToolLabel } from "@t3tools/shared/toolActivity";
-import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
+import { formatReadToolLabel, formatSearchToolLabel } from "@cz/shared/toolActivity";
+import { HostProcessEnvironment } from "@cz/shared/hostProcess";
 import {
   CursorSettings,
   isOrchestrationV2WorkActive,
@@ -29,7 +29,7 @@ import {
   type OrchestrationV2TurnItem,
   type ProviderInstanceId,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -53,7 +53,7 @@ import {
   rewriteCursorSkillMentions,
 } from "../../provider/Drivers/CursorSkills.ts";
 import { mergeProviderInstanceEnvironment } from "../../provider/ProviderInstanceEnvironment.ts";
-import { t3OrchestrationPromptForFirstRun } from "../../provider/T3OrchestrationInstructions.ts";
+import { czOrchestrationPromptForFirstRun } from "../../provider/CzOrchestrationInstructions.ts";
 import { buildRuntimeInstructions } from "../../provider/RuntimeInstructions.ts";
 import * as IdAllocator from "../IdAllocator.ts";
 import { makeProviderFailure } from "../ProviderFailure.ts";
@@ -207,7 +207,7 @@ export function cursorMcpServers(threadId: ThreadId): Record<string, McpServerCo
     return undefined;
   }
   return {
-    "t3-code": {
+    czcode: {
       type: "http",
       url: session.endpoint,
       headers: {
@@ -291,7 +291,7 @@ function nativeThreadId(providerThread: OrchestrationV2ProviderThread): string {
  * plugins. The SDK loads none of them when `settingSources` is omitted.
  * Sandbox policy files are read either way, and hooks can only deny or ask
  * (which local SDK runs reject), so these layers do not loosen the sandbox or
- * approval mode T3 sets.
+ * approval mode cz sets.
  */
 const CURSOR_AGENT_SETTING_SOURCES = [
   "project",
@@ -311,7 +311,7 @@ export function makeCursorAgentOptions(input: {
   const mcpServers = cursorMcpServers(input.threadId);
   return {
     model: cursorSdkModelSelection(input.modelSelection),
-    name: `T3 Code ${input.threadId}`,
+    name: `czcode ${input.threadId}`,
     mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
     ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
     local: {
@@ -1227,7 +1227,10 @@ export function makeCursorAdapterV2(
                 toolCall.result?.status === "success" &&
                 toolCall.result.value.diffString !== undefined
                   ? { diffStr: toolCall.result.value.diffString }
-                  : {}),
+                  : // A failed change keeps its error where the diff would be.
+                    toolCall.result?.status === "error" && outputText.trim().length > 0
+                    ? { diffStr: outputText }
+                    : {}),
                 ...(toolCall.type === "write" ? { newStr: toolCall.args.fileText } : {}),
               };
               break;
@@ -1248,8 +1251,20 @@ export function makeCursorAdapterV2(
             case "ls":
             case "readLints":
             case "semSearch": {
-              const results = cursorToolSearchResults(toolCall, path);
               const pattern = cursorToolSearchPattern(toolCall);
+              const searchPath =
+                toolCall.type === "grep"
+                  ? toolCall.args.path
+                  : toolCall.type === "glob"
+                    ? toolCall.args.targetDirectory
+                    : toolCall.type === "semSearch"
+                      ? toolCall.args.targetDirectories?.join(", ")
+                      : pattern;
+              // A failed search keeps its error as one row under the searched path.
+              const results =
+                toolCall.result?.status === "error" && outputText.trim().length > 0
+                  ? [{ fileName: searchPath?.trim() || ".", preview: outputText }]
+                  : cursorToolSearchResults(toolCall, path);
               turnItem = {
                 ...base,
                 title:
@@ -2104,7 +2119,7 @@ export function makeCursorAdapterV2(
                 .map((skill) => skill.name),
             );
           }
-          const userText = t3OrchestrationPromptForFirstRun({
+          const userText = czOrchestrationPromptForFirstRun({
             prompt: providerMessageTextWithAttachmentPaths({
               text:
                 cursorSkillNames === undefined
@@ -2114,7 +2129,7 @@ export function makeCursorAdapterV2(
               attachmentsDir: serverConfig.attachmentsDir,
             }),
             runOrdinal: turnInput.runOrdinal,
-            hasT3Mcp: cursorMcpServers(turnInput.threadId) !== undefined,
+            hasCzMcp: cursorMcpServers(turnInput.threadId) !== undefined,
           });
           const images = yield* Effect.forEach(
             turnInput.message.attachments.filter(isProviderNativeImageAttachment),

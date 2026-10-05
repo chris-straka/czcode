@@ -2,7 +2,7 @@ import type {
   OrchestrationV2ProviderFailure,
   OrchestrationV2Run,
   OrchestrationV2TurnItem,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as DateTime from "effect/DateTime";
 
 /** Only a failed root turn of the current run owns the thread's failure state. */
@@ -55,9 +55,26 @@ export function latestExecutedRun(
   for (const run of runs) {
     if (run.status === "queued") continue;
     if (run.status === "cancelled" && run.startedAt === null) continue;
-    if (latest === null || run.ordinal > latest.ordinal) latest = run;
+    if (latest === null || runRanAfter(run, latest)) latest = run;
   }
   return latest;
+}
+
+/**
+ * Whether started `run` ran after `other`. Ordinals follow submission, but a
+ * run can start ahead of a held queue (a restart continuation, or a message
+ * sent while the queue is held), so a queued run resumed later can have a
+ * lower ordinal than one that already ended. An unfinished run is the latest.
+ */
+export function runRanAfter(
+  run: Pick<OrchestrationV2Run, "ordinal" | "completedAt">,
+  other: Pick<OrchestrationV2Run, "ordinal" | "completedAt">,
+): boolean {
+  const end = (candidate: typeof run) =>
+    !candidate.completedAt
+      ? Number.POSITIVE_INFINITY
+      : DateTime.toEpochMillis(candidate.completedAt);
+  return end(run) === end(other) ? run.ordinal > other.ordinal : end(run) > end(other);
 }
 
 /**

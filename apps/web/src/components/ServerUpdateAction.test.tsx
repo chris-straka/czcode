@@ -1,7 +1,7 @@
 import { act, type ReactElement } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId, ServerInstallation } from "@cz/contracts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
@@ -9,11 +9,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 const testState = vi.hoisted(() => ({
   updateServer: vi.fn(),
   toast: vi.fn(),
+  clipboard: vi.fn(),
   continueThreadsAfterServerUpdate: false,
 }));
 
 vi.mock("~/hooks/useCopyToClipboard", () => ({
-  useCopyToClipboard: () => ({ copyToClipboard: vi.fn() }),
+  useCopyToClipboard: (options: { onCopy: (context: { command: string }) => void }) => ({
+    copyToClipboard: (command: string, context: { command: string }) => {
+      testState.clipboard(command);
+      options.onCopy(context);
+    },
+  }),
 }));
 vi.mock("~/hooks/useSettings", () => ({
   useEnvironmentSettings: (
@@ -66,8 +72,50 @@ describe("ServerUpdateAction", () => {
   beforeEach(() => {
     testState.updateServer.mockReset();
     testState.toast.mockReset();
+    testState.clipboard.mockReset();
     testState.continueThreadsAfterServerUpdate = false;
   });
+
+  it.each([
+    [
+      { kind: "npm-global", prefix: "/opt/node" },
+      "npm install --global --prefix '/opt/node' cz@0.0.45",
+      "Update command copied",
+      "then restart cz",
+    ],
+    [
+      { kind: "npx" },
+      "npx cz@0.0.45",
+      "Relaunch command copied",
+      "This does not update an installed cz command.",
+    ],
+    [
+      undefined,
+      "npx cz@0.0.45",
+      "Relaunch command copied",
+      "This does not update an installed cz command.",
+    ],
+  ] satisfies ReadonlyArray<readonly [ServerInstallation | undefined, string, string, string]>)(
+    "copies an honest manual command for %j without invoking remote update",
+    (installation, command, title, guidance) => {
+      const action = ServerUpdateAction({
+        environmentId: "env-test" as EnvironmentId,
+        serverLabel: "Test server",
+        selfUpdate: null,
+        installation,
+        targetVersion: "0.0.45",
+      }) as ActionElement;
+      action.props.onClick?.();
+      expect(testState.clipboard).toHaveBeenCalledWith(command);
+      expect(testState.toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title,
+          description: expect.stringContaining(guidance),
+        }),
+      );
+      expect(testState.updateServer).not.toHaveBeenCalled();
+    },
+  );
 
   it("reports success only after the shared update flow reconnects", async () => {
     testState.updateServer.mockResolvedValue(
@@ -84,7 +132,7 @@ describe("ServerUpdateAction", () => {
     expect(testState.toast).toHaveBeenCalledWith({
       type: "success",
       title: "Test server updated",
-      description: "Reconnected on t3@0.0.31.",
+      description: "Reconnected on cz@0.0.31.",
     });
   });
 

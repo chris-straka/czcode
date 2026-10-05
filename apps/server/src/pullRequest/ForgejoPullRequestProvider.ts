@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Result from "effect/Result";
-import type { PullRequestCapabilities, PullRequestViewerPermissions } from "@t3tools/contracts";
-import { decodeJsonResult } from "@t3tools/shared/schemaJson";
+import type { PullRequestCapabilities, PullRequestViewerPermissions } from "@cz/contracts";
+import { decodeJsonResult } from "@cz/shared/schemaJson";
 import * as ForgejoCli from "../sourceControl/ForgejoCli.ts";
 import { parseDiffFileRevisions } from "./bitbucketDiffRevisions.ts";
 import {
@@ -89,7 +89,9 @@ export const make = Effect.gen(function* () {
                   ? "unauthenticated"
                   : error.reason === "rate-limit"
                     ? "rate-limited"
-                    : "failed",
+                    : error.reason === "not-found"
+                      ? "not-found"
+                      : "failed",
           }),
       ),
     );

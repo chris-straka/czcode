@@ -2,7 +2,7 @@ import {
   formatProviderSkillDisplayName,
   resolveProviderSkillSourceKind,
   type ProviderSkillSourceKind,
-} from "@t3tools/client-runtime/providerSkills";
+} from "@cz/client-runtime/providerSkills";
 import {
   type ProjectEntry,
   type ProviderDriverKind,
@@ -10,7 +10,7 @@ import {
   type ScopedThreadRef,
   type ServerProviderSkill,
   type ServerProviderSlashCommand,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import {
   BlocksIcon,
   FolderIcon,

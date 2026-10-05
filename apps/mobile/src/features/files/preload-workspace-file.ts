@@ -1,9 +1,6 @@
-import { executeAtomQuery } from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId } from "@t3tools/contracts";
-import {
-  isWorkspaceBrowserPreviewPath,
-  isWorkspaceImagePreviewPath,
-} from "@t3tools/shared/filePreview";
+import { executeAtomQuery } from "@cz/client-runtime/state/runtime";
+import type { EnvironmentId } from "@cz/contracts";
+import { isWorkspaceBrowserPreviewPath, isWorkspaceImagePreviewPath } from "@cz/shared/filePreview";
 
 import { appAtomRegistry } from "../../state/atom-registry";
 import { projectEnvironment } from "../../state/projects";

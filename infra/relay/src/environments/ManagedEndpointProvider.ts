@@ -14,7 +14,7 @@ import type {
   RelayManagedEndpoint,
   RelayManagedEndpointOrigin,
   RelayManagedEndpointRuntimeConfig,
-} from "@t3tools/contracts/relay";
+} from "@cz/contracts/relay";
 
 import * as RelayConfiguration from "../Config.ts";
 import {
@@ -58,10 +58,20 @@ const ManagedEndpointProvisioningStage = Schema.Literals([
   "sync-origin",
 ]);
 
+// Why a stage failed without an underlying error. `claim-lost` means another
+// provision, release, or deprovision changed the allocation's generation or
+// tunnel after this one loaded it.
+const ManagedEndpointProvisioningFailureReason = Schema.Literals([
+  "claim-lost",
+  "endpoint-mismatch",
+  "invalid-tunnel-response",
+]);
+
 export class ManagedEndpointProvisioningFailed extends Schema.TaggedError<ManagedEndpointProvisioningFailed>()(
   "ManagedEndpointProvisioningFailed",
   {
     stage: ManagedEndpointProvisioningStage,
+    reason: Schema.optionalKey(ManagedEndpointProvisioningFailureReason),
     userId: Schema.String,
     environmentId: Schema.String,
     hostname: Schema.optionalKey(Schema.String),
@@ -185,7 +195,7 @@ export class ManagedEndpointProvider extends Context.Service<
       readonly expectedStatus?: "inactive" | "down";
     }) => Effect.Effect<boolean, ManagedEndpointDeprovisioningFailed>;
   }
->()("t3code-relay/environments/ManagedEndpointProvider") {}
+>()("czcode-relay/environments/ManagedEndpointProvider") {}
 
 export interface ManagedEndpointTunnel {
   readonly id?: string | null;
@@ -265,7 +275,7 @@ export class ManagedEndpointTunnelClient extends Context.Service<
     ) => Effect.Effect<string, ManagedEndpointTunnelClientError>;
     readonly delete: (tunnelId: string) => Effect.Effect<unknown, ManagedEndpointTunnelClientError>;
   }
->()("t3code-relay/environments/ManagedEndpointProvider/ManagedEndpointTunnelClient") {}
+>()("czcode-relay/environments/ManagedEndpointProvider/ManagedEndpointTunnelClient") {}
 
 export const layerTunnelClient = (client: ManagedEndpointTunnelClient["Service"]) =>
   Layer.succeed(ManagedEndpointTunnelClient, client);
@@ -317,7 +327,7 @@ export class ManagedEndpointDnsClient extends Context.Service<
       dnsRecordId: string,
     ) => Effect.Effect<unknown, ManagedEndpointDnsClientError>;
   }
->()("t3code-relay/environments/ManagedEndpointProvider/ManagedEndpointDnsClient") {}
+>()("czcode-relay/environments/ManagedEndpointProvider/ManagedEndpointDnsClient") {}
 
 export const layerDnsClient = (client: ManagedEndpointDnsClient["Service"]) =>
   Layer.succeed(ManagedEndpointDnsClient, client);
@@ -543,6 +553,7 @@ export const make = Effect.gen(function* () {
         return yield* new ManagedEndpointProvisioningFailed({
           ...input,
           stage: "verify-endpoint",
+          reason: "endpoint-mismatch",
           hostname: allocation.hostname,
         });
       }
@@ -609,6 +620,7 @@ export const make = Effect.gen(function* () {
         return yield* new ManagedEndpointProvisioningFailed({
           ...input,
           stage: "sync-origin",
+          reason: "claim-lost",
         });
       }
       return updated.value === "configured" ? "ready" : "recovery_required";
@@ -995,6 +1007,7 @@ export const make = Effect.gen(function* () {
           userId: input.userId,
           environmentId: input.environmentId,
           stage: "validate-tunnel-response",
+          reason: "invalid-tunnel-response",
           hostname,
           tunnelName,
           ...(tunnelResponse.id ? { returnedTunnelId: tunnelResponse.id } : {}),
@@ -1030,6 +1043,7 @@ export const make = Effect.gen(function* () {
           userId: input.userId,
           environmentId: input.environmentId,
           stage: "record-tunnel",
+          reason: "claim-lost",
           hostname,
           tunnelName,
           tunnelId: tunnel.id,
@@ -1090,6 +1104,7 @@ export const make = Effect.gen(function* () {
           userId: input.userId,
           environmentId: input.environmentId,
           stage: "configure-tunnel",
+          reason: "claim-lost",
           hostname,
           tunnelName,
           tunnelId: tunnel.id,
@@ -1162,6 +1177,7 @@ export const make = Effect.gen(function* () {
                 userId: input.userId,
                 environmentId: input.environmentId,
                 stage: "record-dns",
+                reason: "claim-lost",
                 hostname,
                 tunnelName,
                 tunnelId: tunnel.id,
@@ -1192,6 +1208,7 @@ export const make = Effect.gen(function* () {
           userId: input.userId,
           environmentId: input.environmentId,
           stage: "record-dns",
+          reason: "claim-lost",
           hostname,
           tunnelName,
           tunnelId: tunnel.id,
@@ -1242,6 +1259,7 @@ export const make = Effect.gen(function* () {
           userId: input.userId,
           environmentId: input.environmentId,
           stage: "mark-allocation-ready",
+          reason: "claim-lost",
           hostname,
           tunnelName,
           tunnelId: tunnel.id,

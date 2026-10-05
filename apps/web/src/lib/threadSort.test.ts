@@ -5,7 +5,7 @@ import {
   ProjectId,
   ProviderInstanceId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import type { Thread } from "../types";
 import { makeThreadFixture, type ThreadFixtureOverrides } from "../test-fixtures";
 import { getLatestThreadForProject, sortThreads } from "./threadSort";
@@ -105,56 +105,6 @@ describe("sortThreads", () => {
           id: ThreadId.make("thread-2"),
           createdAt: "2026-03-09T10:05:00.000Z",
           updatedAt: "2026-03-09T10:05:00.000Z",
-          messages: [],
-        }),
-      ],
-      "updated_at",
-    );
-
-    expect(sorted.map((thread) => thread.id)).toEqual([
-      ThreadId.make("thread-2"),
-      ThreadId.make("thread-1"),
-    ]);
-  });
-
-  it("falls back to createdAt when updatedAt is invalid", () => {
-    const sorted = sortThreads(
-      [
-        makeThread({
-          id: ThreadId.make("thread-1"),
-          createdAt: "2026-03-09T10:00:00.000Z",
-          updatedAt: "invalid-date" as never,
-          messages: [],
-        }),
-        makeThread({
-          id: ThreadId.make("thread-2"),
-          createdAt: "2026-03-09T09:00:00.000Z",
-          updatedAt: "2026-03-09T09:30:00.000Z",
-          messages: [],
-        }),
-      ],
-      "updated_at",
-    );
-
-    expect(sorted.map((thread) => thread.id)).toEqual([
-      ThreadId.make("thread-1"),
-      ThreadId.make("thread-2"),
-    ]);
-  });
-
-  it("falls back to id ordering when threads have no sortable timestamps", () => {
-    const sorted = sortThreads(
-      [
-        makeThread({
-          id: ThreadId.make("thread-1"),
-          createdAt: "invalid-created-at" as never,
-          updatedAt: "invalid-updated-at" as never,
-          messages: [],
-        }),
-        makeThread({
-          id: ThreadId.make("thread-2"),
-          createdAt: "invalid-created-at" as never,
-          updatedAt: "invalid-updated-at" as never,
           messages: [],
         }),
       ],

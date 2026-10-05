@@ -16,6 +16,7 @@ export function isApplicationActiveWakeup(reason: ConnectionWakeup): boolean {
   );
 }
 
+// A long resume replaces the session, and the new session subscribes on its own.
 export function shouldResubscribeAfterWakeup(reason: ConnectionWakeup): boolean {
   return reason === "application-active" || reason === "application-active-probe";
 }
@@ -25,7 +26,7 @@ export class ConnectionWakeups extends Context.Service<
   {
     readonly changes: Stream.Stream<ConnectionWakeup>;
   }
->()("@t3tools/client-runtime/connection/wakeups/ConnectionWakeups") {}
+>()("@cz/client-runtime/connection/wakeups/ConnectionWakeups") {}
 
 const make = (service: ConnectionWakeups["Service"]) => ConnectionWakeups.of(service);
 

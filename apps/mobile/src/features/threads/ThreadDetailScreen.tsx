@@ -1,15 +1,16 @@
+import { useThreadReportedModelSelection } from "../../state/entities";
 import { UsageLimitRecoveryCard } from "./UsageLimitRecoveryCard";
 import { useNavigation } from "@react-navigation/native";
 import type { WorktreeSetupCardProps } from "./worktree-setup-card";
-import type { ComposerTextPaste } from "../../native/T3ComposerEditor.types";
-import { type EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import type { ComposerTextPaste } from "../../native/CzComposerEditor.types";
+import { type EnvironmentConnectionPhase } from "@cz/client-runtime/connection";
+import type { EnvironmentThreadShell } from "@cz/client-runtime/state/shell";
 import type {
   CodexFeedbackSubmission,
   EnvironmentThreadStatus,
-} from "@t3tools/client-runtime/state/threads";
+} from "@cz/client-runtime/state/threads";
 import { useKeyboardChatComposerInset, useKeyboardScrollToEnd } from "@legendapp/list/keyboard";
-import { resolveProviderSkillsForCwd } from "@t3tools/client-runtime/providerSkills";
+import { resolveProviderSkillsForCwd } from "@cz/client-runtime/providerSkills";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { HeaderHeightContext } from "@react-navigation/elements";
 import type {
@@ -20,26 +21,26 @@ import type {
   ProviderInteractionMode,
   RuntimeMode,
   RuntimeRequestId,
-  ServerConfig as T3ServerConfig,
+  ServerConfig as CzServerConfig,
   ThreadId,
   UsageLimitsReport,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import {
   appendCodexArtifactTemplateUsePrompt,
   type CodexArtifactTemplate,
-} from "@t3tools/client-runtime/codex-artifact-templates";
-import type { ThreadUserInputQuestion } from "@t3tools/client-runtime/state/thread-requests";
-import { presentPendingBackgroundWork } from "@t3tools/client-runtime/state/thread-execution";
-import { resolveSubagentPillSegment } from "@t3tools/client-runtime/state/thread-subagents";
+} from "@cz/client-runtime/codex-artifact-templates";
+import type { ThreadUserInputQuestion } from "@cz/client-runtime/state/thread-requests";
+import { presentPendingBackgroundWork } from "@cz/client-runtime/state/thread-execution";
+import { resolveSubagentPillSegment } from "@cz/client-runtime/state/thread-subagents";
 import {
   formatModelSelectionEffort,
   type ProviderSubagentStatus,
-} from "@t3tools/client-runtime/state/thread-execution";
-import { formatModelSlugName } from "@t3tools/shared/model";
-import { isProviderNativeSubagentThread } from "@t3tools/contracts";
+} from "@cz/client-runtime/state/thread-execution";
+import { formatModelSlugName, resolveSelectableModel } from "@cz/shared/model";
+import { isProviderNativeSubagentThread } from "@cz/contracts";
 import type { QueuedRunEdit } from "../../state/queued-run-edit";
 import type { FollowUpBehavior } from "../../lib/followUpBehavior";
-import type { ActiveTurnComposerAction } from "@t3tools/client-runtime/state/composer-dispatch";
+import type { ActiveTurnComposerAction } from "@cz/client-runtime/state/composer-dispatch";
 import * as Haptics from "expo-haptics";
 import {
   memo,
@@ -80,7 +81,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useWorkspaceContentWidth } from "../layout/workspace-content-width";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
-import { collectProviderUsageLimits } from "@t3tools/shared/usageLimits";
+import { collectProviderUsageLimits } from "@cz/shared/usageLimits";
 import type { ComposerEditorHandle } from "../../components/ComposerEditor";
 import type { StatusTone } from "../../components/StatusPill";
 import type { DraftComposerAttachment } from "../../lib/composerImages";
@@ -131,6 +132,7 @@ import { ComposerQueuedEditBanner } from "./ComposerQueuedEdit";
 import { useThreadQueuedCount } from "./ThreadQueueControl";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
 import { resolveThreadFeedSubmissionAnchor } from "./thread-feed-live-follow";
+import { useGlobalVoiceInput } from "../voice-input/VoiceInputProvider";
 
 export interface ThreadDetailScreenProps {
   readonly worktreeSetup?: WorktreeSetupCardProps | null;
@@ -188,7 +190,7 @@ export interface ThreadDetailScreenProps {
   readonly selectedThreadQueueCount: number;
   readonly queuedMessages: ReadonlyArray<QueuedThreadMessage>;
   readonly dispatchingMessageId: MessageId | null;
-  readonly serverConfig: T3ServerConfig | null;
+  readonly serverConfig: CzServerConfig | null;
   readonly layoutVariant?: LayoutVariant;
   readonly usesAutomaticContentInsets?: boolean;
   readonly onHeaderMaterialVisibilityChange?: (visible: boolean) => void;
@@ -303,6 +305,11 @@ const USER_INPUT_TOGGLE_TIMING = {
 
 export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: ThreadDetailScreenProps) {
   const navigation = useNavigation();
+  const { session: voiceInputSession } = useGlobalVoiceInput();
+  const reportedModelSelection = useThreadReportedModelSelection({
+    environmentId: props.environmentId,
+    threadId: props.selectedThread.id,
+  });
   const deviceState = useEnvironmentQuery(
     deviceEnvironment.state({ environmentId: props.environmentId, input: {} }),
   );
@@ -469,11 +476,12 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
     }
     if (pendingBackgroundWork !== null && contentPresentationKind === "ready") {
       return {
-        kind: "waiting",
+        kind: "background",
         label: pendingBackgroundWork.title,
         accessibilityLabel: `${pendingBackgroundWork.title}: ${pendingBackgroundWork.items
           .map((item) => item.label)
           .join(", ")}`,
+        waiting: pendingBackgroundWork.waiting,
       };
     }
     return null;
@@ -760,8 +768,16 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
   const providerSubagentProvider = props.serverConfig?.providers.find(
     (provider) => provider.instanceId === props.selectedThread.modelSelection.instanceId,
   );
+  // Providers can report a dated id or alias (claude-haiku-4-5-20251001).
+  const providerSubagentModelSlug = providerSubagentProvider
+    ? resolveSelectableModel(
+        providerSubagentProvider.driver,
+        props.selectedThread.modelSelection.model,
+        providerSubagentProvider.models,
+      )
+    : null;
   const providerSubagentCatalogModel = providerSubagentProvider?.models.find(
-    (model) => model.slug === props.selectedThread.modelSelection.model,
+    (model) => model.slug === providerSubagentModelSlug,
   );
   const workspaceContentWidth = useWorkspaceContentWidth();
   // Clearing animated width can retain the unfolded width after Android resumes folded.
@@ -1155,7 +1171,10 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                   >
                     <ComposerQueuedEditBanner
                       saving={props.isSavingQueuedEdit}
-                      onCancel={props.onCancelQueuedRunEdit}
+                      onCancel={() => {
+                        voiceInputSession.cancel(props.composerDraftKey);
+                        props.onCancelQueuedRunEdit();
+                      }}
                     />
                   </Animated.View>
                 ) : null}
@@ -1269,6 +1288,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                       effortLabel={formatModelSelectionEffort(
                         props.selectedThread.modelSelection,
                         providerSubagentProvider?.models,
+                        reportedModelSelection,
                       )}
                       status={props.providerSubagentStatus ?? null}
                       onOpenParent={
@@ -1285,6 +1305,7 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                 ) : (
                   <>
                     <ThreadComposer
+                      reportedModelSelection={reportedModelSelection}
                       editorRef={composerEditorRef}
                       draftMessage={props.draftMessage}
                       draftAttachments={props.draftAttachments}

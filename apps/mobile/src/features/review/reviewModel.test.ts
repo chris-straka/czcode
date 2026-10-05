@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { MessageId, RunId, type ReviewDiffPreviewSource } from "@t3tools/contracts";
-import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
+import { MessageId, RunId, type ReviewDiffPreviewSource } from "@cz/contracts";
+import type { ThreadCheckpointSummary } from "@cz/client-runtime/state/thread-checkpoints";
 
 import {
   applyReviewDiffMetadata,
@@ -18,7 +18,7 @@ function makeCheckpoint(
     Pick<ThreadCheckpointSummary, "runId" | "checkpointTurnCount" | "completedAt">,
 ): ThreadCheckpointSummary {
   return {
-    checkpointRef: `refs/t3/checkpoints/thread/${input.checkpointTurnCount}` as any,
+    checkpointRef: `refs/cz/checkpoints/thread/${input.checkpointTurnCount}` as any,
     status: "ready",
     files: [],
     assistantMessageId: MessageId.make(`msg-${input.checkpointTurnCount}`),
@@ -62,7 +62,7 @@ describe("buildReviewSectionItems", () => {
       {
         id: "working-tree",
         kind: "working-tree",
-        title: "Dirty worktree",
+        title: "Uncommitted",
         baseRef: "HEAD",
         headRef: null,
         diff: "diff --git a/a.ts b/a.ts",
@@ -72,7 +72,7 @@ describe("buildReviewSectionItems", () => {
       {
         id: "branch-range",
         kind: "branch-range",
-        title: "Against main",
+        title: "Changes vs main",
         baseRef: "main",
         headRef: "feature",
         diff: "diff --git a/a.ts b/a.ts",
@@ -105,10 +105,28 @@ describe("buildReviewSectionItems", () => {
       isLoading: false,
       diff: expect.stringContaining("loaded.ts"),
     });
-    expect(getDefaultReviewSectionId(items)).toBe("turn:2");
+    expect(getDefaultReviewSectionId(items)).toBe("git:branch-range");
   });
 
-  it("shows dirty worktree while git preview is loading", () => {
+  it("falls back to the first turn without git sections", () => {
+    const items = buildReviewSectionItems({
+      checkpoints: [
+        makeCheckpoint({
+          runId: RunId.make("run-1"),
+          checkpointTurnCount: 1,
+          completedAt: "2026-04-01T00:00:00.000Z",
+        }),
+      ],
+      gitSections: [],
+      turnDiffById: {},
+      loadingTurnIds: {},
+      loadingGitSections: false,
+    });
+
+    expect(getDefaultReviewSectionId(items)).toBe("turn:1");
+  });
+
+  it("holds the Changes place while git preview is loading", () => {
     const items = buildReviewSectionItems({
       checkpoints: [],
       gitSections: [],
@@ -119,15 +137,14 @@ describe("buildReviewSectionItems", () => {
 
     expect(items).toEqual([
       expect.objectContaining({
-        id: "git:working-tree",
-        kind: "working-tree",
-        title: "Dirty worktree",
-        subtitle: "Tracked, staged, and untracked worktree changes",
+        id: "git:branch-range",
+        kind: "branch-range",
+        title: "Changes",
         diff: null,
         isLoading: true,
       }),
     ]);
-    expect(getDefaultReviewSectionId(items)).toBe("git:working-tree");
+    expect(getDefaultReviewSectionId(items)).toBe("git:branch-range");
   });
 });
 

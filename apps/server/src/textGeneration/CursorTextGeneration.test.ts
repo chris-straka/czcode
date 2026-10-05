@@ -1,12 +1,12 @@
 import type { RunResult } from "@cursor/sdk";
-import { CursorSettings, ProviderInstanceId, TextGenerationError } from "@t3tools/contracts";
+import { CursorSettings, ProviderInstanceId, TextGenerationError } from "@cz/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Fiber from "effect/Fiber";
 import * as TestClock from "effect/testing/TestClock";
 import * as Schema from "effect/Schema";
-import { createModelSelection } from "@t3tools/shared/model";
+import { createModelSelection } from "@cz/shared/model";
 import { beforeEach, vi } from "vite-plus/test";
 
 import { makeCursorTextGeneration } from "./CursorTextGeneration.ts";
@@ -253,8 +253,9 @@ describe("CursorTextGeneration", () => {
     }).pipe(Effect.provide(fsLayer)),
   );
 
-  for (const status of ["error", "cancelled"] as const) {
-    it.effect(`rejects a ${status} Cursor SDK run that includes valid title JSON`, () =>
+  it.effect.each(["error", "cancelled"] as const)(
+    "rejects a %s Cursor SDK run that includes valid title JSON",
+    (status) =>
       Effect.gen(function* () {
         const promptResult = {
           id: "run-cursor-partial-title-test",
@@ -284,8 +285,7 @@ describe("CursorTextGeneration", () => {
         );
         expect(cursorSdkMock.close).toHaveBeenCalledOnce();
       }).pipe(Effect.provide(fsLayer)),
-    );
-  }
+  );
 
   it.effect("fails closed when ambient sandbox policy can expand write access", () =>
     Effect.gen(function* () {
@@ -329,8 +329,9 @@ describe("CursorTextGeneration", () => {
     }).pipe(Effect.provide(fsLayer), Effect.scoped),
   );
 
-  for (const phase of ["create", "send"] as const) {
-    it.effect(`times out pending ${phase} and releases its late SDK resource`, () =>
+  it.effect.each(["create", "send"] as const)(
+    "times out pending %s and releases its late SDK resource",
+    (phase) =>
       Effect.gen(function* () {
         let started!: () => void;
         const called = new Promise<void>((resolve) => {
@@ -388,8 +389,7 @@ describe("CursorTextGeneration", () => {
         expect(wait).not.toHaveBeenCalled();
         if (phase === "send") expect(cursorSdkMock.cancel).toHaveBeenCalledOnce();
       }).pipe(Effect.provide(fsLayer), Effect.scoped),
-    );
-  }
+  );
 
   it.effect("requires CURSOR_API_KEY before calling the SDK", () =>
     Effect.gen(function* () {

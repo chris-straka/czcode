@@ -4,7 +4,7 @@ import {
   DEFAULT_MODEL,
   ProjectId,
   ProviderInstanceId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -31,11 +31,20 @@ it.effect("starts without scanning or rebuilding projection history", () =>
     const result = yield* ServerRuntimeStartup.runOrderedV2StartupPhases({
       importLegacyShells: record("import"),
       recover: record("recover").pipe(Effect.as({ closedRequests: 2 })),
+      recoverDelegatedTasks: record("delegated"),
       startEffectWorker: record("worker"),
       autoBootstrap: record("bootstrap").pipe(Effect.as({ projectId: "project-1" })),
     });
 
-    assert.deepEqual(yield* Ref.get(calls), ["import", "recover", "worker", "bootstrap"]);
+    // Delegated recovery reads the runs recovery terminalizes, and settles them
+    // before the worker runs restart continuations that would otherwise race it.
+    assert.deepEqual(yield* Ref.get(calls), [
+      "import",
+      "recover",
+      "delegated",
+      "worker",
+      "bootstrap",
+    ]);
     assert.deepEqual(result, {
       recovery: { closedRequests: 2 },
       bootstrap: { projectId: "project-1" },

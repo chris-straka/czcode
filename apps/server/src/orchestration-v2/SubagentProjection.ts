@@ -15,9 +15,10 @@ import type {
   ProviderTurnId,
   ThreadId,
   TurnItemId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
+import { runRanAfter } from "@cz/shared/orchestrationV2ThreadError";
 import * as DateTime from "effect/DateTime";
-import { isOrchestrationV2WorkActive } from "@t3tools/contracts";
+import { isOrchestrationV2WorkActive } from "@cz/contracts";
 
 function trimmed(value: string | null | undefined): string | undefined {
   const result = value?.trim();
@@ -239,7 +240,7 @@ export function delegatedTaskProgress(projection: {
     projection.providerThreads.some((thread) => (thread.pendingBackgroundTasks?.length ?? 0) > 0);
   const resultRun = workRuns
     .filter((run) => terminal(run.status) && (run.startedAt !== null || run.ordinal === 1))
-    .toSorted((a, b) => b.ordinal - a.ordinal)[0];
+    .toSorted((a, b) => (runRanAfter(a, b) ? -1 : runRanAfter(b, a) ? 1 : 0))[0];
   return {
     state:
       active || resultRun === undefined

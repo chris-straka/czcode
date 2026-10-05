@@ -14,13 +14,10 @@ import {
   type SourceControlProviderAuth,
   type SourceControlRepositoryCloneUrls,
   type SourceControlRepositoryVisibility,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
-import { sanitizeBranchFragment } from "@t3tools/shared/git";
-import {
-  detectSourceControlProviderFromRemoteUrl,
-  isSshRemoteUrl,
-} from "@t3tools/shared/sourceControl";
+import { sanitizeBranchFragment } from "@cz/shared/git";
+import { detectSourceControlProviderFromRemoteUrl, isSshRemoteUrl } from "@cz/shared/sourceControl";
 
 import {
   BitbucketPullRequestListSchema,
@@ -42,12 +39,12 @@ const DEFAULT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 
 const BitbucketApiEnvConfig = Config.all({
-  baseUrl: Config.String("T3CODE_BITBUCKET_API_BASE_URL").pipe(
+  baseUrl: Config.String("CZ_BITBUCKET_API_BASE_URL").pipe(
     Config.withDefault(DEFAULT_API_BASE_URL),
   ),
-  accessToken: Config.String("T3CODE_BITBUCKET_ACCESS_TOKEN").pipe(Config.option),
-  email: Config.String("T3CODE_BITBUCKET_EMAIL").pipe(Config.option),
-  apiToken: Config.String("T3CODE_BITBUCKET_API_TOKEN").pipe(Config.option),
+  accessToken: Config.String("CZ_BITBUCKET_ACCESS_TOKEN").pipe(Config.option),
+  email: Config.String("CZ_BITBUCKET_EMAIL").pipe(Config.option),
+  apiToken: Config.String("CZ_BITBUCKET_API_TOKEN").pipe(Config.option),
 });
 
 const BitbucketApiOperation = Schema.Literals([
@@ -388,7 +385,7 @@ export class BitbucketApi extends Context.Service<
       readonly force?: boolean;
     }) => Effect.Effect<void, BitbucketApiError>;
   }
->()("t3/sourceControl/BitbucketApi") {}
+>()("cz/sourceControl/BitbucketApi") {}
 
 function nonEmpty(value: string | undefined): Option.Option<string> {
   const trimmed = value?.trim();
@@ -526,7 +523,7 @@ function checkoutBranchName(input: {
     return input.headBranch;
   }
 
-  return `t3code/pr-${input.pullRequestId}/${sanitizeBranchFragment(input.headBranch)}`;
+  return `czcode/pr-${input.pullRequestId}/${sanitizeBranchFragment(input.headBranch)}`;
 }
 
 function repositoryNameWithOwner(
@@ -565,7 +562,7 @@ function credentialFrom(input: {
 }
 
 /**
- * Credentials saved in settings win over the `T3CODE_BITBUCKET_*` environment variables, which
+ * Credentials saved in settings win over the `CZ_BITBUCKET_*` environment variables, which
  * stay as a fallback. Within each source the access token wins.
  */
 function resolveCredential(
@@ -606,7 +603,7 @@ function authFromCredential(credential: BitbucketCredential | null): SourceContr
     account: Option.none(),
     host: Option.some("bitbucket.org"),
     detail: Option.some(
-      "Add a Bitbucket token in Settings → Source Control, or set the T3CODE_BITBUCKET_* environment variables on the server.",
+      "Add a Bitbucket token in Settings → Source Control, or set the CZ_BITBUCKET_* environment variables on the server.",
     ),
   };
 }

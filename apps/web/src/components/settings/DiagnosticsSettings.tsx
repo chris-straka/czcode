@@ -1,23 +1,17 @@
 import { ProcessSignalActions } from "./ProcessSignalActions";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
-import {
-  AlertTriangleIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  CopyIcon,
-  FolderOpenIcon,
-  InfoIcon,
-} from "lucide-react";
+import { AlertTriangleIcon, CopyIcon, FolderOpenIcon, InfoIcon } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@cz/client-runtime/state/runtime";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type {
   ServerProcessDiagnosticsEntry,
   ServerProcessResourceHistorySummary,
   ServerProcessSignal,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 
@@ -30,6 +24,7 @@ import { serverEnvironment } from "../../state/server";
 import { shellEnvironment } from "../../state/shell";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { Button } from "../ui/button";
+import { MorphIcon } from "~/components/MorphIcon";
 import { ScrollArea } from "../ui/scroll-area";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -268,7 +263,6 @@ function ProcessNameCell({
 }) {
   const name = formatProcessName(process.command);
   const hasChildren = process.childPids.length > 0;
-  const ChevronIcon = isExpanded ? ChevronDownIcon : ChevronRightIcon;
 
   return (
     <div
@@ -282,7 +276,7 @@ function ProcessNameCell({
           aria-label={isExpanded ? `Collapse ${name}` : `Expand ${name}`}
           onClick={() => onToggle(process.pid)}
         >
-          <ChevronIcon className="size-3.5" />
+          <MorphIcon className="size-3.5" icon={isExpanded ? ChevronDown : ChevronRight} />
         </Button>
       ) : (
         <span className="size-5 shrink-0" aria-hidden="true" />
@@ -880,7 +874,7 @@ export function DiagnosticsSettingsPanel() {
               type: "info",
               title: "Process already exited",
               description:
-                "The process is not a child of the T3 Server. It might already have exited.",
+                "The process is not a child of the cz Server. It might already have exited.",
             });
             return;
           }
@@ -993,7 +987,7 @@ export function DiagnosticsSettingsPanel() {
           <StatBlock
             label="CPU Time"
             value={resourceData ? formatCpuTime(resourceData.totalCpuSecondsApprox) : "..."}
-            tooltip="Approximate active CPU time for the T3 server root process and its descendants during the selected window. It grows only while sampled processes use CPU and older samples leave as the window moves."
+            tooltip="Approximate active CPU time for the cz server root process and its descendants during the selected window. It grows only while sampled processes use CPU and older samples leave as the window moves."
           />
           <StatBlock
             label="Samples"

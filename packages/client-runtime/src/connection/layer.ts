@@ -1,4 +1,4 @@
-import type { RelayEnvironmentStatusResponse } from "@t3tools/contracts/relay";
+import type { RelayEnvironmentStatusResponse } from "@cz/contracts/relay";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
@@ -75,6 +75,8 @@ export function layerWithOptions(options: RpcSession.RpcSessionOptions) {
     registryLayer,
     RelayEnvironmentDiscovery.layer,
     onboardingLayer,
+    // Exposed for updating hosts too old to connect through the driver.
+    ConnectionResolver.layer,
   );
   const connectionStartupLayer = Layer.effectDiscard(
     Effect.gen(function* () {

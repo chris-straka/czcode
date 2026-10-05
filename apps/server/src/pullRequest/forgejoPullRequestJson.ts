@@ -9,7 +9,7 @@ import type {
   PullRequestReaction,
   PullRequestReactionContent,
   PullRequestReviewThread,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import type { ProviderChangeRequest } from "./PullRequestProvider.ts";
 import { dedupeChecks } from "./pullRequestChecks.ts";
 
@@ -135,8 +135,8 @@ export function forgejoChangeRequest(pr: typeof ForgejoPullRequest.Type) {
     headRepositoryNameWithOwner: pr.head.repo?.full_name ?? null,
     state: pr.merged ? "merged" : pr.state === "closed" ? "closed" : "open",
     isDraft: pr.draft ?? /^(?:\[WIP\]|WIP:)/i.test(pr.title),
-    mergeability:
-      pr.mergeable === undefined ? "unknown" : pr.mergeable ? "mergeable" : "conflicting",
+    // A false value also covers drafts and unfinished or failed conflict checks.
+    mergeability: pr.mergeable === true ? "mergeable" : "unknown",
     additions: pr.additions ?? 0,
     deletions: pr.deletions ?? 0,
     createdAt: toIsoUtc(pr.created_at),

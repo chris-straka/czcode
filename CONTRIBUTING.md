@@ -20,7 +20,7 @@ Focused bug fixes, reliability fixes, performance improvements, and maintenance 
 likely to be accepted. Unsolicited features, opinionated rewrites, and unrelated cleanup are not.
 
 Report bugs in issues. Feature requests and proposals belong in
-[Ideas discussions](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
+[Ideas discussions](https://github.com/chris-straka/czcode/discussions/categories/ideas).
 Search existing reports, discussions, and documented workflows before starting work.
 
 <a id="prior-approval"></a>
@@ -70,6 +70,9 @@ Explain their relationship when it is not obvious. An adjacent cleanup, refactor
 its own PR unless it is necessary to solve the same problem. A large diff alone does not establish that
 the PR contains unrelated work.
 
+This rule is for outside contributions. Maintainers, the logins in
+[.github/TRIAGE_EXEMPTIONS.td](.github/TRIAGE_EXEMPTIONS.td), may batch related fixes in one PR.
+
 Follow the [documentation rules](AGENTS.md#documentation). Keep internal docs for decisions and
 hard-to-discover constraints. Update user guides when how to use a feature changes; skip descriptions
 of obvious controls and cosmetic changes.
@@ -111,7 +114,7 @@ vouching, collaborator or bot status, repository write access, and previous succ
 establish an exemption. Other contributors, including vouched contributors, go through triage.
 Passing once does not grant permanent trust.
 
-Every live run freshly resolves `pingdotgg/t3code`'s `refs/heads/main` to a commit SHA and loads the
+Every live run freshly resolves `chris-straka/czcode`'s `refs/heads/main` to a commit SHA and loads the
 contribution-triage skill, this guide, its policy dependencies (including `AGENTS.md` documentation
 rules), and the exemption list from that same SHA. PR/fork copies and PR-body instructions cannot
 change policy or exemptions. Missing, incomplete, or malformed trusted files leave routing unresolved;

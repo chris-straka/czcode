@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema";
 
 import {
   PullRequestDetail,
+  PullRequestOperationError,
   pullRequestHostOf,
   type PullRequestAction,
   type PullRequestActor,
@@ -24,11 +25,13 @@ import {
   type ThreadLinkedPullRequest,
   type ThreadPullRequestLink,
   type VcsRef,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import {
+  legacyThreadPullRequestKey,
+  resolveThreadCurrentPullRequestLink,
   threadPullRequestKeysEqual,
   visibleThreadPullRequests,
-} from "@t3tools/shared/threadPullRequests";
+} from "@cz/shared/threadPullRequests";
 
 import { inferReviewCommentFenceLanguage, type ReviewCommentContext } from "~/reviewCommentContext";
 import { reviewCommentContextId } from "~/lib/composerContextRecords";
@@ -133,7 +136,7 @@ export function pullRequestCheckoutCommand(
       ) {
         return null;
       }
-      return `git clone --single-branch --branch ${headBranch} https://bitbucket.org/${headRepositoryNameWithOwner}.git t3code-pr-${number}`;
+      return `git clone --single-branch --branch ${headBranch} https://bitbucket.org/${headRepositoryNameWithOwner}.git czcode-pr-${number}`;
     }
     case "unknown":
       return null;
@@ -234,6 +237,33 @@ export function pullRequestPanelContext(
     legacy.number === surface.number
     ? "thread"
     : "page";
+}
+
+export function threadPullRequestPanelTarget(thread: {
+  readonly projectId: string;
+  readonly pullRequests?: ReadonlyArray<ThreadPullRequestLink> | undefined;
+  readonly linkedPullRequest?: ThreadLinkedPullRequest | null | undefined;
+  readonly branchPullRequest?: ThreadLinkedPullRequest | null | undefined;
+}) {
+  const current = resolveThreadCurrentPullRequestLink(thread.pullRequests ?? []);
+  const legacy = thread.linkedPullRequest;
+  if (
+    current !== null &&
+    legacy != null &&
+    threadPullRequestKeysEqual(current, legacyThreadPullRequestKey(legacy))
+  ) {
+    return legacy;
+  }
+  if (current !== null) {
+    return {
+      projectId: thread.projectId,
+      host: current.host,
+      repository: current.repository,
+      number: current.number,
+      url: current.url,
+    };
+  }
+  return legacy ?? thread.branchPullRequest ?? null;
 }
 
 /** Names where a pull-request task will land, without letting each surface guess independently. */
@@ -1161,6 +1191,12 @@ export function buildAddSelectionToAgentHandoff(input: {
   };
 }
 
+const isPullRequestOperationError = Schema.is(PullRequestOperationError);
+
+export function isPullRequestNotFound(failure: unknown): boolean {
+  return isPullRequestOperationError(failure) && failure.reason === "not-found";
+}
+
 /**
  * The internal wrapper every failed operation arrives in: which operation ran, and which tool
  * said no. A reader has no use for either.
@@ -1281,8 +1317,8 @@ const pullRequestDetailSnapshotKey = (
   reference: PullRequestDetailSnapshotRef,
 ) =>
   reference.host
-    ? `t3.pullRequests.detail:${JSON.stringify([environmentId, reference.projectId, reference.host.toLowerCase(), reference.repository.toLowerCase(), reference.number])}`
-    : `t3.pullRequests.detail:${environmentId}:${reference.projectId}:${reference.repository}#${reference.number}`;
+    ? `cz.pullRequests.detail:${JSON.stringify([environmentId, reference.projectId, reference.host.toLowerCase(), reference.repository.toLowerCase(), reference.number])}`
+    : `cz.pullRequests.detail:${environmentId}:${reference.projectId}:${reference.repository}#${reference.number}`;
 
 const decodeDetailSnapshot = Schema.decodeUnknownOption(PullRequestDetail);
 

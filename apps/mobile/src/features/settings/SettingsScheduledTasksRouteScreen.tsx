@@ -3,19 +3,18 @@ import type {
   ProjectId,
   ScheduledTask,
   ScheduledTaskUpsertInput,
-} from "@t3tools/contracts";
-import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
+} from "@cz/contracts";
+import { resolveEnvironmentMachineKind } from "@cz/contracts";
 import type { MenuAction } from "@react-native-menu/menu";
 import { DateTimePicker } from "@expo/ui/community/datetime-picker";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
   type AtomCommandResult,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@cz/client-runtime/state/runtime";
 import {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -63,6 +62,8 @@ import {
 } from "./scheduledTaskDraft";
 import { settingsTargetsForProject } from "./settings-environment-filter.logic";
 import { useScheduledTaskEditor } from "./scheduled-task-editor";
+import { scheduledTaskEditorSessionAtom } from "./scheduled-task-editor-state";
+import { appAtomRegistry } from "../../state/atom-registry";
 import {
   formatNextScheduledTaskRun,
   formatScheduledTaskInterval,
@@ -372,14 +373,21 @@ export function SettingsScheduledTaskEditRouteScreen() {
 }
 
 function SettingsScheduledTaskEditorScreen({ title }: { readonly title: string }) {
-  const { editor, setEditor, hasChanges, draftForEnvironment } = useScheduledTaskEditor();
+  const {
+    editor,
+    voiceOwnerKey,
+    readEditor,
+    setEditor,
+    startEditor,
+    hasChanges,
+    draftForEnvironment,
+  } = useScheduledTaskEditor();
   const { availableTargets } = useSettingsEnvironmentFilter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const voiceOwnerId = useId();
-  const ownerKey = editor ? `${voiceOwnerId}:${editor.environmentId}` : null;
+  const ownerKey = editor ? `${voiceOwnerKey}:${editor.environmentId}` : null;
   const prompt = editor?.draft.prompt ?? "";
   const [selectionState, setSelectionState] = useState<{
     readonly ownerKey: string | null;
@@ -402,32 +410,40 @@ function SettingsScheduledTaskEditorScreen({ title }: { readonly title: string }
     );
   const voiceInput = useVoiceInputController({
     ownerKey,
-    draftMessage: prompt,
+    label: editor?.draft.title.trim() || title,
+    subscribeToDraftChanges: (onChange) =>
+      appAtomRegistry.subscribe(scheduledTaskEditorSessionAtom, onChange),
     selection,
+    readDraftMessage: () => {
+      const current = readEditor();
+      return current?.environmentId === editor?.environmentId
+        ? (current?.draft.prompt ?? null)
+        : null;
+    },
     onChangeSelection: setSelection,
-    onChangeDraftMessage: setPrompt,
+    onChangeDraftMessage: (text) => {
+      if (readEditor()?.environmentId === editor?.environmentId) setPrompt(text);
+    },
     disabled: saving,
   });
-  const preventRemove = !saved && (hasChanges || saving || voiceInput.isBusy);
+  const preventRemove = !saved && (hasChanges || saving);
   usePreventRemove(preventRemove, ({ data }) => {
     if (saving) {
       Alert.alert("Saving task", "Wait for the task to finish saving before leaving.");
       return;
     }
-    Alert.alert(
-      "Discard changes?",
-      voiceInput.isBusy
-        ? "Your dictation and unsaved changes will be lost."
-        : "Your unsaved changes will be lost.",
-      [
-        { text: "Keep editing", style: "cancel" },
-        {
-          text: "Discard changes",
-          style: "destructive",
-          onPress: () => navigation.dispatch(data.action),
+    Alert.alert("Discard changes?", "Your unsaved changes will be lost.", [
+      { text: "Keep editing", style: "cancel" },
+      {
+        text: "Discard changes",
+        style: "destructive",
+        onPress: () => {
+          if (voiceInput.isBusy) voiceInput.cancel();
+          startEditor(null);
+          navigation.dispatch(data.action);
         },
-      ],
-    );
+      },
+    ]);
   });
   useEffect(() => {
     if (!saved) return;
@@ -920,7 +936,7 @@ function TaskForm({
         onPress={() => void save()}
         className="min-h-12 items-center justify-center rounded-[14px] bg-primary px-4 disabled:opacity-50"
       >
-        <Text className="text-base font-t3-medium text-primary-foreground">
+        <Text className="text-base font-cz-medium text-primary-foreground">
           {saving ? "Saving…" : draft.task ? "Save changes" : "Create task"}
         </Text>
       </Pressable>
@@ -1013,7 +1029,7 @@ function EnvironmentTasks({
               }}
               className="min-w-0 flex-1 gap-1 active:opacity-70"
             >
-              <Text className="text-lg font-t3-medium text-foreground" numberOfLines={1}>
+              <Text className="text-lg font-cz-medium text-foreground" numberOfLines={1}>
                 {task.title}
               </Text>
               <Text className="text-sm text-foreground-muted" numberOfLines={2}>

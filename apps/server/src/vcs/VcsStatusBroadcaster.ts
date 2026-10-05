@@ -20,9 +20,9 @@ import type {
   VcsStatusRemoteResult,
   VcsStatusResult,
   VcsStatusStreamEvent,
-} from "@t3tools/contracts";
-import { mergeGitStatusParts } from "@t3tools/shared/git";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+} from "@cz/contracts";
+import { mergeGitStatusParts } from "@cz/shared/git";
+import { resolveProjectSettings } from "@cz/shared/projectSettings";
 
 import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
@@ -145,7 +145,7 @@ interface StreamStatusOptions {
 
 export class VcsAutoPullPolicy extends Context.Reference<{
   readonly isEnabled: (cwd: string) => Effect.Effect<boolean, never>;
-}>("t3/vcs/VcsAutoPullPolicy", {
+}>("cz/vcs/VcsAutoPullPolicy", {
   defaultValue: () => ({ isEnabled: () => Effect.succeed(false) }),
 }) {}
 
@@ -205,7 +205,7 @@ export class VcsStatusBroadcaster extends Context.Service<
       options?: StreamStatusOptions,
     ) => Stream.Stream<VcsStatusStreamEvent, GitManagerServiceError>;
   }
->()("t3/vcs/VcsStatusBroadcaster") {}
+>()("cz/vcs/VcsStatusBroadcaster") {}
 
 function fingerprintStatusPart(status: unknown): string {
   return JSON.stringify(status);
@@ -462,9 +462,22 @@ export const make = Effect.gen(function* () {
         if (options?.refreshUpstream !== false) {
           yield* workflow.invalidateRemoteStatus(cwd);
         }
+        const previousRemote = (yield* getCachedStatus(cwd))?.remote?.value;
         const remote = yield* workflow.remoteStatus({ cwd }, options);
         const pulled = yield* maybeAutoPull(cwd, remote, options?.policyCwds ?? [cwd]);
         if (pulled !== null) return pulled.remote;
+        // Local status holds the Changes totals, which compare against remote refs. A fetch can
+        // move them with no local trigger (a push from a terminal, a PR merged on the host), so
+        // re-read local status on the first fetch and whenever divergence moves.
+        if (
+          remote &&
+          (!previousRemote ||
+            previousRemote.aheadCount !== remote.aheadCount ||
+            previousRemote.behindCount !== remote.behindCount ||
+            previousRemote.aheadOfDefaultCount !== remote.aheadOfDefaultCount)
+        ) {
+          yield* refreshLocalStatusCore(cwd);
+        }
         return yield* updateCachedRemoteStatus(cwd, remote, { publish: true });
       }),
     );
@@ -480,10 +493,9 @@ export const make = Effect.gen(function* () {
       cwd,
       Effect.gen(function* () {
         yield* workflow.invalidateStatus(cwd);
-        const [local, remote] = yield* Effect.all(
-          [workflow.localStatus({ cwd }), workflow.remoteStatus({ cwd })],
-          { concurrency: "unbounded" },
-        );
+        // Local after remote: the fetch can move the base that the Changes totals compare with.
+        const remote = yield* workflow.remoteStatus({ cwd });
+        const local = yield* workflow.localStatus({ cwd });
         const pulled = yield* maybeAutoPull(cwd, remote, [rawCwd]);
         if (pulled !== null) return mergeGitStatusParts(pulled.local, pulled.remote);
         return yield* updateCachedStatus(cwd, local, remote, { publish: true });

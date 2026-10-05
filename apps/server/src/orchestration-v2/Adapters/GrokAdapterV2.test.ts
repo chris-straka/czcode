@@ -6,9 +6,9 @@ import {
   ProviderSessionId,
   type RuntimeMode,
   ThreadId,
-} from "@t3tools/contracts";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { resolveSelfInvocation } from "@t3tools/shared/nodeRuntime";
+} from "@cz/contracts";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
+import { resolveSelfInvocation } from "@cz/shared/nodeRuntime";
 import * as EffectAcpErrors from "effect-acp/errors";
 import { xAiRateLimitedErrorCode } from "../../provider/acp/XAiAcpExtension.ts";
 import { assert, describe, it } from "@effect/vitest";
@@ -291,7 +291,7 @@ describe("Grok permission prompts", () => {
   } as unknown as GrokAdapterV2Options).permissionDisposition;
 
   // grok_auto_blocked_command replays Auto end to end. When an explicit policy
-  // launches Grok asking instead, T3's policy still answers its prompts.
+  // launches Grok asking instead, cz's policy still answers its prompts.
   it("leaves Auto prompts to the user unless an explicit policy launched Grok asking", () => {
     assert.equal(
       disposition?.(runtimePolicy({ runtimeMode: "auto" }), permissionRequest("read")),
@@ -312,7 +312,7 @@ describe("Grok permission prompts", () => {
 
 describe("Grok launch permission mode", () => {
   const serverConfigLayer = ServerConfig.layerTest(process.cwd(), {
-    prefix: "t3-grok-v2-launch-",
+    prefix: "cz-grok-v2-launch-",
   }).pipe(Layer.provide(NodeServices.layer));
   const testLayer = Layer.mergeAll(NodeServices.layer, IdAllocator.layer, serverConfigLayer);
 
@@ -371,17 +371,19 @@ describe("Grok launch permission mode", () => {
       ...override,
     });
 
-  for (const [runtimeMode, args] of [
-    ["approval-required", ["--permission-mode", "default", "agent", "stdio"]],
-    ["auto", ["--permission-mode", "auto", "agent", "stdio"]],
-    ["full-access", ["agent", "--always-approve", "stdio"]],
-  ] as const) {
-    it.effect(`launches ${runtimeMode} threads with ${args.join(" ")}`, () =>
-      Effect.gen(function* () {
-        assert.deepEqual(yield* launchArgs(policy(runtimeMode)), [args]);
-      }),
-    );
-  }
+  it.effect.each(
+    (
+      [
+        ["approval-required", ["--permission-mode", "default", "agent", "stdio"]],
+        ["auto", ["--permission-mode", "auto", "agent", "stdio"]],
+        ["full-access", ["agent", "--always-approve", "stdio"]],
+      ] as const
+    ).map(([runtimeMode, args]) => [runtimeMode, args.join(" "), args] as const),
+  )("launches %s threads with %s", ([runtimeMode, , args]) =>
+    Effect.gen(function* () {
+      assert.deepEqual(yield* launchArgs(policy(runtimeMode)), [args]);
+    }),
+  );
 
   it.effect("launches a thread stored as Auto-accept edits asking", () =>
     Effect.gen(function* () {

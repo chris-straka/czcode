@@ -5,13 +5,13 @@ import type {
   RuntimeMode,
   ScheduledTask,
   ScheduledTaskUpsertSchedule,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 
-import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
+import { DEFAULT_SERVER_SETTINGS } from "@cz/contracts";
 import {
   resolveProjectSettings,
   type LegacyProjectSettingsFields,
-} from "@t3tools/shared/projectSettings";
+} from "@cz/shared/projectSettings";
 import {
   buildModelOptions,
   resolveDefaultableModelSelection,

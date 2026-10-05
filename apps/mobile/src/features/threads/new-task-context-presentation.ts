@@ -1,4 +1,4 @@
-import { sanitizeNewRefName } from "@t3tools/shared/git";
+import { sanitizeNewRefName } from "@cz/shared/git";
 
 type WorkspaceMode = "local" | "worktree";
 

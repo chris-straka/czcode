@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type ReactNode, type RefObject } from "react";
-import type { ScopedThreadRef } from "@t3tools/contracts";
+import type { ScopedThreadRef } from "@cz/contracts";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { Popover, PopoverPopup, PopoverCreateHandle } from "../ui/popover";
@@ -29,12 +29,17 @@ export function ThreadDetailsCard({
   const preferredPlacement = canvas
     ? resolveThreadDetailsCardLayout({
         container: canvas.container,
-        chat: canvas.layout.chat,
+        lane: canvas.lane,
         frame: null,
       })
     : null;
   const placement = canvas
-    ? resolveThreadDetailsCardLayout({ container: canvas.container, ...canvas.layout })
+    ? resolveThreadDetailsCardLayout({
+        container: canvas.container,
+        lane: canvas.lane,
+        frame: canvas.layout.frame,
+        overlapsDetailsCard: canvas.layout.overlapsDetailsCard,
+      })
     : null;
   const mode = placement ? "inline" : "popover";
   const inlineOpen = useRightPanelStore((state) =>

@@ -6,7 +6,7 @@ import {
   TurnItemId,
   type OrchestrationV2ProjectedTurnItem,
   type OrchestrationV2TurnItem,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 
@@ -207,6 +207,36 @@ describe("threadHistoryPaging", () => {
     expect([...older.items, ...first.items].map((row) => row.sourceItemId)).toEqual(
       items.map((row) => row.sourceItemId),
     );
+  });
+
+  it("pages agent-only child transcripts instead of dropping their earlier activity", () => {
+    const commandRows = Array.from({ length: 90 }, (_, index) => makeRow(index + 1));
+    const first = makeRow(0);
+    const prompt = {
+      ...first,
+      item: {
+        ...first.item,
+        type: "user_message" as const,
+        createdBy: "agent" as const,
+        creationSource: "provider" as const,
+        inputIntent: "turn_start" as const,
+        messageId: MessageId.make("child-prompt"),
+        text: "Inspect this project",
+        attachments: [],
+      },
+    } as OrchestrationV2ProjectedTurnItem;
+    const items = [prompt, ...commandRows];
+    const recent = selectRecentTimelineWindow({ items, snapshotSequence: 1 });
+
+    expect(recent.items).toHaveLength(THREAD_HISTORY_PAGE_POLICY.maxItems);
+    expect(recent.hasMoreHistory).toBe(true);
+    const older = selectHistoryPageFromCursor({
+      items,
+      cursor: recent.nextCursor!,
+      snapshotSequence: 1,
+    });
+    expect(older.items[0]?.item.type).toBe("user_message");
+    expect([...older.items, ...recent.items]).toHaveLength(items.length);
   });
 
   it("encodes opaque cursors with stable source identity", () => {

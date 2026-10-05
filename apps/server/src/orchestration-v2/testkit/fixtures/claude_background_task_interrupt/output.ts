@@ -1,5 +1,5 @@
 import { assert } from "@effect/vitest";
-import type { ProviderReplayTranscript } from "@t3tools/contracts";
+import type { ProviderReplayTranscript } from "@cz/contracts";
 
 import type { OrchestratorV2ScenarioResult } from "../../OrchestratorScenario.ts";
 import {
@@ -44,7 +44,7 @@ export function assertClaudeBackgroundTaskInterruptOutput(
     projection.turnItems.flatMap((item) =>
       item.type === "command_execution" ? [item.status] : [],
     ),
-    ["completed", "failed"],
-    "the background launch completed; the interrupted foreground command did not",
+    ["completed", "interrupted"],
+    "the background launch completed; the foreground command was interrupted",
   );
 }

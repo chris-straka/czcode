@@ -26,6 +26,7 @@ import {
   decodeWorkflowRunApprovalsJson,
   reviewThreadConversation,
   REVIEW_THREADS_GRAPHQL_QUERY,
+  pullRequestCoreGraphQlQuery,
   pullRequestSearchGraphQlQuery,
 } from "./gitHubPullRequestJson.ts";
 
@@ -34,7 +35,7 @@ function listJson(entries: ReadonlyArray<Record<string, unknown>>): string {
     entries.map((entry) => ({
       number: 1,
       title: "Add the pull requests page",
-      url: "https://github.com/pingdotgg/t3code/pull/1",
+      url: "https://github.com/chris-straka/czcode/pull/1",
       headRefName: "feat/page",
       baseRefName: "main",
       createdAt: "2026-07-01T00:00:00Z",
@@ -198,12 +199,12 @@ describe("pull request search decoding", () => {
           nodes: rollupStates.map((state, index) => ({
             number: index + 1,
             title: "Add the pull requests page",
-            url: "https://github.com/pingdotgg/t3code/pull/1",
+            url: "https://github.com/chris-straka/czcode/pull/1",
             headRefName: "feat/page",
             baseRefName: "main",
             createdAt: "2026-07-01T00:00:00Z",
             updatedAt: "2026-07-02T00:00:00Z",
-            repository: { nameWithOwner: "pingdotgg/t3code" },
+            repository: { nameWithOwner: "chris-straka/czcode" },
             commits: {
               nodes: [{ commit: { statusCheckRollup: state === null ? null : { state } } }],
             },
@@ -247,7 +248,7 @@ describe("pull request detail decoding", () => {
   const detailJson = JSON.stringify({
     number: 7,
     title: "Detail",
-    url: "https://github.com/pingdotgg/t3code/pull/7",
+    url: "https://github.com/chris-straka/czcode/pull/7",
     headRefName: "feat/detail",
     baseRefName: "main",
     createdAt: "2026-07-01T00:00:00Z",
@@ -283,6 +284,25 @@ describe("pull request detail decoding", () => {
       ["test", "failure"],
       ["ci/legacy", "success"],
     ]);
+  });
+
+  it("keeps what branch protection requires, and asks for it on github.com only", () => {
+    const raw = JSON.parse(detailJson) as Record<string, unknown>;
+    const detail = expectSuccess(
+      decodePullRequestDetailJson(
+        JSON.stringify({
+          ...raw,
+          statusCheckRollup: [
+            { __typename: "CheckRun", name: "test", status: "IN_PROGRESS", isRequired: true },
+            { __typename: "StatusContext", context: "bot", state: "PENDING", isRequired: false },
+            { __typename: "StatusContext", context: "legacy", state: "SUCCESS" },
+          ],
+        }),
+      ),
+    );
+    expect(detail.checks.map((check) => check.required)).toEqual([true, false, undefined]);
+    expect(pullRequestCoreGraphQlQuery("github.com")).toContain("isRequired");
+    expect(pullRequestCoreGraphQlQuery("github.example.com")).not.toContain("isRequired");
   });
 
   it("keeps a workflow waiting for approval out of the passing state", () => {

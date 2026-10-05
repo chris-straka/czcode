@@ -3,12 +3,12 @@ import {
   buildMenuItems,
   getGitActionDisabledReason,
   requiresDefaultBranchConfirmation,
-} from "@t3tools/client-runtime/state/vcs";
+} from "@cz/client-runtime/state/vcs";
 import {
   resolveThreadPullRequestChains,
   threadPullRequestKeyOf,
-} from "@t3tools/shared/threadPullRequests";
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+} from "@cz/shared/threadPullRequests";
+import { EnvironmentId, ThreadId } from "@cz/contracts";
 import {
   CommonActions,
   StackActions,
@@ -282,7 +282,7 @@ export function GitOverviewSheet(props: GitOverviewSheetProps) {
         <SheetListRow
           icon="text.bubble"
           title="Review changes"
-          subtitle="Inspect turn diffs, worktree changes, and base branch diff"
+          subtitle="Inspect changes, uncommitted edits, and turn diffs"
           disabled={busy || !isRepo}
           onPress={() => {
             const params = { environmentId, threadId };
@@ -310,7 +310,7 @@ export function GitOverviewSheet(props: GitOverviewSheetProps) {
 
       {linkedPrChains.length > 0 ? (
         <View className="gap-2">
-          <Text className="px-1 text-xs font-t3-bold text-foreground-muted">
+          <Text className="px-1 text-xs font-cz-bold text-foreground-muted">
             Linked pull requests
           </Text>
           {linkedPrChains.map((chain) => (
@@ -339,7 +339,7 @@ export function GitOverviewSheet(props: GitOverviewSheetProps) {
                   <SheetListRow
                     icon="arrow.triangle.pull"
                     title={`#${link.number} ${link.snapshot?.title ?? "Pull request"}`}
-                    subtitle={`${link.repository} · ${link.snapshot === null ? "Status pending" : link.snapshot.isDraft && link.snapshot.state === "open" ? "Draft" : link.snapshot.state}`}
+                    subtitle={`${link.repository} · ${link.snapshot === null ? "Status pending" : link.snapshot.isDraft && link.snapshot.state === "open" ? "Draft" : link.snapshot.state}${link.watch === undefined ? "" : " · Watching"}`}
                     onPress={() => {
                       void tryOpenExternalUrl(link.url, "pull-request").then((opened) => {
                         if (!opened)
@@ -497,10 +497,10 @@ export function GitOverviewSheet(props: GitOverviewSheetProps) {
               />
             </Pressable>
           )}
-          <Text className="text-xs font-t3-bold tracking-[1px] uppercase text-foreground-muted">
+          <Text className="text-xs font-cz-bold tracking-[1px] uppercase text-foreground-muted">
             Repository
           </Text>
-          <Text className="pr-10 text-xl font-t3-bold">{currentBranchLabel}</Text>
+          <Text className="pr-10 text-xl font-cz-bold">{currentBranchLabel}</Text>
           <Text className="text-foreground-secondary text-sm font-medium leading-normal">
             {currentStatusSummary}
           </Text>

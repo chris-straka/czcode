@@ -6,6 +6,7 @@ import {
   type OrchestrationV2PlanArtifact,
   type OrchestrationV2Run,
   type OrchestrationV2ProviderTurn,
+  type OrchestrationV2Subagent,
   type ModelSelection,
   type RuntimeMode,
   type ProviderInteractionMode,
@@ -17,20 +18,21 @@ import {
   RunAttemptId,
   RunId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+import { getModelSelectionStringOptionValue } from "@cz/shared/model";
 import * as AnalyticsService from "../telemetry/AnalyticsService.ts";
 import * as EventSink from "./EventSink.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as IdAllocator from "./IdAllocator.ts";
 import { ProviderAdapterV2Event } from "./ProviderAdapter.ts";
 import { makeProviderFailureTurnItem } from "./ProviderFailure.ts";
+import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 
 export class ProviderEventNormalizeError extends Schema.TaggedError<ProviderEventNormalizeError>()(
   "ProviderEventNormalizeError",
@@ -73,7 +75,7 @@ export interface ProviderTurnAnalyticsContext {
 
 export class ProviderTurnAnalytics extends Context.Reference<{
   readonly record: (properties: Readonly<Record<string, unknown>>) => Effect.Effect<void>;
-}>("t3/orchestration-v2/ProviderTurnAnalytics", {
+}>("cz/orchestration-v2/ProviderTurnAnalytics", {
   defaultValue: () => ({ record: () => Effect.void }),
 }) {}
 
@@ -238,7 +240,7 @@ export interface ProviderEventIngestorV2Shape {
 export class ProviderEventIngestorV2 extends Context.Service<
   ProviderEventIngestorV2,
   ProviderEventIngestorV2Shape
->()("t3/orchestration-v2/ProviderEventIngestor/ProviderEventIngestorV2") {}
+>()("cz/orchestration-v2/ProviderEventIngestor/ProviderEventIngestorV2") {}
 
 function compactUndefined<T extends Record<string, unknown>>(record: T): T {
   return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined)) as T;
@@ -249,13 +251,17 @@ const decodeDomainEvent = Schema.decodeUnknownEffect(OrchestrationV2DomainEvent)
 export const layer: Layer.Layer<
   ProviderEventIngestorV2,
   never,
-  EventSink.EventSinkV2 | IdAllocator.IdAllocatorV2 | ProjectionStore.ProjectionStoreV2
+  | EventSink.EventSinkV2
+  | IdAllocator.IdAllocatorV2
+  | ProjectionStore.ProjectionStoreV2
+  | ThreadCommandExecutor.ThreadCommandExecutor
 > = Layer.effect(
   ProviderEventIngestorV2,
   Effect.gen(function* () {
     const eventSink = yield* EventSink.EventSinkV2;
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     const idAllocator = yield* IdAllocator.IdAllocatorV2;
+    const threadCommands = yield* ThreadCommandExecutor.ThreadCommandExecutor;
     const analytics = yield* ProviderTurnAnalytics;
     const completedTurnAnalytics = new Set<string>();
 
@@ -335,6 +341,48 @@ export const layer: Layer.Layer<
           );
         }
         return events;
+      },
+    );
+
+    /**
+     * A native subagent's thread starts on the parent's model when the
+     * provider names the real one later (a Claude agent file's model arrives
+     * with the subagent's first reply). Clients read the thread's model, so
+     * move the thread to the reported one. Thread commands rewrite the whole
+     * thread row under the thread's lock, so this read and write take it too.
+     */
+    const syncSubagentThreadModel = Effect.fn("ProviderEventIngestor.syncSubagentThreadModel")(
+      function* (input: ProviderEventIngestInput, subagent: OrchestrationV2Subagent) {
+        const { childThreadId, model } = subagent;
+        if (subagent.origin !== "provider_native" || childThreadId === null || model === null) {
+          return [];
+        }
+        const staleThread = projections.getThread(childThreadId).pipe(
+          Effect.map((thread) => (thread.modelSelection.model === model ? null : thread)),
+          Effect.catchTags({ ProjectionStoreThreadNotFoundError: () => Effect.succeed(null) }),
+        );
+        // Nearly every update already matches; only a mismatch takes the lock.
+        if ((yield* staleThread) === null) return [];
+        return yield* threadCommands.withLock(
+          childThreadId,
+          Effect.gen(function* () {
+            const thread = yield* staleThread;
+            if (thread === null) return [];
+            const now = yield* DateTime.now;
+            const event = yield* makeDomainEvent(input, {
+              type: "thread.model-selection-updated",
+              threadId: thread.id,
+              // The parent's options belong to the parent's model.
+              payload: {
+                ...thread,
+                modelSelection: { instanceId: thread.modelSelection.instanceId, model },
+                updatedAt: now,
+              },
+              occurredAt: now,
+            });
+            return yield* eventSink.write({ events: [event] });
+          }),
+        );
       },
     );
 
@@ -543,6 +591,21 @@ export const layer: Layer.Layer<
             .pipe(Effect.mapError(mapWriteError));
           return result.storedEvents;
         }).pipe(
+          Effect.flatMap((storedEvents) =>
+            storedEvents.length === 0 || input.event.type !== "subagent.updated"
+              ? Effect.succeed(storedEvents)
+              : syncSubagentThreadModel(input, input.event.subagent).pipe(
+                  Effect.map((synced) => [...storedEvents, ...synced]),
+                  Effect.mapError(
+                    (cause) =>
+                      new ProviderEventPublishError({
+                        providerSessionId: input.providerSessionId,
+                        eventCount: 1,
+                        cause,
+                      }),
+                  ),
+                ),
+          ),
           Effect.tap((storedEvents) =>
             Effect.gen(function* () {
               if (storedEvents.length === 0 || input.event.type !== "provider_turn.updated") return;

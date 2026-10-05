@@ -8,14 +8,14 @@ import {
   type SDKUserMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { SpawnExecutableResolution } from "@t3tools/shared/shell";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
+import { SpawnExecutableResolution } from "@cz/shared/shell";
 import {
   ProviderReplayEntry,
   type ModelSelection,
   type ProviderApprovalDecision,
   type ProviderReplayTranscript,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -184,6 +184,11 @@ interface ClaudeQuerySetModelFrame {
   readonly model: string;
 }
 
+interface ClaudeQuerySetPermissionModeFrame {
+  readonly type: "query.set_permission_mode";
+  readonly mode: string;
+}
+
 interface ClaudeQueryInterruptFrame {
   readonly type: "query.interrupt";
 }
@@ -239,6 +244,7 @@ type ClaudeOutboundFrame =
   | ClaudeQueryOpenFrame
   | ClaudePromptOfferFrame
   | ClaudeQuerySetModelFrame
+  | ClaudeQuerySetPermissionModeFrame
   | ClaudeQueryInterruptFrame
   | ClaudePermissionResponseFrame
   | ClaudeSessionForkFrame
@@ -809,6 +815,13 @@ function makeReplayQueryRunner(
             assertNextOutboundFrame({
               type: "query.set_model",
               model,
+            });
+          }),
+        setPermissionMode: (mode) =>
+          replayEffect(() => {
+            assertNextOutboundFrame({
+              type: "query.set_permission_mode",
+              mode,
             });
           }),
         interrupt: replayEffect(() => {

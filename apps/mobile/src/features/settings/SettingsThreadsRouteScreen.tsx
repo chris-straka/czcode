@@ -6,8 +6,8 @@ import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
-import { supportsSharedSettingsSync } from "@t3tools/client-runtime/state/shared-settings";
+import { DEFAULT_SERVER_SETTINGS } from "@cz/contracts";
+import { supportsSharedSettingsSync } from "@cz/client-runtime/state/shared-settings";
 import { AppText as Text } from "../../components/AppText";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
 import { serverEnvironment } from "../../state/server";
@@ -45,6 +45,7 @@ export function SettingsThreadsRouteScreen() {
           contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
         >
           <AutoSettleSettingsRows />
+          <BetaSettingsSection />
           <LegacySettingsSection />
         </ScrollView>
       </SettingsScreen>
@@ -228,13 +229,42 @@ function AutoSettleSettingsRows() {
               onPress={() => writeToAll(autoSettlePatch)}
               className="self-start rounded-full bg-subtle px-4 py-2 active:opacity-70"
             >
-              <Text className="text-sm font-t3-medium text-foreground">
+              <Text className="text-sm font-cz-medium text-foreground">
                 Apply auto-settle defaults
               </Text>
             </Pressable>
           </View>
         </SettingsSection>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * Device-local beta toggles, the counterpart of web's Working section (beta)
+ * in Settings → General.
+ */
+function BetaSettingsSection() {
+  const savePreferences = useAtomSet(updateMobilePreferencesAtom);
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const workingShelfEnabled =
+    AsyncResult.isSuccess(preferences) && preferences.value.workingShelfEnabled === true;
+
+  return (
+    <View className="gap-3">
+      <SettingsSection title="Beta">
+        <SettingsSwitchRow
+          icon="bolt.circle"
+          label="Working section"
+          value={workingShelfEnabled}
+          onValueChange={(value) => savePreferences({ workingShelfEnabled: value })}
+        />
+      </SettingsSection>
+      <Text className="px-2 text-sm text-foreground-muted">
+        Fold working and monitoring threads into a Working section. They return to the top of the
+        list when they need you. While this is on, active threads are ordered by time and cannot be
+        moved.
+      </Text>
     </View>
   );
 }

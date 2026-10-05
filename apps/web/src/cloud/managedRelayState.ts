@@ -5,16 +5,10 @@ import {
   ManagedRelay,
   managedRelaySessionAtom,
   readManagedRelaySnapshotState,
-} from "@t3tools/client-runtime/relay";
-import {
-  createAtomCommandScheduler,
-  createRuntimeCommand,
-} from "@t3tools/client-runtime/state/runtime";
-import type {
-  RelayClientDeviceRecord,
-  RelayClientEnvironmentRecord,
-} from "@t3tools/contracts/relay";
-import type { EnvironmentId } from "@t3tools/contracts";
+} from "@cz/client-runtime/relay";
+import { createAtomCommandScheduler, createRuntimeCommand } from "@cz/client-runtime/state/runtime";
+import type { RelayClientDeviceRecord, RelayClientEnvironmentRecord } from "@cz/contracts/relay";
+import type { EnvironmentId } from "@cz/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -69,7 +63,7 @@ export function useManagedRelayEnvironments() {
   const snapshot = readManagedRelaySnapshotState(result);
   useEffect(() => {
     if (snapshot.error) {
-      console.error("[t3-cloud] Relay environment listing failed", {
+      console.error("[cz-cloud] Relay environment listing failed", {
         message: snapshot.error,
         traceId: snapshot.errorTraceId,
       });
@@ -96,7 +90,7 @@ export function useManagedRelayDevices() {
   const snapshot = readManagedRelaySnapshotState(result);
   useEffect(() => {
     if (snapshot.error) {
-      console.error("[t3-cloud] Relay device listing failed", {
+      console.error("[cz-cloud] Relay device listing failed", {
         message: snapshot.error,
         traceId: snapshot.errorTraceId,
       });

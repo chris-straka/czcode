@@ -29,13 +29,13 @@ import {
   type ServerProvider,
   type ServerProviderSlashCommand,
   type ServerSettings as ContractServerSettings,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as PlatformError from "effect/PlatformError";
 import { HttpClient, HttpClientResponse } from "effect/unstable/http";
 import { ChildProcessSpawner } from "effect/unstable/process";
-import { deepMerge } from "@t3tools/shared/Struct";
-import { createModelCapabilities } from "@t3tools/shared/model";
-import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
+import { deepMerge } from "@cz/shared/Struct";
+import { createModelCapabilities } from "@cz/shared/model";
+import { applyServerSettingsPatch } from "@cz/shared/serverSettings";
 
 import { checkCodexProviderStatus, type CodexAppServerProviderSnapshot } from "./CodexProvider.ts";
 import { checkClaudeProviderStatus } from "./ClaudeProvider.ts";
@@ -63,7 +63,7 @@ import {
   writeProviderStatusCache,
 } from "../providerStatusCache.ts";
 import { COMPACT_SLASH_COMMAND } from "../providerSnapshot.ts";
-import type { ProviderInstance } from "../ProviderDriver.ts";
+import type { ProviderInstance, ProviderWorkspaceSnapshot } from "../ProviderDriver.ts";
 import * as ProviderInstanceRegistry from "../Services/ProviderInstanceRegistry.ts";
 import * as ProviderRegistry from "../Services/ProviderRegistry.ts";
 import { makeManualOnlyProviderMaintenanceCapabilities } from "../providerMaintenance.ts";
@@ -78,7 +78,7 @@ const disabledCodexSettings: CodexSettings = Schema.decodeSync(CodexSettings)({
   enabled: false,
 });
 
-process.env.T3CODE_CURSOR_ENABLED = "1";
+process.env.CZ_CURSOR_ENABLED = "1";
 
 // ── Test helpers ────────────────────────────────────────────────────
 
@@ -641,6 +641,34 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             skills: scopedSnapshot.skills,
           },
         ]);
+
+        const pendingSnapshot = {
+          ...scopedSnapshot,
+          slashCommands: [COMPACT_SLASH_COMMAND],
+          slashCommandsPending: true,
+        } satisfies ProviderWorkspaceSnapshot;
+        const partial = upsertProviderWorkspaceSnapshot(result, "/project", pendingSnapshot);
+        assert.deepStrictEqual(partial.workspaceSnapshots?.[0]?.slashCommands, [
+          { name: "project" },
+        ]);
+        assert.strictEqual(partial.workspaceSnapshots?.[0]?.slashCommandsPending, true);
+        const otherProject = upsertProviderWorkspaceSnapshot(
+          partial,
+          "/other-project",
+          pendingSnapshot,
+        );
+        assert.deepStrictEqual(otherProject.workspaceSnapshots?.[1]?.slashCommands, [
+          COMPACT_SLASH_COMMAND,
+        ]);
+        const recovered = upsertProviderWorkspaceSnapshot(partial, "/project", {
+          ...scopedSnapshot,
+          slashCommands: [COMPACT_SLASH_COMMAND, { name: "replacement" }],
+        });
+        assert.deepStrictEqual(recovered.workspaceSnapshots?.[0]?.slashCommands, [
+          COMPACT_SLASH_COMMAND,
+          { name: "replacement" },
+        ]);
+        assert.strictEqual(recovered.workspaceSnapshots?.[0]?.slashCommandsPending, undefined);
       });
 
       it("preserves previously discovered provider models when a refresh returns none", () => {
@@ -1189,7 +1217,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
           }).pipe(
             Effect.provide(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-codex-retired-model-cache-",
+                prefix: "czcodex-retired-model-cache-",
               }).pipe(Layer.provideMerge(NodeServices.layer)),
             ),
           ),
@@ -1529,7 +1557,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-background-refresh-",
+                  prefix: "cz-provider-registry-background-refresh-",
                 }),
               ),
               Layer.provideMerge(NodeServices.layer),
@@ -1573,7 +1601,12 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             slashCommands: [],
           } as const satisfies ServerProvider;
           const snapshotCalls = yield* Ref.make(0);
-          const scopedResult = yield* Ref.make<ServerProvider>(scopedProvider);
+          const scopedResult = yield* Ref.make<ProviderWorkspaceSnapshot>({
+            ...scopedProvider,
+            status: "error",
+            slashCommands: [COMPACT_SLASH_COMMAND],
+            slashCommandsPending: true,
+          });
           const cacheInvalidations = yield* Ref.make(0);
           const scanGate = yield* Ref.make<{
             readonly started: Deferred.Deferred<void>;
@@ -1661,7 +1694,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-workspace-snapshot-",
+                  prefix: "cz-provider-registry-workspace-snapshot-",
                 }),
               ),
               Layer.provideMerge(NodeServices.layer),
@@ -1698,8 +1731,27 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               providers[0]?.workspaceSnapshots?.[0]?.skills,
               scopedProvider.skills,
             );
+            assert.deepStrictEqual(providers[0]?.workspaceSnapshots?.[0]?.slashCommands, [
+              COMPACT_SLASH_COMMAND,
+            ]);
+            assert.strictEqual(providers[0]?.workspaceSnapshots?.[0]?.slashCommandsPending, true);
+            yield* Ref.set(scopedResult, {
+              ...scopedProvider,
+              status: "error",
+              slashCommandsPending: false,
+            });
             yield* registry.refreshWorkspaceSnapshot({ instanceId, cwd: "/workspace" });
-            assert.strictEqual(yield* Ref.get(snapshotCalls), 2);
+            assert.strictEqual(yield* Ref.get(snapshotCalls), 3);
+            assert.deepStrictEqual(
+              (yield* registry.getProviders)[0]?.workspaceSnapshots?.[0]?.slashCommands,
+              scopedProvider.slashCommands,
+            );
+            assert.strictEqual(
+              (yield* registry.getProviders)[0]?.workspaceSnapshots?.[0]?.slashCommandsPending,
+              undefined,
+            );
+            yield* registry.refreshWorkspaceSnapshot({ instanceId, cwd: "/workspace" });
+            assert.strictEqual(yield* Ref.get(snapshotCalls), 3);
             const newSkills = [
               ...scopedProvider.skills,
               { name: "added", path: "/workspace/added/SKILL.md", enabled: true },
@@ -1710,7 +1762,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               cwd: "/workspace",
               fresh: true,
             });
-            assert.strictEqual(yield* Ref.get(snapshotCalls), 3);
+            assert.strictEqual(yield* Ref.get(snapshotCalls), 4);
             assert.strictEqual(yield* Ref.get(cacheInvalidations), 1);
             assert.deepStrictEqual(
               (yield* registry.getProviders)[0]?.workspaceSnapshots?.map((s) => s.skills),
@@ -1900,7 +1952,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-reconnect-refresh-",
+                  prefix: "cz-provider-registry-reconnect-refresh-",
                 }),
               ),
               Layer.provideMerge(NodeServices.layer),
@@ -2090,7 +2142,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-merged-persist-",
+                  prefix: "cz-provider-registry-merged-persist-",
                 }),
               ),
               Layer.provideMerge(BackgroundPolicyAlwaysRunLayer),
@@ -2218,7 +2270,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
                 Layer.provideMerge(instanceRegistryLayer),
                 Layer.provideMerge(
                   ServerConfig.layerTest(process.cwd(), {
-                    prefix: "t3-provider-registry-opencode-authoritative-persist-",
+                    prefix: "cz-provider-registry-opencode-authoritative-persist-",
                   }),
                 ),
                 Layer.provideMerge(NodeServices.layer),
@@ -2321,7 +2373,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-refresh-failure-",
+                  prefix: "cz-provider-registry-refresh-failure-",
                 }),
               ),
               Layer.provideMerge(BackgroundPolicyAlwaysRunLayer),
@@ -2437,7 +2489,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-sync-failure-",
+                  prefix: "cz-provider-registry-sync-failure-",
                 }),
               ),
               Layer.provideMerge(BackgroundPolicyAlwaysRunLayer),
@@ -2489,7 +2541,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
       // assertions below fail.
       it.effect("propagates real Codex probe failures to the aggregator at boot", () =>
         Effect.gen(function* () {
-          const missingBinary = `t3code_codex_missing_`;
+          const missingBinary = `czcode_codex_missing_`;
           const serverSettings = yield* makeMutableServerSettingsService(
             decodeServerSettings(
               deepMerge(encodedDefaultServerSettings, {
@@ -2511,7 +2563,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
                 // accepts + decodes them. Cast the patch to `unknown` so
                 // the `Schema.decodeSync` below does the real validation.
                 providerInstances: {
-                  // Matches the shape the user had in `.t3/dev/settings.json`
+                  // Matches the shape the user had in `.cz/dev/settings.json`
                   // when the bug was reported: a custom enabled Codex instance
                   // pointing at a binary the server has to actually spawn.
                   codex_personal: {
@@ -2538,7 +2590,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             Layer.provideMerge(ServerSecretStore.layer),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-",
+                prefix: "cz-provider-registry-",
               }),
             ),
             Layer.provideMerge(TestHttpClientLive),
@@ -2604,8 +2656,8 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
       // A binary path change must rebuild Codex and publish its new probe result.
       it.effect("re-probes when settings change the codex binaryPath", () =>
         Effect.gen(function* () {
-          const firstMissing = `t3code_codex_first_`;
-          const secondMissing = `t3code_codex_second_`;
+          const firstMissing = `czcode_codex_first_`;
+          const secondMissing = `czcode_codex_second_`;
           const spawnedCommands: Array<string> = [];
           const secondProbeStarted = yield* Deferred.make<void>();
           const releaseSecondProbe = yield* Deferred.make<void>();
@@ -2642,7 +2694,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             Layer.provideMerge(ServerSecretStore.layer),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-",
+                prefix: "cz-provider-registry-",
               }),
             ),
             Layer.provideMerge(TestHttpClientLive),
@@ -2763,7 +2815,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
             Layer.provideMerge(ServerSecretStore.layer),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-",
+                prefix: "cz-provider-registry-",
               }),
             ),
             Layer.provideMerge(TestHttpClientLive),
@@ -2830,7 +2882,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               Layer.provideMerge(ServerSecretStore.layer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-",
+                  prefix: "cz-provider-registry-",
                 }),
               ),
               Layer.provideMerge(TestHttpClientLive),
@@ -2897,10 +2949,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
               ]);
               assert.strictEqual(cursorProvider?.enabled, false);
               assert.strictEqual(cursorProvider?.status, "disabled");
-              assert.strictEqual(
-                cursorProvider?.message,
-                "Cursor is disabled in T3 Code settings.",
-              );
+              assert.strictEqual(cursorProvider?.message, "Cursor is disabled in czcode settings.");
               assert.strictEqual(cursorSpawned, false);
             }).pipe(Effect.provide(runtimeServices));
           }),
@@ -2914,7 +2963,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
           assert.strictEqual(status.enabled, false);
           assert.strictEqual(status.status, "disabled");
           assert.strictEqual(status.installed, false);
-          assert.strictEqual(status.message, "Codex is disabled in T3 Code settings.");
+          assert.strictEqual(status.message, "Codex is disabled in czcode settings.");
         }),
       );
     });
@@ -3106,7 +3155,7 @@ it.layer(Layer.mergeAll(TestNodeServices, ServerSettingsModule.layerTest(), Test
       );
 
       it.effect("runs Claude status probes with the configured CLAUDE_CONFIG_DIR", () => {
-        const claudeConfigDir = "/tmp/t3code-claude-home";
+        const claudeConfigDir = "/tmp/czcode-claude-home";
         const recorded = recordingMockSpawnerLayer((args) => {
           const joined = args.join(" ");
           if (joined === "--version") return { stdout: "1.0.0\n", stderr: "", code: 0 };

@@ -36,8 +36,8 @@ import type {
   PullRequestUpdateMethod,
   PullRequestViewerPermissions,
   SourceControlProviderKind,
-} from "@t3tools/contracts";
-import { SourceControlProviderKind as SourceControlProviderKindSchema } from "@t3tools/contracts";
+} from "@cz/contracts";
+import { SourceControlProviderKind as SourceControlProviderKindSchema } from "@cz/contracts";
 
 /**
  * The one failure shape every provider reports, so the service can decide what a failure means
@@ -52,7 +52,13 @@ export class PullRequestProviderError extends Schema.TaggedError<PullRequestProv
   {
     provider: SourceControlProviderKindSchema,
     operation: Schema.String,
-    reason: Schema.Literals(["missing-tool", "unauthenticated", "rate-limited", "failed"]),
+    reason: Schema.Literals([
+      "missing-tool",
+      "unauthenticated",
+      "rate-limited",
+      "not-found",
+      "failed",
+    ]),
     detail: Schema.String,
     retryAt: Schema.optional(Schema.Number),
     cause: Schema.optional(Schema.Defect()),
@@ -213,6 +219,8 @@ export interface ProviderChangeRequestStat {
 }
 
 export interface ProviderChangeRequestDetail extends ProviderChangeRequest {
+  /** The head commit, where the host's detail read reports it. */
+  readonly headSha?: string | null;
   readonly body: string;
   readonly changedFiles: number;
   readonly mergedAt: string | null;
@@ -246,6 +254,7 @@ export interface ProviderChangeRequestActivity {
    */
   readonly commentCount: number;
   readonly commentsTruncated: boolean;
+  readonly reviewThreadsTruncated?: boolean;
   readonly reviewThreads: ReadonlyArray<PullRequestReviewThread>;
   readonly commits: ReadonlyArray<PullRequestCommit>;
   /** The change request's own reactions, from a host that has them. */

@@ -5,17 +5,17 @@ import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
-// oxlint-disable-next-line t3code/no-global-process-runtime -- The native compiler targets the actual host; this script has no Effect runtime.
+// oxlint-disable-next-line czcode/no-global-process-runtime -- The native compiler targets the actual host; this script has no Effect runtime.
 const hostArch = process.arch;
-// oxlint-disable-next-line t3code/no-global-process-runtime -- Native compilation only runs on the actual Linux host.
+// oxlint-disable-next-line czcode/no-global-process-runtime -- Native compilation only runs on the actual Linux host.
 const hostPlatform = process.platform;
 
 describe.skipIf(hostPlatform !== "linux")("bundled libsecret helper", () => {
   let directory;
   let executable;
   beforeAll(() => {
-    directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-browser-secret-test-"));
-    executable = NodePath.join(directory, "t3-browser-secret");
+    directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "cz-browser-secret-test-"));
+    executable = NodePath.join(directory, "cz-browser-secret");
     const root = NodeURL.fileURLToPath(new URL("../../../native/browser-secret/", import.meta.url));
     const flags = NodeChildProcess.execFileSync(
       "pkg-config",
@@ -55,7 +55,7 @@ describe.skipIf(hostPlatform !== "linux")("bundled libsecret helper", () => {
     });
 
   it("builds an executable for the requested architecture into a staged resource directory", () => {
-    const output = NodePath.join(directory, "resources", "browser-secret", "t3-browser-secret");
+    const output = NodePath.join(directory, "resources", "browser-secret", "cz-browser-secret");
     NodeChildProcess.execFileSync(process.execPath, [
       NodeURL.fileURLToPath(new URL("./build-browser-secret.mjs", import.meta.url)),
       "--arch",
@@ -78,7 +78,7 @@ describe.skipIf(hostPlatform !== "linux")("bundled libsecret helper", () => {
     expect(result.stderr.length).toBe(0);
   });
 
-  for (const [scenario, code] of [
+  it.each([
     ["missing", 2],
     ["empty", 2],
     ["locked", 3],
@@ -86,13 +86,11 @@ describe.skipIf(hostPlatform !== "linux")("bundled libsecret helper", () => {
     ["denied", 3],
     ["unavailable", 4],
     ["unloaded", 4],
-  ]) {
-    it(`reports ${scenario} without emitting a secret`, () => {
-      const result = run([scenario]);
-      expect(result.status).toBe(code);
-      expect(result.stdout.length).toBe(0);
-    });
-  }
+  ])("reports %s without emitting a secret", (scenario, code) => {
+    const result = run([scenario]);
+    expect(result.status).toBe(code);
+    expect(result.stdout.length).toBe(0);
+  });
   it("rejects invalid arguments before accessing the keyring", () => {
     for (const args of [[], [""], ["chrome", "extra"]]) {
       const result = run(args);

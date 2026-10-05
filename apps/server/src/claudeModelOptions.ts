@@ -1,10 +1,10 @@
-import type { ModelSelection } from "@t3tools/contracts";
+import type { ModelSelection } from "@cz/contracts";
 import {
   getModelSelectionBooleanOptionValue,
   getModelSelectionStringOptionValue,
   getProviderOptionDescriptors,
   resolvePromptInjectedEffort,
-} from "@t3tools/shared/model";
+} from "@cz/shared/model";
 
 import {
   BUNDLED_CLAUDE_MODEL_CATALOG,
@@ -37,7 +37,7 @@ export function compileClaudeModelSelection(
   const resolvedEffort = resolveClaudeCatalogEffort(catalog, selection.model, rawEffort);
   const effort = normalizeClaudeCatalogEffort(catalog, resolvedEffort, selection.model);
   const fastMode = supportsBoolean("fastMode")
-    ? getModelSelectionBooleanOptionValue(selection, "fastMode")
+    ? (getModelSelectionBooleanOptionValue(selection, "fastMode") ?? false)
     : undefined;
   const thinking = supportsBoolean("thinking")
     ? getModelSelectionBooleanOptionValue(selection, "thinking")

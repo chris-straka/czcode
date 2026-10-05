@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/shared",
+  "name": "@cz/shared",
   "private": true,
   "type": "module",
   "exports": {
@@ -139,9 +139,9 @@
       "types": "./src/projectSettings.ts",
       "import": "./src/projectSettings.ts"
     },
-    "./t3ProjectFile": {
-      "types": "./src/t3ProjectFile.ts",
-      "import": "./src/t3ProjectFile.ts"
+    "./czProjectFile": {
+      "types": "./src/czProjectFile.ts",
+      "import": "./src/czProjectFile.ts"
     },
     "./orchestrationTiming": {
       "types": "./src/orchestrationTiming.ts",
@@ -194,6 +194,10 @@
     "./connectAuth": {
       "types": "./src/connectAuth.ts",
       "import": "./src/connectAuth.ts"
+    },
+    "./symlink": {
+      "types": "./src/symlink.ts",
+      "import": "./src/symlink.ts"
     },
     "./path": {
       "types": "./src/path.ts",
@@ -343,9 +347,9 @@
       "types": "./src/orchestrationV2Timeline.ts",
       "import": "./src/orchestrationV2Timeline.ts"
     },
-    "./t3McpToolPresentation": {
-      "types": "./src/t3McpToolPresentation.ts",
-      "import": "./src/t3McpToolPresentation.ts"
+    "./czMcpToolPresentation": {
+      "types": "./src/czMcpToolPresentation.ts",
+      "import": "./src/czMcpToolPresentation.ts"
     },
     "./Array": {
       "types": "./src/Array.ts",
@@ -389,9 +393,9 @@
     "test": "vp test run --config ../../vite.config.ts --dir ."
   },
   "dependencies": {
+    "@cz/contracts": "workspace:*",
     "@noble/curves": "catalog:",
     "@noble/hashes": "catalog:",
-    "@t3tools/contracts": "workspace:*",
     "effect": "catalog:",
     "jose": "catalog:",
     "yaml": "catalog:"

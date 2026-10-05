@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import type { PullRequestCapabilities, PullRequestViewerPermissions } from "@t3tools/contracts";
+import type { PullRequestCapabilities, PullRequestViewerPermissions } from "@cz/contracts";
 
 import * as BitbucketPullRequestApi from "./BitbucketPullRequestApi.ts";
 import {
@@ -81,6 +81,12 @@ export function bitbucketProviderFailure(
       reason: "rate-limited",
       ...(error.retryAt === undefined ? {} : { retryAt: error.retryAt }),
     };
+  }
+  if (
+    (error._tag === "BitbucketResponseError" || error._tag === "BitbucketResponseBodyReadError") &&
+    error.status === 404
+  ) {
+    return { reason: "not-found" };
   }
   return { reason: "failed" };
 }

@@ -4,7 +4,7 @@ import {
   hasSpecificPierreIconForFileName,
   resolvePierreIconForEntry,
   syntheticFileNameForLanguageId,
-  T3_PIERRE_ICONS,
+  CZ_PIERRE_ICONS,
 } from "./pierre-icons";
 
 describe("Pierre file icons", () => {
@@ -27,21 +27,21 @@ describe("Pierre file icons", () => {
     );
   });
 
-  it("extends Pierre with T3-specific exact filename icons", () => {
-    assert.equal(resolvePierreIconForEntry("AGENTS.md", "file")?.name, "t3-file-icon-agents");
-    assert.equal(resolvePierreIconForEntry("pnpm-lock.yaml", "file")?.name, "t3-file-icon-pnpm");
+  it("extends Pierre with cz-specific exact filename icons", () => {
+    assert.equal(resolvePierreIconForEntry("AGENTS.md", "file")?.name, "cz-file-icon-agents");
+    assert.equal(resolvePierreIconForEntry("pnpm-lock.yaml", "file")?.name, "cz-file-icon-pnpm");
     assert.equal(
       resolvePierreIconForEntry("pnpm-workspace.yaml", "file")?.name,
-      "t3-file-icon-pnpm",
+      "cz-file-icon-pnpm",
     );
   });
 
   it("ships every custom icon referenced by the extended resolver", () => {
     const customIconNames = new Set(
-      Object.values(T3_PIERRE_ICONS.byFileName).filter((name) => name.startsWith("t3-")),
+      Object.values(CZ_PIERRE_ICONS.byFileName).filter((name) => name.startsWith("cz-")),
     );
     for (const iconName of customIconNames) {
-      assert.include(T3_PIERRE_ICONS.spriteSheet, `id="${iconName}"`);
+      assert.include(CZ_PIERRE_ICONS.spriteSheet, `id="${iconName}"`);
     }
   });
 

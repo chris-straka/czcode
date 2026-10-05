@@ -1,4 +1,4 @@
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@cz/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Equal from "effect/Equal";
@@ -41,6 +41,17 @@ import {
 } from "./githubRoutingPermissions.ts";
 
 const isSshConnectionProfile = Schema.is(SshConnectionProfile);
+
+function unsupportedState(
+  entry: ConnectionCatalogEntry,
+): Pick<ConnectionCatalogEntry, "unsupportedReason" | "serverUpdateRequired"> {
+  return {
+    ...(entry.unsupportedReason === undefined
+      ? {}
+      : { unsupportedReason: entry.unsupportedReason }),
+    ...(entry.serverUpdateRequired === true ? { serverUpdateRequired: true } : {}),
+  };
+}
 
 export class EnvironmentNotRegisteredError extends Schema.TaggedError<EnvironmentNotRegisteredError>()(
   "EnvironmentNotRegisteredError",
@@ -140,7 +151,7 @@ export class EnvironmentRegistry extends Context.Service<
       stream: Stream.Stream<A, E, R>,
     ) => Stream.Stream<A, E, Exclude<R, EnvironmentSupervisor.EnvironmentSupervisor>>;
   }
->()("@t3tools/client-runtime/connection/registry/EnvironmentRegistry") {}
+>()("@cz/client-runtime/connection/registry/EnvironmentRegistry") {}
 
 interface EnvironmentServiceScope {
   readonly entry: ConnectionCatalogEntry;
@@ -455,7 +466,7 @@ export const make = Effect.gen(function* () {
                 enabled: previous.enabled,
                 ...(previous.unsupportedReason !== undefined &&
                 gitHubRoutingConnectionKey(previous) === gitHubRoutingConnectionKey(registered)
-                  ? { unsupportedReason: previous.unsupportedReason }
+                  ? unsupportedState(previous)
                   : {}),
               };
         if (
@@ -494,7 +505,7 @@ export const make = Effect.gen(function* () {
           const entry: ConnectionCatalogEntry =
             previous?.unsupportedReason !== undefined &&
             gitHubRoutingConnectionKey(previous) === gitHubRoutingConnectionKey(registered)
-              ? { ...registered, enabled: false, unsupportedReason: previous.unsupportedReason }
+              ? { ...registered, enabled: false, ...unsupportedState(previous) }
               : registered;
           const persistedTarget = (yield* Ref.get(persistedTargetsByEnvironment)).get(
             target.environmentId,
@@ -844,11 +855,26 @@ export const make = Effect.gen(function* () {
       environmentId,
       Effect.gen(function* () {
         const entry = (yield* SubscriptionRef.get(entries)).get(environmentId);
-        if (entry === undefined || entry.unsupportedReason === (error?.message ?? undefined))
+        if (
+          entry === undefined ||
+          (entry.unsupportedReason === (error?.message ?? undefined) &&
+            entry.serverUpdateRequired === (error?.serverUpdateRequired ?? undefined))
+        )
           return;
-        const { unsupportedReason: _previousReason, ...rest } = entry;
+        const {
+          unsupportedReason: _previousReason,
+          serverUpdateRequired: _previousUpdateRequired,
+          ...rest
+        } = entry;
         const next: ConnectionCatalogEntry =
-          error === null ? rest : { ...rest, enabled: false, unsupportedReason: error.message };
+          error === null
+            ? rest
+            : {
+                ...rest,
+                enabled: false,
+                unsupportedReason: error.message,
+                ...(error.serverUpdateRequired === true ? { serverUpdateRequired: true } : {}),
+              };
         if (
           error !== null &&
           entry.enabled &&

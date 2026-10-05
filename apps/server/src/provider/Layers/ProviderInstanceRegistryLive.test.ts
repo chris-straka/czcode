@@ -37,8 +37,8 @@ import {
   ProviderDriverKind,
   type ProviderInstanceConfigMap,
   ProviderInstanceId,
-} from "@t3tools/contracts";
-import { HostProcessPlatform, isHostWindows } from "@t3tools/shared/hostProcess";
+} from "@cz/contracts";
+import { HostProcessPlatform, isHostWindows } from "@cz/shared/hostProcess";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -153,7 +153,7 @@ const makeTildeProviderFixtures = Effect.fn(
   const homePath = expandHomePath("~");
   const fixtureDir = yield* fileSystem.makeTempDirectoryScoped({
     directory: homePath,
-    prefix: ".t3-provider-path-test-",
+    prefix: ".cz-provider-path-test-",
   });
   const codexPath = path.join(fixtureDir, "codex");
   const claudePath = path.join(fixtureDir, "claude");
@@ -177,55 +177,11 @@ const makeTildeProviderFixtures = Effect.fn(
   );
   yield* fileSystem.chmod(codexPath, 0o755);
 
-  yield* fileSystem.writeFileString(
+  yield* fileSystem.copyFile(
+    yield* path.fromFileUrl(
+      new URL("./testing/ProviderInstanceRegistryLive.fixture.mjs", import.meta.url),
+    ),
     claudePath,
-    [
-      "#!/usr/bin/env node",
-      'import { existsSync } from "node:fs";',
-      'import * as NodeReadline from "node:readline";',
-      'if (process.argv.includes("--version")) {',
-      '  process.stdout.write("claude 2.1.219\\n");',
-      "  process.exit(0);",
-      "}",
-      "const lines = NodeReadline.createInterface({ input: process.stdin });",
-      'lines.on("line", (line) => {',
-      "  const message = JSON.parse(line);",
-      '  if (message.type !== "control_request") return;',
-      '  if (message.request?.subtype === "get_usage") {',
-      "    const marker = process.env.T3_CLAUDE_RESET_MARKER;",
-      "    if (process.env.T3_CLAUDE_USAGE_FAILS_AFTER_CLAIM && marker && existsSync(marker)) {",
-      "      process.stdout.write(JSON.stringify({",
-      '        type: "control_response",',
-      '        response: { subtype: "error", request_id: message.request_id, error: "usage failed" },',
-      '      }) + "\\n");',
-      "      return;",
-      "    }",
-      "    process.stdout.write(JSON.stringify({",
-      '      type: "control_response",',
-      '      response: { subtype: "success", request_id: message.request_id, response: {',
-      '        session: {}, subscription_type: "pro", rate_limits_available: true,',
-      "        rate_limits: { five_hour: { utilization: marker && existsSync(marker) ? 0 : 100, resets_at: null } },",
-      "      } },",
-      '    }) + "\\n");',
-      "    return;",
-      "  }",
-      '  if (message.request?.subtype !== "initialize") return;',
-      "  process.stdout.write(JSON.stringify({",
-      '    type: "control_response",',
-      "    response: {",
-      '      subtype: "success",',
-      "      request_id: message.request_id,",
-      "      response: {",
-      "        commands: [], agents: [], models: [],",
-      '        output_style: "default", available_output_styles: ["default"],',
-      '        account: { email: "test@example.com", subscriptionType: "pro", tokenSource: "oauth" },',
-      "      },",
-      "    },",
-      '  }) + "\\n");',
-      "});",
-      "setInterval(() => {}, 1_000);",
-      "",
-    ].join("\n"),
   );
   yield* fileSystem.chmod(claudePath, 0o755);
   yield* fileSystem.makeDirectory(claudeHomePath);
@@ -407,7 +363,7 @@ describe("ProviderInstanceRegistryLive — multi-instance codex slice", () => {
             driver: ProviderDriverKind.make("codex"),
             enabled: true,
             environment: [
-              { name: "T3_CODEX_COLLAB_SCRIPT", value: fixtures.codexScriptPath, sensitive: false },
+              { name: "czcodeX_COLLAB_SCRIPT", value: fixtures.codexScriptPath, sensitive: false },
             ],
             config: makeCodexConfig({ enabled: true, binaryPath: fixtures.codexBinaryPath }),
           },
@@ -435,7 +391,7 @@ describe("ProviderInstanceRegistryLive — multi-instance codex slice", () => {
           enabled: true,
           environment: [
             {
-              name: "T3_CODEX_COLLAB_SCRIPT",
+              name: "czcodeX_COLLAB_SCRIPT",
               value: fixtures.codexScriptPath,
               sensitive: false,
             },
@@ -518,9 +474,9 @@ describe("ProviderInstanceRegistryLive — multi-instance codex slice", () => {
             driver: ProviderDriverKind.make("claudeAgent"),
             enabled: true,
             environment: [
-              { name: "T3_CLAUDE_RESET_MARKER", value: marker, sensitive: false },
+              { name: "CZ_CLAUDE_RESET_MARKER", value: marker, sensitive: false },
               ...(claim.usageFailsAfterClaim
-                ? [{ name: "T3_CLAUDE_USAGE_FAILS_AFTER_CLAIM", value: "1", sensitive: false }]
+                ? [{ name: "CZ_CLAUDE_USAGE_FAILS_AFTER_CLAIM", value: "1", sensitive: false }]
                 : []),
             ],
             config: makeClaudeConfig({

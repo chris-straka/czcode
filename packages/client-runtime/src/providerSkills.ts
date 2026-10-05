@@ -2,7 +2,7 @@ import type {
   ServerProvider,
   ServerProviderSkill,
   ServerProviderSlashCommand,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 
 export type ProviderSkillSourceKind = "app" | "repo" | "project" | "personal" | "system" | "other";
 
@@ -109,6 +109,14 @@ function resolveProviderWorkspaceSnapshot(
 ) {
   if (!cwd) return undefined;
   return provider.workspaceSnapshots?.find((snapshot) => snapshot.cwd === cwd);
+}
+
+export function hasCompleteProviderWorkspaceSnapshot(
+  provider: ServerProvider | null | undefined,
+  cwd: string | null | undefined,
+): boolean {
+  const snapshot = provider && resolveProviderWorkspaceSnapshot(provider, cwd);
+  return Boolean(snapshot && !snapshot.slashCommandsPending);
 }
 
 export function resolveProviderSkillsForCwd(

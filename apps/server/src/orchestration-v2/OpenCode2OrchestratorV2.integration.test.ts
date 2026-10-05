@@ -17,7 +17,7 @@ import {
   type ProviderReplayEntry,
   type RuntimeMode,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as FileSystem from "effect/FileSystem";
@@ -72,16 +72,16 @@ const event = (type: string, data: Record<string, unknown>): ProviderReplayEntry
 const labelled = (entry: ProviderReplayEntry, label: string): ProviderReplayEntry =>
   entry.type === "runtime_exit" ? entry : { ...entry, label };
 /**
- * T3's own rules after a mode's: every thread's T3 MCP server is denied, and
+ * cz's own rules after a mode's: every thread's cz MCP server is denied, and
  * then this thread's own is allowed again (last match wins).
  */
 const mcpRules = (name: string) => [
-  { action: "t3-code-*", resource: "*", effect: "deny" },
-  { action: `t3-code-thread_${name}_*`, resource: "*", effect: "allow" },
+  { action: "czcode-*", resource: "*", effect: "deny" },
+  { action: `czcode-thread_${name}_*`, resource: "*", effect: "allow" },
 ];
 const FULL_ACCESS = [{ action: "*", resource: "*", effect: "allow" }];
 /** Full access for the thread named `name`. */
-const t3Rules = (name: string) => [...FULL_ACCESS, ...mcpRules(name)];
+const czRules = (name: string) => [...FULL_ACCESS, ...mcpRules(name)];
 /** Paths the build and plan agents allow for themselves, as 2.0.18 lists them. */
 const BUILD_PATHS = [
   {
@@ -104,7 +104,7 @@ const agentInfo = (id: string, description: string, permissions: ReadonlyArray<u
   hidden: false,
   permissions,
 });
-/** `/api/agent` trimmed to the two agents a T3 session runs. */
+/** `/api/agent` trimmed to the two agents a cz session runs. */
 const agentList = (directory: string) => ({
   location: { directory },
   data: [
@@ -163,9 +163,9 @@ const sessionInfo = (directory: string, permissions: ReadonlyArray<unknown>) => 
     permissions,
   },
 });
-/** T3's instructions entry, written before a thread's first prompt and whenever it changes. */
+/** cz's instructions entry, written before a thread's first prompt and whenever it changes. */
 const instructionsWritten: ReadonlyArray<ProviderReplayEntry> = [
-  out("session.instructions.entry.put", { sessionID: SESSION, key: "t3-code", value: "<any>" }),
+  out("session.instructions.entry.put", { sessionID: SESSION, key: "czcode", value: "<any>" }),
   reply("session.instructions.entry.put", null),
 ];
 /** One prompt the server accepts and answers with `text`. */
@@ -221,7 +221,7 @@ const catalogModel = (id: string, name: string) => ({
 const createdSession = (
   directory: string,
   name: string,
-  permissions: ReadonlyArray<unknown> = t3Rules(name),
+  permissions: ReadonlyArray<unknown> = czRules(name),
   // Only a mode that narrows Full access reads the agents' own path rules.
   narrows = false,
 ): ReadonlyArray<ProviderReplayEntry> => [
@@ -332,61 +332,59 @@ const runScenario = (input: {
   });
 
 describe("OpenCode 2 through the orchestrator", () => {
-  for (const via of ["message", "thread settings"] as const) {
-    it.effect(
-      `switches the session's model before the next prompt when changed from the ${via}`,
-      () =>
-        Effect.gen(function* () {
-          const name = `opencode2-model-switch-${via.replace(" ", "-")}`;
-          const cwd = yield* checkpointWorkspace(name);
-          const thread = threadCommands({ name, worktreePath: cwd });
-          const projection = yield* runScenario({
-            name,
-            threadId: thread.threadId,
-            entries: [
-              ...createdSession(cwd, name),
-              ...instructionsWritten,
-              ...answeredPrompt("FIRST"),
-              // The next turn resumes the session at its new selection.
-              out("session.get", { sessionID: SESSION }),
-              reply("session.get", sessionInfo(cwd, t3Rules(name))),
-              out("session.switchModel", {
-                sessionID: SESSION,
-                model: { providerID: "opencode", id: "mimo-v2.6-flash-free" },
-              }),
-              reply("session.switchModel", null),
-              // The instructions name the model, so they are written again.
-              ...instructionsWritten,
-              ...answeredPrompt("SECOND"),
-            ],
-            commands: [
-              thread.create,
-              thread.message("first"),
-              ...(via === "thread settings"
-                ? [
-                    {
-                      type: "thread.model-selection.set",
-                      commandId: thread.command("model"),
-                      threadId: thread.threadId,
-                      modelSelection: mimo,
-                    } satisfies OrchestrationV2Command,
-                  ]
-                : []),
-              thread.message("second", mimo),
-            ],
-          });
-          assert.deepEqual(
-            projection.runs.map((run) => [run.status, run.modelSelection.model]),
-            [
-              ["completed", bigPickle.model],
-              ["completed", mimo.model],
-            ],
-          );
-          // One native session carried both turns.
-          assert.lengthOf(projection.providerThreads, 1);
-        }).pipe(Effect.scoped),
-    );
-  }
+  it.effect.each(["message", "thread settings"] as const)(
+    "switches the session's model before the next prompt when changed from the %s",
+    (via) =>
+      Effect.gen(function* () {
+        const name = `opencode2-model-switch-${via.replace(" ", "-")}`;
+        const cwd = yield* checkpointWorkspace(name);
+        const thread = threadCommands({ name, worktreePath: cwd });
+        const projection = yield* runScenario({
+          name,
+          threadId: thread.threadId,
+          entries: [
+            ...createdSession(cwd, name),
+            ...instructionsWritten,
+            ...answeredPrompt("FIRST"),
+            // The next turn resumes the session at its new selection.
+            out("session.get", { sessionID: SESSION }),
+            reply("session.get", sessionInfo(cwd, czRules(name))),
+            out("session.switchModel", {
+              sessionID: SESSION,
+              model: { providerID: "opencode", id: "mimo-v2.6-flash-free" },
+            }),
+            reply("session.switchModel", null),
+            // The instructions name the model, so they are written again.
+            ...instructionsWritten,
+            ...answeredPrompt("SECOND"),
+          ],
+          commands: [
+            thread.create,
+            thread.message("first"),
+            ...(via === "thread settings"
+              ? [
+                  {
+                    type: "thread.model-selection.set",
+                    commandId: thread.command("model"),
+                    threadId: thread.threadId,
+                    modelSelection: mimo,
+                  } satisfies OrchestrationV2Command,
+                ]
+              : []),
+            thread.message("second", mimo),
+          ],
+        });
+        assert.deepEqual(
+          projection.runs.map((run) => [run.status, run.modelSelection.model]),
+          [
+            ["completed", bigPickle.model],
+            ["completed", mimo.model],
+          ],
+        );
+        // One native session carried both turns.
+        assert.lengthOf(projection.providerThreads, 1);
+      }).pipe(Effect.scoped),
+  );
 
   it.effect("moves the session to the thread's new worktree before the next prompt", () =>
     Effect.gen(function* () {
@@ -403,7 +401,7 @@ describe("OpenCode 2 through the orchestrator", () => {
           ...answeredPrompt("FIRST"),
           ...directoryModels(after),
           out("session.get", { sessionID: SESSION }),
-          reply("session.get", sessionInfo(before, t3Rules(name))),
+          reply("session.get", sessionInfo(before, czRules(name))),
           // The worktree change detached the thread, so its session is loaded afresh.
           ...noOpenRequests,
           out("session.move", { sessionID: SESSION, directory: after }),
@@ -432,7 +430,7 @@ describe("OpenCode 2 through the orchestrator", () => {
     }).pipe(Effect.scoped),
   );
 
-  it.effect("gives a session made with older rules T3's rules before its next prompt", () =>
+  it.effect("gives a session made with older rules cz's rules before its next prompt", () =>
     Effect.gen(function* () {
       const name = "opencode2-resume-rules";
       const before = yield* checkpointWorkspace(`${name}-before`);
@@ -458,7 +456,7 @@ describe("OpenCode 2 through the orchestrator", () => {
             ]),
           ),
           ...noOpenRequests,
-          out("session.update", { sessionID: SESSION, permissions: t3Rules(name) }),
+          out("session.update", { sessionID: SESSION, permissions: czRules(name) }),
           reply("session.update", null),
           out("session.move", { sessionID: SESSION, directory: after }),
           reply("session.move", null),
@@ -533,7 +531,7 @@ describe("OpenCode 2 through the orchestrator", () => {
           ...answeredPrompt("FIRST"),
           // A mode change detaches nothing: the same session is resumed with the new rules.
           out("session.get", { sessionID: SESSION }),
-          reply("session.get", sessionInfo(cwd, t3Rules(name))),
+          reply("session.get", sessionInfo(cwd, czRules(name))),
           out("agent.list", "<any>"),
           reply("agent.list", agentList(cwd)),
           out("session.update", { sessionID: SESSION, permissions: autoEditRules(name) }),
@@ -542,7 +540,7 @@ describe("OpenCode 2 through the orchestrator", () => {
           // Back to Full access: the narrowing rules go.
           out("session.get", { sessionID: SESSION }),
           reply("session.get", sessionInfo(cwd, autoEditRules(name))),
-          out("session.update", { sessionID: SESSION, permissions: t3Rules(name) }),
+          out("session.update", { sessionID: SESSION, permissions: czRules(name) }),
           reply("session.update", null),
           ...answeredPrompt("THIRD"),
         ],
@@ -580,7 +578,7 @@ describe("OpenCode 2 through the orchestrator", () => {
           ...answeredPrompt("PLANNED"),
           out("session.get", { sessionID: SESSION }),
           reply("session.get", sessionInfo(cwd, planRules(name))),
-          out("session.update", { sessionID: SESSION, permissions: t3Rules(name) }),
+          out("session.update", { sessionID: SESSION, permissions: czRules(name) }),
           reply("session.update", null),
           out("session.switchAgent", { sessionID: SESSION, agent: "build" }),
           reply("session.switchAgent", null),
@@ -664,7 +662,7 @@ describe("OpenCode 2 through the orchestrator", () => {
         recorded.metadata?.["forkedNativeSessionId"],
       );
       // The fork keeps the first turn and drops the second: the model answers
-      // from the first alone, and T3 shows the inherited turn but not the other.
+      // from the first alone, and cz shows the inherited turn but not the other.
       assert.deepEqual(
         forked.runs.map((run) => run.status),
         ["completed"],
@@ -763,7 +761,7 @@ describe("OpenCode 2 through the orchestrator", () => {
   /**
    * The recorded background run (`opencode2_background`): the parent's turn
    * ends while its subagent runs, then the subagent's report wakes the parent
-   * and T3 opens a continuation run for that follow-up. `reconnect` replaces
+   * and cz opens a continuation run for that follow-up. `reconnect` replaces
    * the recording from `cut` on with a stream drop, a restarted stream and
    * what the server answers then.
    */

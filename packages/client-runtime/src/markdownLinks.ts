@@ -1,4 +1,4 @@
-import { isWindowsAbsolutePath } from "@t3tools/shared/path";
+import { isWindowsAbsolutePath } from "@cz/shared/path";
 
 const SLASH_PREFIXED_WINDOWS_DRIVE_PATTERN = /^\/[A-Za-z]:[\\/]/;
 const RELATIVE_PATH_PREFIX_PATTERN = /^(~\/|\.{1,2}\/)/;
@@ -263,6 +263,29 @@ export function splitFilePathPosition(path: string, hash = ""): FilePathPosition
 export function formatFilePathPosition(position: FilePathPosition): string {
   if (!position.line) return position.path;
   return `${position.path}:${position.line}${position.column ? `:${position.column}` : ""}`;
+}
+
+/** Keeps filename and destination-path labels compact without discarding prose. */
+export function isMarkdownFileLinkLabel(label: string, href: string): boolean {
+  const destination = parseMarkdownFileLink(href);
+  if (!destination) return false;
+  const normalize = (path: string) =>
+    path.replaceAll("\\", "/").replace(/^\.\//, "").replace(/\/+$/, "");
+  const labelPosition = splitFilePathPosition(label.trim());
+  if (
+    (labelPosition.line !== undefined && labelPosition.line !== destination.line) ||
+    (labelPosition.column !== undefined && labelPosition.column !== destination.column)
+  ) {
+    return false;
+  }
+  let labelPath = normalize(labelPosition.path);
+  let destinationPath = normalize(destination.path);
+  if (labelPath.length === 0) return true;
+  if (isWindowsAbsolutePath(destination.path)) {
+    labelPath = labelPath.toLowerCase();
+    destinationPath = destinationPath.toLowerCase();
+  }
+  return destinationPath === labelPath || destinationPath.endsWith(`/${labelPath}`);
 }
 
 export function isRelativeFilePath(path: string): boolean {

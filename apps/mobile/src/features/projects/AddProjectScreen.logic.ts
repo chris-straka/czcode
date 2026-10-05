@@ -1,6 +1,6 @@
-import { canCreateProjectInEnvironment } from "@t3tools/client-runtime/operations/projects";
-import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
-import type { EnvironmentId } from "@t3tools/contracts";
+import { canCreateProjectInEnvironment } from "@cz/client-runtime/operations/projects";
+import type { EnvironmentConnectionPhase } from "@cz/client-runtime/connection";
+import type { EnvironmentId } from "@cz/contracts";
 
 export function resolveAddProjectEnvironment<
   T extends {

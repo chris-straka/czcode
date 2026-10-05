@@ -8,7 +8,7 @@ import {
   OpenCodeSettings,
   PiSettings,
   ProviderDriverKind,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import type * as Schema from "effect/Schema";
 
 type ProviderSettingsSchema = {
@@ -89,13 +89,11 @@ const PROVIDER_CLIENT_DEFINITIONS: readonly ProviderClientDefinition[] = [
   {
     value: ProviderDriverKind.make("pi"),
     label: "Pi",
-    badgeLabel: "Early Access",
     settingsSchema: PiSettings,
   },
   {
     value: ProviderDriverKind.make("acpRegistry"),
     label: "ACP Registry",
-    badgeLabel: "Early Access",
     settingsSchema: AcpRegistrySettings,
     hasDefaultInstance: false,
   },

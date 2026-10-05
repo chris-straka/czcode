@@ -1,5 +1,5 @@
-import type { SubagentPillSegment } from "@t3tools/client-runtime/state/thread-subagents";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
+import type { SubagentPillSegment } from "@cz/client-runtime/state/thread-subagents";
+import { formatDuration } from "@cz/shared/orchestrationTiming";
 import { GlassContainer, GlassView } from "expo-glass-effect";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
@@ -207,7 +207,7 @@ export function FloatingWorkingControl(props: {
         >
           {hasStatus || hasDevicePreview ? <View className="mr-1 h-4 w-px bg-border" /> : null}
           <SymbolView name="person.2" size={13} tintColorClassName="accent-foreground-muted" />
-          <Text className="font-t3-medium text-xs tabular-nums" numberOfLines={1}>
+          <Text className="font-cz-medium text-xs tabular-nums" numberOfLines={1}>
             {agents.label}
           </Text>
         </Pressable>
@@ -226,7 +226,7 @@ export function FloatingWorkingControl(props: {
             <View className="mr-1 h-4 w-px bg-border" />
           ) : null}
           <SymbolView name="list.number" size={13} tintColorClassName="accent-foreground-muted" />
-          <Text className="shrink font-t3-medium text-xs tabular-nums" numberOfLines={1}>
+          <Text className="shrink font-cz-medium text-xs tabular-nums" numberOfLines={1}>
             {props.queuedCount} queued
           </Text>
         </Pressable>
@@ -332,7 +332,7 @@ function CompactingLabel(props: { readonly onLayout: (event: LayoutChangeEvent) 
         tintColorClassName="foreground"
         type="monochrome"
       />
-      <Text className="font-t3-medium text-xs text-foreground">Compacting…</Text>
+      <Text className="font-cz-medium text-xs text-foreground">Compacting…</Text>
     </StatusLabelRow>
   );
 }
@@ -352,7 +352,7 @@ function FloatingStatusLabel(props: {
         onLayout={props.onLayout}
       >
         <ActivityIndicator size="small" colorClassName="accent-icon-muted" />
-        <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
+        <Text className="shrink font-cz-medium text-xs text-foreground" numberOfLines={1}>
           {props.status.label}
         </Text>
       </StatusLabelRow>
@@ -377,7 +377,7 @@ function FloatingStatusLabel(props: {
           <View className="h-2 w-2 rounded-full bg-red-500" />
         )}
         <Text
-          className="max-w-[260px] shrink font-t3-medium text-xs text-foreground"
+          className="max-w-[260px] shrink font-cz-medium text-xs text-foreground"
           numberOfLines={1}
         >
           {props.status.label}
@@ -385,21 +385,23 @@ function FloatingStatusLabel(props: {
       </StatusLabelRow>
     );
   }
-  if (props.status.kind === "waiting") {
+  if (props.status.kind === "background") {
     return (
       <StatusLabelRow
-        key="waiting"
+        key="background"
         accessibilityLabel={props.status.accessibilityLabel}
         className="gap-2"
         onLayout={props.onLayout}
       >
+        {/* A dev server can run for hours after the agent is done, so only work
+            that will wake the agent gets the bolt. */}
         <SymbolView
-          name={{ ios: "bolt", android: "bolt" }}
+          name={props.status.waiting ? { ios: "bolt", android: "bolt" } : "terminal"}
           size={13}
           tintColorClassName="foreground"
           type="monochrome"
         />
-        <Text className="shrink font-t3-medium text-xs text-foreground" numberOfLines={1}>
+        <Text className="shrink font-cz-medium text-xs text-foreground" numberOfLines={1}>
           {props.status.label}
         </Text>
       </StatusLabelRow>
@@ -421,7 +423,7 @@ function FloatingStatusLabel(props: {
         />
         <ShimmeringWorkContent
           className="flex-none"
-          textClassName="font-t3-medium"
+          textClassName="font-cz-medium"
           compact
           icon="arrow.triangle.branch"
           iconSubtleColor="transparent"

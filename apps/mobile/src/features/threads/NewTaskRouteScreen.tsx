@@ -7,11 +7,13 @@ import {
   type StaticScreenProps,
 } from "@react-navigation/native";
 import { SymbolView } from "../../components/AppSymbol";
-import { canCreateProjectInEnvironment } from "@t3tools/client-runtime/operations/projects";
-import { isScratchProject } from "@t3tools/client-runtime/state/projects";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import * as Cause from "effect/Cause";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { availableScratchWorkspaceRoot } from "@cz/client-runtime/operations/projects";
+import { isScratchProject } from "@cz/client-runtime/state/projects";
+import {
+  isAtomCommandInterrupted,
+  squashAtomCommandFailure,
+} from "@cz/client-runtime/state/runtime";
+import type { EnvironmentProject } from "@cz/client-runtime/state/shell";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,7 +23,7 @@ import { MaterialButton } from "../../components/MaterialButton";
 import { ScreenScrollView as ScrollView } from "../../components/ScreenScrollView";
 import { AppText as Text } from "../../components/AppText";
 import { ProjectFavicon } from "../../components/ProjectFavicon";
-import { useProjects, useServerConfigs, waitForProject } from "../../state/entities";
+import { useProjects, useServerConfigs } from "../../state/entities";
 import { projectEnvironment } from "../../state/projects";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useRemoteConnectionStatus } from "../../state/use-remote-environment-registry";
@@ -173,7 +175,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
       ) ?? null)
     : null;
   const { connectedEnvironments } = useRemoteConnectionStatus();
-  const ensureScratch = useAtomCommand(projectEnvironment.ensureScratch, {
+  const openScratch = useAtomCommand(projectEnvironment.openScratch, {
     reportFailure: false,
   });
   // Threads without a project need a connected environment that offers them.
@@ -181,8 +183,10 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
   // first that does; the draft page's machine picker moves it from there.
   const scratchEnvironments = connectedEnvironments.filter(
     (environment) =>
-      canCreateProjectInEnvironment(environment.connectionState) &&
-      serverConfigs.get(environment.environmentId)?.scratchWorkspaceRoot !== undefined,
+      availableScratchWorkspaceRoot(
+        environment.connectionState,
+        serverConfigs.get(environment.environmentId),
+      ) !== null,
   );
   const scratchEnvironment =
     scratchEnvironments.find(
@@ -230,26 +234,20 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
     const environmentId = scratchEnvironment.environmentId;
     scratchStartInFlightRef.current = true;
     try {
-      const result = await ensureScratch({ environmentId, input: {} });
-      if (AsyncResult.isFailure(result)) {
-        const error = Cause.squash(result.cause);
-        Alert.alert(
-          "Could not start without a project",
-          error instanceof Error
-            ? error.message
-            : "The folder for threads without a project could not be created.",
-        );
+      const result = await openScratch({ environmentId, input: {} });
+      if (result._tag === "Failure") {
+        if (!isAtomCommandInterrupted(result)) {
+          const error = squashAtomCommandFailure(result);
+          Alert.alert(
+            "Could not start without a project",
+            error instanceof Error
+              ? error.message
+              : "The folder for threads without a project could not be created.",
+          );
+        }
         return;
       }
-      const project = await waitForProject({ environmentId, projectId: result.value.projectId });
-      if (project === null) {
-        Alert.alert(
-          "Could not start without a project",
-          "It has not reached this device yet. Pick No project from the list once it appears.",
-        );
-        return;
-      }
-      await selectProject(project);
+      await selectProject(result.value);
     } finally {
       scratchStartInFlightRef.current = false;
     }
@@ -347,7 +345,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                     />
                   </View>
                   <View className="min-w-0 flex-1">
-                    <Text className="text-base font-t3-bold leading-snug">No project</Text>
+                    <Text className="text-base font-cz-bold leading-snug">No project</Text>
                     <Text className="text-xs leading-snug text-foreground-muted" numberOfLines={1}>
                       Start a task without a project
                     </Text>
@@ -373,7 +371,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
               {projectEmptyState.loading ? (
                 <ActivityIndicator colorClassName="accent-icon-muted" />
               ) : null}
-              <Text className="text-center text-lg font-t3-bold text-foreground">
+              <Text className="text-center text-lg font-cz-bold text-foreground">
                 {projectEmptyState.title}
               </Text>
               <Text className="text-center text-sm leading-normal text-foreground-muted">
@@ -403,7 +401,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                   className="mt-1 rounded-full bg-primary px-4 py-2.5 active:opacity-70"
                   onPress={() => navigation.navigate("ConnectionsNew")}
                 >
-                  <Text className="text-sm font-t3-bold text-primary-foreground">
+                  <Text className="text-sm font-cz-bold text-primary-foreground">
                     Add environment
                   </Text>
                 </Pressable>
@@ -413,7 +411,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                     className="mt-1 rounded-full bg-primary px-4 py-2.5 active:opacity-70"
                     onPress={() => navigation.dispatch(StackActions.push("AddProject"))}
                   >
-                    <Text className="text-sm font-t3-bold text-primary-foreground">
+                    <Text className="text-sm font-cz-bold text-primary-foreground">
                       Add new project
                     </Text>
                   </Pressable>
@@ -422,7 +420,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                       className="rounded-full bg-subtle px-4 py-2.5 active:opacity-70"
                       onPress={() => void startScratch()}
                     >
-                      <Text className="text-sm font-t3-bold text-foreground">
+                      <Text className="text-sm font-cz-bold text-foreground">
                         Start without a project
                       </Text>
                     </Pressable>
@@ -432,7 +430,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
             </View>
           ) : visibleScopes.length === 0 ? (
             <View className="items-center gap-2 px-6 py-8">
-              <Text className="text-center text-lg font-t3-bold text-foreground">
+              <Text className="text-center text-lg font-cz-bold text-foreground">
                 No matching projects
               </Text>
               <Text className="text-center text-sm leading-normal text-foreground-muted">
@@ -503,7 +501,7 @@ export function NewTaskRouteScreen({ route }: StaticScreenProps<NewTaskRoutePara
                         />
                       </View>
                       <View className="min-w-0 flex-1">
-                        <Text className={cn("text-base leading-snug", "font-t3-bold")}>
+                        <Text className={cn("text-base leading-snug", "font-cz-bold")}>
                           {scope.title}
                         </Text>
                         <Text

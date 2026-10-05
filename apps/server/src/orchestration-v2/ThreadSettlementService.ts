@@ -1,12 +1,13 @@
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { visibleThreadPullRequests } from "@t3tools/shared/threadPullRequests";
+import { backgroundWorkHoldsCompletion } from "@cz/shared/orchestrationV2PendingBackgroundWork";
+import { resolveProjectSettings } from "@cz/shared/projectSettings";
+import { visibleThreadPullRequests } from "@cz/shared/threadPullRequests";
 import {
   CommandId,
   type ThreadId,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ThreadShell,
-} from "@t3tools/contracts";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+} from "@cz/contracts";
+import { makeDrainableWorker } from "@cz/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -105,10 +106,15 @@ export function threadHasQueuedTurnStart(
   ].every((value) => value === null || value < messageAtMs);
 }
 
+/**
+ * A merged or closed pull request settles the thread unless the user wrote to
+ * it afterwards. Runs that background work, a PR watch, or another agent
+ * started do not count, so they cannot hold a merged thread open.
+ */
 function pullRequestSettles(
   thread: Pick<
-    OrchestrationV2ThreadShell,
-    "createdAt" | "latestUserMessageAt" | "latestRunRequestedAt"
+    ProjectionStore.ProjectionSettlementCandidate,
+    "createdAt" | "latestUserAuthoredMessageAt"
   >,
   pullRequest: SettlementPullRequest,
   autoSettleOnMerge: boolean,
@@ -120,8 +126,7 @@ function pullRequestSettles(
   if (terminalAt == null) return false;
   const userAnchorMs = latestMillis([
     toMillis(thread.createdAt),
-    toMillis(thread.latestUserMessageAt),
-    toMillis(thread.latestRunRequestedAt),
+    toMillis(thread.latestUserAuthoredMessageAt),
   ]);
   if (userAnchorMs === null) return false;
   const pullRequestAtMs = Date.parse(terminalAt);
@@ -131,16 +136,17 @@ function pullRequestSettles(
 
 /** Cheap checks that run before any source control lookup. */
 export function isAutoSettlementCandidate(
-  thread: ProjectionStore.ProjectionSettlementCandidate,
+  thread: Omit<ProjectionStore.ProjectionSettlementCandidate, "latestUserAuthoredMessageAt">,
   nowMs: number,
 ): boolean {
   if (thread.archivedAt !== null || thread.settledOverride !== null) return false;
   if (thread.pinnedAt != null || thread.autoSettleDisabledAt != null) return false;
   // Blocked-on-you work must never park behind a settled override.
   if (thread.pendingRuntimeRequest !== null) return false;
-  // A live run — or post-settlement background work — is not staleness.
+  // A live run, or background work that will wake the agent, is not
+  // staleness. A dev server left running is: the agent is done.
   if (thread.activityRunStatus != null) return false;
-  if ((thread.pendingBackgroundTasks?.length ?? 0) > 0) return false;
+  if (backgroundWorkHoldsCompletion(thread.pendingBackgroundTasks ?? [])) return false;
   if (threadHasQueuedTurnStart(thread, nowMs)) return false;
   const snoozedUntilMs = toMillis(thread.snoozedUntil);
   if (snoozedUntilMs === null || snoozedUntilMs <= nowMs) return true;
@@ -208,9 +214,9 @@ export class ThreadSettlementServiceV2 extends Context.Service<
     readonly start: () => Effect.Effect<void, never, Scope.Scope>;
     readonly drain: Effect.Effect<void>;
   }
->()("t3/orchestration-v2/ThreadSettlementService/ThreadSettlementServiceV2") {}
+>()("cz/orchestration-v2/ThreadSettlementService/ThreadSettlementServiceV2") {}
 
-function autoSettlementConfigured(settings: import("@t3tools/contracts").ServerSettings): boolean {
+function autoSettlementConfigured(settings: import("@cz/contracts").ServerSettings): boolean {
   if (settings.sidebarAutoSettleOnMerge || settings.sidebarAutoSettleAfterDays !== null) {
     return true;
   }
@@ -224,7 +230,7 @@ function autoSettlementConfigured(settings: import("@t3tools/contracts").ServerS
 /** Identity of every settlement input, so unrelated settings edits do not trigger a sweep. */
 /** @internal Exported for tests. */
 export function autoSettlementSettingsKey(
-  settings: import("@t3tools/contracts").ServerSettings,
+  settings: import("@cz/contracts").ServerSettings,
 ): string {
   return JSON.stringify([
     settings.sidebarAutoSettleOnMerge,

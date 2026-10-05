@@ -8,7 +8,7 @@ import {
   ThreadId,
   TurnItemId,
   type OrchestrationV2DomainEvent,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import { assert, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -394,8 +394,9 @@ layer("OrchestrationEventStore", (it) => {
   );
 });
 
-for (const phase of ["high-water", "replay"] as const) {
-  it.effect(`bounds application live events while the ${phase} query is blocked`, () =>
+it.effect.each(["high-water", "replay"] as const)(
+  "bounds application live events while the %s query is blocked",
+  (phase) =>
     Effect.scoped(
       Effect.gen(function* () {
         const store = yield* OrchestrationEventStore.OrchestrationEventStore;
@@ -464,8 +465,7 @@ for (const phase of ["high-water", "replay"] as const) {
         }
       }),
     ).pipe(Effect.provide(Layer.fresh(TestLayer))),
-  );
-}
+);
 
 it.effect("releases consumed application replay pages", () =>
   Effect.gen(function* () {
