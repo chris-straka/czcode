@@ -20,7 +20,11 @@ export async function runTui(options: RunTuiOptions): Promise<void> {
   const tuiRuntime = makeTuiRuntime(options);
   const atoms = makeTuiAtoms(tuiRuntime);
   const app = render(
-    h(RegistryContext.Provider, { value: tuiRuntime.registry }, h(App, { atoms })),
+    h(
+      RegistryContext.Provider,
+      { value: tuiRuntime.registry },
+      h(App, { atoms, cwd: options.cwd }),
+    ),
     { exitOnCtrlC: true },
   );
   await app.waitUntilExit();

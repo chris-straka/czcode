@@ -17,6 +17,8 @@ export interface RunTuiOptions {
   /** Saved connections live here (mode 600). */
   readonly configDir: string;
   readonly appVersion: string;
+  /** Where `cz tui` was started: the list opens scoped to the project containing it. */
+  readonly cwd: string;
 }
 
 export interface TuiModule {

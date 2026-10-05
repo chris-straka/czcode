@@ -1,12 +1,15 @@
 import type { EnvironmentId, ThreadId } from "@cz/contracts";
 import { Box, Text, useApp, useInput } from "ink";
-import { createElement as h, useCallback, useEffect, useState } from "react";
+import { useAtomValue } from "@effect/atom-react";
+import { createElement as h, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext } from "./command.ts";
 import { HostsScreen } from "./HostsScreen.ts";
 import { NewThreadScreen } from "./NewThreadScreen.ts";
-import { ThreadListScreen } from "./ThreadListScreen.ts";
+import { projectScope } from "../model/scope.ts";
+import { DiffScreen } from "./DiffScreen.ts";
+import { environmentShellsAtom, ThreadListScreen } from "./ThreadListScreen.ts";
 import { ThreadScreen } from "./ThreadScreen.ts";
 
 const TABS = ["Threads", "Hosts"] as const;
@@ -15,18 +18,30 @@ type Tab = (typeof TABS)[number];
 type Overlay =
   | { readonly kind: "none" }
   | { readonly kind: "new-thread" }
-  | { readonly kind: "thread"; readonly environmentId: EnvironmentId; readonly threadId: ThreadId };
+  | { readonly kind: "thread"; readonly environmentId: EnvironmentId; readonly threadId: ThreadId }
+  | {
+      readonly kind: "diff";
+      readonly environmentId: EnvironmentId;
+      readonly threadId: ThreadId;
+      readonly toTurnCount: number;
+    };
 
 /**
  * Tabs across the top (1-2 or Tab to switch), one screen below, a status line
  * at the bottom. Keys stay off `\` and `|` (the owner's float toggle and
  * terminal-normal exit) and Cmd chords; Esc always goes back.
  */
-export function App({ atoms }: { readonly atoms: TuiAtoms }) {
+export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: string }) {
   const { exit } = useApp();
   const [tab, setTab] = useState<Tab>("Threads");
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
   const [listCursor, setListCursor] = useState(0);
+  // Opens on the project containing the cwd (one Ghostty tab per project); `a` shows all.
+  const [allProjects, setAllProjects] = useState(false);
+  const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
+  const shells = useAtomValue(shellsAtom);
+  const scope = useMemo(() => projectScope(shells, cwd), [shells, cwd]);
+  const scopeKeys = allProjects || scope === null ? null : scope.keys;
   const [status, setStatusText] = useState("");
   const setStatus = useCallback((message: string) => setStatusText(message), []);
   useEffect(() => {
@@ -43,6 +58,10 @@ export function App({ atoms }: { readonly atoms: TuiAtoms }) {
       if (digit >= 1 && digit <= TABS.length) return setTab(TABS[digit - 1] ?? "Threads");
       if (key.tab) return setTab(TABS[(TABS.indexOf(tab) + 1) % TABS.length] ?? "Threads");
       if (input === "n" && tab === "Threads") setOverlay({ kind: "new-thread" });
+      if (input === "a" && scope !== null) {
+        setAllProjects(!allProjects);
+        setListCursor(0);
+      }
     },
     { isActive: atTop },
   );
@@ -52,16 +71,32 @@ export function App({ atoms }: { readonly atoms: TuiAtoms }) {
     setOverlay({ kind: "thread", environmentId, threadId });
 
   let body;
-  if (overlay.kind === "thread") {
+  if (overlay.kind === "diff") {
+    const { environmentId, threadId } = overlay;
+    body = h(DiffScreen, {
+      key: `diff:${threadId}`,
+      atoms,
+      ...overlay,
+      active: true,
+      onBack: () => setOverlay({ kind: "thread", environmentId, threadId }),
+    });
+  } else if (overlay.kind === "thread") {
     body = h(ThreadScreen, {
       key: overlay.threadId,
       atoms,
       ...overlay,
       active: true,
       onBack: back,
+      onDiff: (toTurnCount: number) => setOverlay({ ...overlay, kind: "diff", toTurnCount }),
     });
   } else if (overlay.kind === "new-thread") {
-    body = h(NewThreadScreen, { atoms, active: true, onStarted: openThread, onCancel: back });
+    body = h(NewThreadScreen, {
+      atoms,
+      active: true,
+      onStarted: openThread,
+      onCancel: back,
+      scope: scope?.keys ?? null,
+    });
   } else if (tab === "Hosts") {
     body = h(HostsScreen, { atoms, active: true });
   } else {
@@ -71,6 +106,7 @@ export function App({ atoms }: { readonly atoms: TuiAtoms }) {
       onOpen: openThread,
       cursor: listCursor,
       onCursor: setListCursor,
+      scope: scopeKeys,
     });
   }
 
@@ -94,7 +130,13 @@ export function App({ atoms }: { readonly atoms: TuiAtoms }) {
                 `${index + 1} ${name}  `,
               ),
             ),
-            h(Text, { dimColor: true }, tab === "Threads" ? "n new · q quit" : "q quit"),
+            h(
+              Text,
+              { dimColor: true },
+              tab === "Threads"
+                ? `${scope ? (scopeKeys ? `${scope.title} · a all` : "all · a this project") : "all"} · n new · q quit`
+                : "q quit",
+            ),
           )
         : null,
       body,

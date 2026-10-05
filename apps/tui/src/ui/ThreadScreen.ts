@@ -9,13 +9,20 @@ import {
 } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { Box, Text, useInput } from "ink";
-import { createElement as h, useMemo, useState } from "react";
+import { createElement as h, useContext, useMemo, useState } from "react";
 import { randomUUID } from "node:crypto";
 
 import { hasActiveRun, type LineTone, transcriptLines } from "../model/transcript.ts";
 import { wrapText } from "../model/wrap.ts";
+import {
+  floatTerminalLua,
+  parentNvim,
+  remoteShellCommand,
+  runInParentNvim,
+} from "../model/nvim.ts";
+import { LOCAL_CONNECTION_ID } from "../runtime/platform.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
-import { useCommand } from "./command.ts";
+import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
 import { TextInput } from "./TextInput.ts";
 
@@ -42,6 +49,8 @@ export function ThreadScreen(props: {
   readonly threadId: ThreadId;
   readonly active: boolean;
   readonly onBack: () => void;
+  /** Shows the thread's changes up to the given turn. */
+  readonly onDiff: (toTurnCount: number) => void;
 }) {
   const { atoms } = props;
   const ref = { environmentId: props.environmentId, threadId: props.threadId };
@@ -60,6 +69,35 @@ export function ThreadScreen(props: {
   const respondToUserInput = useCommand(atoms.threadEnvironment.respondToUserInput);
 
   const projection = thread?.projection ?? null;
+  const setStatus = useContext(StatusContext);
+  const catalogEntry = useAtomValue(atoms.catalog.catalogValueAtom).entries.get(
+    props.environmentId,
+  );
+  const snapshot = useAtomValue(atoms.snapshotAtom(props.environmentId));
+  const workspace =
+    projection?.thread.worktreePath ??
+    snapshot?.projects.find((project) => project.id === projection?.thread.projectId)
+      ?.workspaceRoot ??
+    null;
+  const remoteHost =
+    catalogEntry === undefined ||
+    (catalogEntry.target._tag === "BearerConnectionTarget" &&
+      catalogEntry.target.connectionId === LOCAL_CONNECTION_ID)
+      ? null
+      : Option.match(catalogEntry.profile, {
+          onNone: () => null,
+          onSome: (profile) =>
+            "httpBaseUrl" in profile ? new URL(profile.httpBaseUrl).hostname : null,
+        });
+  const openShell = () => {
+    if (workspace === null) return setStatus("This thread has no workspace yet.");
+    if (remoteHost === null) return setStatus(`On this machine: ${workspace}`);
+    const command = remoteShellCommand(remoteHost, workspace);
+    if (parentNvim() === null) return setStatus(command);
+    void runInParentNvim(floatTerminalLua(command)).then((error) => {
+      if (error) setStatus(error);
+    });
+  };
   const running = projection !== null && hasActiveRun(projection);
   const approval = pending?.approvals[0] ?? null;
   const question = pending?.userInputs[0] ?? null;
@@ -102,6 +140,14 @@ export function ThreadScreen(props: {
     (input, key) => {
       if (key.escape) return props.onBack();
       if (input === "i" || input === "r") return setComposing(true);
+      if (input === "d" && projection) {
+        const turns = Math.max(
+          0,
+          ...projection.checkpoints.map((checkpoint) => checkpoint.appRunOrdinal ?? 0),
+        );
+        return turns > 0 ? props.onDiff(turns) : setStatus("No changes yet.");
+      }
+      if (input === "o") return openShell();
       if (key.pageUp || (key.ctrl && input === "b"))
         return setScroll(Math.min(maxScroll, offset + visible - 1));
       if (key.pageDown || (key.ctrl && input === "f"))
@@ -232,7 +278,7 @@ export function ThreadScreen(props: {
         : h(
             Text,
             { dimColor: true },
-            `i reply${running ? " · s stop" : ""} · m ${projection?.thread.runtimeMode ?? "mode"} · pgup/pgdn${offset > 0 ? ` (${offset} up, G end)` : ""} · esc back`,
+            `i reply${running ? " · s stop" : ""} · d diff${remoteHost ? " · o shell" : ""} · m ${projection?.thread.runtimeMode ?? "mode"} · pgup/pgdn${offset > 0 ? ` (${offset} up, G end)` : ""} · esc back`,
           ),
     ),
   );

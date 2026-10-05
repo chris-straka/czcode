@@ -11,7 +11,9 @@
           "globalDate": "off",
           "globalConsole": "off",
           "globalTimers": "off",
-          "globalFetch": "off"
+          "globalFetch": "off",
+          // Terminal glue (nvim RPC, f3d, mpv, adb) runs from React handlers, not Effect.
+          "nodeBuiltinImport": "off"
         }
       }
     ]

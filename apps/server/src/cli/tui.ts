@@ -51,7 +51,8 @@ export const tuiCommand = Command.make("tui", { baseDir: baseDirFlag }).pipe(
         const auth = yield* EnvironmentAuth.EnvironmentAuth;
         const run = (local: LocalServer | null) =>
           Effect.tryPromise({
-            try: () => runTui({ local, configDir, appVersion: packageJson.version }),
+            try: () =>
+              runTui({ local, configDir, appVersion: packageJson.version, cwd: process.cwd() }),
             catch: (cause) =>
               new TuiCliError({ message: `The terminal app failed: ${String(cause)}` }),
           });

@@ -5,6 +5,7 @@ import { Atom } from "effect/unstable/reactivity";
 import { Box, Text, useInput } from "ink";
 import { createElement as h, useMemo } from "react";
 
+import { projectKey } from "../model/scope.ts";
 import { age, type EnvironmentShell, threadRows, threadState } from "../model/threadList.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useNow, useViewport } from "./hooks.ts";
@@ -16,6 +17,8 @@ export interface ThreadListProps {
   /** Kept by the parent so the selection survives opening a thread and coming back. */
   readonly cursor: number;
   readonly onCursor: (cursor: number) => void;
+  /** `environmentId:projectId` keys to show, or null for every project. */
+  readonly scope: ReadonlySet<string> | null;
 }
 
 /** Every environment's shell, as one value the list can render from. */
@@ -42,10 +45,17 @@ export function ThreadListScreen({
   onOpen,
   cursor,
   onCursor: setCursor,
+  scope,
 }: ThreadListProps) {
   const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
   const shells = useAtomValue(shellsAtom);
-  const rows = useMemo(() => threadRows(shells), [shells]);
+  const rows = useMemo(
+    () =>
+      threadRows(shells).filter(
+        (row) => scope === null || scope.has(projectKey(row.environmentId, row.thread.projectId)),
+      ),
+    [shells, scope],
+  );
   const now = useNow(30_000);
   const { rows: height, columns } = useViewport();
   const visible = Math.max(3, height - 4);
