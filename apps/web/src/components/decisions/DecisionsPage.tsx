@@ -16,7 +16,7 @@ import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { DecisionMedia } from "./DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "./DecisionView";
-import { answerSummary, VERDICT_BUTTONS } from "./decisionDraft";
+import { answerSummary, VERDICT_BUTTONS } from "@cz/client-runtime/decisions/draft";
 
 /** How long an answer can be undone before it is sent. */
 const UNDO_WINDOW_MS = 5_000;

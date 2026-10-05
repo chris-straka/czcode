@@ -42,7 +42,7 @@ import {
   draftToAnswer,
   emptyDraft,
   VERDICT_BUTTONS,
-} from "./decisionDraft";
+} from "@cz/client-runtime/decisions/draft";
 
 export type UploadDecisionMedia = (
   meta: DecisionMediaUploadQuery,

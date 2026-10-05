@@ -1,7 +1,7 @@
 import type { DecisionItem } from "@cz/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { answerSummary, draftProblem, draftToAnswer, emptyDraft } from "./decisionDraft";
+import { answerSummary, draftProblem, draftToAnswer, emptyDraft } from "./draft.ts";
 
 const item = (overrides: Partial<DecisionItem>): DecisionItem => ({
   id: "d1",

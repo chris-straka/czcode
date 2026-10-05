@@ -378,6 +378,10 @@
     "./state/decisions": {
       "types": "./src/state/decisions.ts",
       "default": "./src/state/decisions.ts"
+    },
+    "./decisions/draft": {
+      "types": "./src/decisions/draft.ts",
+      "default": "./src/decisions/draft.ts"
     }
   },
   "scripts": {
