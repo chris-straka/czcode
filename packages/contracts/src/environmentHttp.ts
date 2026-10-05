@@ -58,6 +58,13 @@ import {
   DecisionSubmitInput,
   DecisionWaitQuery,
 } from "./decisions.ts";
+import {
+  QueuedRun,
+  QueuedRunError,
+  QueuedRunInput,
+  QueuedRunListResult,
+  QueuedRunNotFoundError,
+} from "./resetQueue.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import {
   PullRequestDiffInput,
@@ -753,6 +760,48 @@ class EnvironmentDecisionsHttpApi extends HttpApiGroup.make("decisions")
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}
 
+const QueuedRunIdParams = Schema.Struct({ id: Schema.String });
+const QueuedRunErrors = [
+  QueuedRunError,
+  EnvironmentScopeRequiredError,
+  EnvironmentInternalError,
+] as const;
+const QueuedRunMutationErrors = [...QueuedRunErrors, QueuedRunNotFoundError] as const;
+
+/** The reset queue: runs that start at a provider's next quota reset (fork). */
+class EnvironmentQueueHttpApi extends HttpApiGroup.make("queue")
+  .add(
+    HttpApiEndpoint.get("list", "/api/queue", {
+      headers: OptionalBearerHeaders,
+      success: QueuedRunListResult,
+      error: QueuedRunErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("enqueue", "/api/queue", {
+      headers: OptionalBearerHeaders,
+      payload: QueuedRunInput,
+      success: QueuedRun,
+      error: QueuedRunErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("cancel", "/api/queue/:id/cancel", {
+      headers: OptionalBearerHeaders,
+      params: QueuedRunIdParams,
+      success: QueuedRun,
+      error: QueuedRunMutationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("runNow", "/api/queue/:id/run-now", {
+      headers: OptionalBearerHeaders,
+      params: QueuedRunIdParams,
+      success: QueuedRun,
+      error: QueuedRunMutationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
@@ -760,4 +809,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentPullRequestsHttpApi)
   .add(EnvironmentProjectsHttpApi)
   .add(EnvironmentConnectHttpApi)
-  .add(EnvironmentDecisionsHttpApi) {}
+  .add(EnvironmentDecisionsHttpApi)
+  .add(EnvironmentQueueHttpApi) {}

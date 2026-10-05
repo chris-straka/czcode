@@ -77,6 +77,9 @@ import * as Keybindings from "./keybindings.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as AgentAwarenessRelay from "./relay/AgentAwarenessRelay.ts";
 import * as DecisionService from "./decisions/DecisionService.ts";
+import * as ForkDatabase from "./forkDatabase/ForkDatabase.ts";
+import * as ResetQueueService from "./resetQueue/ResetQueueService.ts";
+import { queueHttpApiLayer } from "./resetQueue/http.ts";
 import { decisionMediaRouteLayer, decisionsHttpApiLayer } from "./decisions/http.ts";
 import { hasCloudPublicConfig } from "./cloud/publicConfig.ts";
 import { ProviderRegistryLive } from "./provider/Layers/ProviderRegistry.ts";
@@ -614,7 +617,7 @@ const RuntimeCoreDependenciesLive = RuntimeCoreDependenciesBaseLive.pipe(
   ),
 );
 
-const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(
+const RuntimeServicesLive = RuntimeCoreDependenciesLive.pipe(
   // Misc.
   Layer.provideMerge(BackgroundLayerLive),
   Layer.provideMerge(ResourceDiagnosticsLayerLive),
@@ -622,11 +625,17 @@ const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(
   Layer.provideMerge(TraceDiagnostics.layer),
   Layer.provideMerge(AnalyticsService.layer),
   Layer.provideMerge(DecisionService.layer),
+  Layer.provideMerge(ForkDatabase.layer),
   Layer.provideMerge(ExternalLauncher.layer),
   Layer.provideMerge(RemoteOpenTargets.layer),
   Layer.provideMerge(DirectEndpoints.layer),
   Layer.provideMerge(ServerLifecycleEvents.layer),
   Layer.provide(NetService.layer),
+);
+
+// The reset queue starts threads, so it sits above everything it launches with.
+const RuntimeDependenciesLive = ResetQueueService.layer.pipe(
+  Layer.provideMerge(RuntimeServicesLive),
 );
 
 const commandReadinessLayer = HttpRouter.middleware(
@@ -646,6 +655,7 @@ const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(pullRequestHttpApiLayer),
       Layer.provide(projectHttpApiLayer),
       Layer.provide(decisionsHttpApiLayer),
+      Layer.provide(queueHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),
