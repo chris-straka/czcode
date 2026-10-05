@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # WINDOWS, FIRST TIME ONLY: open PowerShell, run `wsl --install`, restart the
 # PC, open "Ubuntu" from the Start menu, and pick a username and password.
+# On a PC running Ubuntu itself, open Terminal instead.
 #
-# Then copy this line into the Ubuntu terminal (right-click pastes):
+# Then copy this line into the terminal (right-click pastes):
 #
-# curl -fsSL https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh -o /tmp/cz-host.sh && bash /tmp/cz-host.sh
+# wget -qO /tmp/cz-host.sh https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh && bash /tmp/cz-host.sh
 #
 # Sets up this machine as a cz agent host: tools, Tailscale, cz built from this
 # repo and kept running as a background service on the tailnet, and the Claude,
@@ -61,6 +62,7 @@ fi
 # Global npm tools (the coding agents) go to ~/.local, so no sudo.
 npm config set prefix "$HOME/.local"
 export PATH="$HOME/.local/bin:$PATH"
+# shellcheck disable=SC2016 # written literally, for .bashrc to expand
 grep -q '.local/bin' "$HOME/.bashrc" || echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
 [ -x "$HOME/.local/share/vite-plus/bin/vp" ] || curl -fsSL https://vite.plus | bash
 # shellcheck disable=SC1091
@@ -137,6 +139,11 @@ if $in_wsl; then
     (cd /mnt/c && /mnt/c/Windows/System32/powercfg.exe /change "$setting" 0)
   done
   echo "Sleep and hibernate are off on AC power."
+else
+  step "Never sleep"
+  # Ubuntu Desktop suspends when idle, which drops agents mid-turn. The screen can still turn off.
+  sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target > /dev/null 2>&1
+  echo "Sleep and hibernate are off."
 fi
 
 step "Coding agents"

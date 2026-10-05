@@ -2,11 +2,12 @@
 
 **Windows, first time only:** open PowerShell, run `wsl --install`, restart,
 open **Ubuntu** from the Start menu, and pick a username and password.
+**A PC running Ubuntu itself:** open Terminal.
 
-Then paste this into the Ubuntu terminal (right-click pastes):
+Then paste this into the terminal (right-click pastes):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh -o /tmp/cz-host.sh && bash /tmp/cz-host.sh
+wget -qO /tmp/cz-host.sh https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh && bash /tmp/cz-host.sh
 ```
 
 It installs Tailscale, cz, Claude Code, Codex, and OpenCode, and keeps cz
