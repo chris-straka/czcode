@@ -10,9 +10,11 @@ import * as Option from "effect/Option";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as ServerConfig from "../config.ts";
+import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 import * as DecisionService from "./DecisionService.ts";
 
 const TestLayer = DecisionService.layer.pipe(
+  Layer.provideMerge(ForkDatabase.layer),
   Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "cz-decisions-" })),
   Layer.provideMerge(NodeServices.layer),
 );

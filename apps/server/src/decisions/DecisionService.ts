@@ -1,9 +1,8 @@
 /**
  * DecisionService - the decisions agents ask the owner (ccez/DECISIONS.md).
  *
- * Items, answers, and uploaded media live beside the server's state: a
- * private `decisions.sqlite` and a `decisions-media/` folder under the state
- * dir. Transports (HTTP, MCP, the `cz inbox` CLI) call these methods only.
+ * Items and answers live in the fork database (`cz.sqlite`), uploaded media
+ * in a `decisions-media/` folder under the state dir. Transports (HTTP, MCP, the `cz inbox` CLI) call these methods only.
  *
  * @module DecisionService
  */
@@ -23,7 +22,6 @@ import {
   DecisionStorageError,
   type DecisionSubmitInput,
 } from "@cz/contracts";
-import * as NodeSqliteClient from "@cz/shared/nodeSqliteClient";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -35,10 +33,9 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
-import * as SqlClient from "effect/unstable/sql/SqlClient";
 
 import * as ServerConfig from "../config.ts";
-import { runDecisionMigrations } from "./DecisionMigrations.ts";
+import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 
 /** Verdicts each kind accepts in `choice`. */
 const VERDICTS: Partial<Record<DecisionKind, readonly string[]>> = {
@@ -233,21 +230,7 @@ const make = Effect.gen(function* () {
   const mediaDir = path.join(config.stateDir, "decisions-media");
   yield* fs.makeDirectory(mediaDir, { recursive: true });
 
-  // A private client: the server's own SqlClient serves statev2.sqlite.
-  const sqlContext = yield* Layer.build(
-    NodeSqliteClient.layer({ filename: path.join(config.stateDir, "decisions.sqlite") }),
-  );
-  const sql = Context.get(sqlContext, SqlClient.SqlClient);
-  const withSql = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    Effect.provideService(effect, SqlClient.SqlClient, sql);
-  yield* withSql(
-    Effect.gen(function* () {
-      yield* sql`PRAGMA busy_timeout = 5000;`;
-      yield* sql`PRAGMA journal_mode = WAL;`;
-      yield* sql`PRAGMA foreign_keys = ON;`;
-      yield* runDecisionMigrations;
-    }),
-  ).pipe(Effect.orDie);
+  const { sql } = yield* ForkDatabase.ForkDatabase;
 
   const changes = yield* PubSub.unbounded<string>();
   const storage = (operation: string) =>

@@ -1,7 +1,7 @@
 /**
  * `cz inbox`: ask the owner and read answers from scripts and agents that
  * don't run inside a cz thread (thread agents use the MCP tools). Works on
- * this machine's decisions.sqlite directly, with or without a running server.
+ * this machine's cz.sqlite directly, with or without a running server.
  *
  * @module InboxCli
  */
@@ -31,6 +31,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import * as ServerConfig from "../config.ts";
 import * as DecisionService from "../decisions/DecisionService.ts";
+import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 import { baseDirFlag, resolveCliAuthConfig } from "./config.ts";
 
 export class InboxCliError extends Schema.TaggedError<InboxCliError>()("InboxCliError", {
@@ -53,7 +54,12 @@ const withDecisions = <A, E, R>(
     const config = yield* resolveCliAuthConfig({ baseDir }, logLevel);
     return yield* DecisionService.DecisionService.pipe(
       Effect.flatMap(run),
-      Effect.provide(DecisionService.layer.pipe(Layer.provide(ServerConfig.layer(config)))),
+      Effect.provide(
+        DecisionService.layer.pipe(
+          Layer.provideMerge(ForkDatabase.layer),
+          Layer.provide(ServerConfig.layer(config)),
+        ),
+      ),
     );
   });
 
