@@ -63,12 +63,16 @@ export function createQueueEnvironmentAtoms<R, E>(
   };
 }
 
-/** When a queued run starts, for lists and toasts: "at the reset, in 2h 10m". */
+/** A queued run's state as a phrase for lists and toasts: "starts at the reset, in 2h 10m". */
 export function queuedRunStartLabel(run: QueuedRun, now: number): string {
   if (run.status === "started") return "started";
   if (run.status === "failed") return "couldn't start";
   if (run.status === "cancelled") return "cancelled";
-  if (run.dueAt <= now) return "starting";
+  if (run.dueAt <= now) {
+    return run.dueReason === "unknown-reset"
+      ? "starts now (this model reports no quota reset)"
+      : "starts now";
+  }
   const wait = formatDuration(run.dueAt - now);
-  return run.dueReason === "reset" ? `at the reset, in ${wait}` : `in ${wait}`;
+  return run.dueReason === "reset" ? `starts at the reset, in ${wait}` : `starts in ${wait}`;
 }

@@ -8430,7 +8430,7 @@ export default function ChatView(props: ChatViewProps) {
       stackedThreadToast({
         type: "success",
         title: "Queued for the next reset",
-        description: `Starts ${queuedRunStartLabel(result.value, Date.now())}. It's listed under Usage.`,
+        description: `It ${queuedRunStartLabel(result.value, Date.now())}. Find it under Usage → Limits.`,
       }),
     );
   };

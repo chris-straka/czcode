@@ -1254,7 +1254,7 @@ export function NewTaskDraftScreen(props: {
     });
     Alert.alert(
       "Queued for the next reset",
-      `Starts ${queuedRunStartLabel(result.value, Date.now())}. It's listed under Usage.`,
+      `It ${queuedRunStartLabel(result.value, Date.now())}. Find it under Usage → Limits.`,
     );
     setSubmitNavigationAction(CommonActions.goBack());
   }
