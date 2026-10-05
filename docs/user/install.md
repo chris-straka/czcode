@@ -33,7 +33,13 @@ line to add. Set `CZ_CHANNEL=nightly` to install the nightly train, or
 | Move to the newest release                       | `cz update`                                               |
 | Remove it again                                  | `cz uninstall`                                            |
 
-Run `cz --help` for the full reference.
+Run `cz help` or `cz --help` for the full reference. To start in a new working
+directory, use an explicit path such as `cz ./my-project`. A bare directory name
+is accepted only if it already exists.
+
+If `cz` or `cz start` reports an already running server, connect to that server
+instead. Stop it before starting a replacement, or use a different `--base-dir`
+for an independent server.
 
 To try czcode once without installing it, run `npx cz@latest` instead (needs
 Node.js for `npx`).
