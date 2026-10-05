@@ -10,6 +10,7 @@ Object.assign(process.env, repoEnv);
 
 const APP_VARIANT = resolveAppVariant(repoEnv.APP_VARIANT);
 const isIosPersonalTeamBuild = repoEnv.CZ_IOS_PERSONAL_TEAM === "1";
+const androidVersionCode = Number(process.env.CZ_ANDROID_VERSION_CODE) || 1;
 const runtimeVersionPolicy =
   process.env.MOBILE_VERSION_POLICY ??
   (APP_VARIANT === "development" ? "appVersion" : "fingerprint");
@@ -292,6 +293,9 @@ const config: ExpoConfig = {
   android: {
     icon: variant.assets.appIcon,
     package: variant.androidPackage,
+    // Release builds stamp the git commit count (ccez/release/android.sh) so
+    // each one installs over the last and paired servers can offer newer ones.
+    versionCode: androidVersionCode,
     ...(repoEnv.CZ_ANDROID_GOOGLE_SERVICES_FILE
       ? { googleServicesFile: repoEnv.CZ_ANDROID_GOOGLE_SERVICES_FILE }
       : {}),
@@ -460,6 +464,7 @@ const config: ExpoConfig = {
   ],
   extra: {
     appVariant: APP_VARIANT,
+    androidVersionCode,
     iosPersonalTeamBuild: isIosPersonalTeamBuild,
     relay: {
       url: repoEnv.CZ_RELAY_URL ?? null,

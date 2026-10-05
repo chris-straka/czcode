@@ -65,6 +65,7 @@ import {
   QueuedRunListResult,
   QueuedRunNotFoundError,
 } from "./resetQueue.ts";
+import { AndroidReleaseResult } from "./mobileRelease.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import {
   PullRequestDiffInput,
@@ -802,6 +803,15 @@ class EnvironmentQueueHttpApi extends HttpApiGroup.make("queue")
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}
 
+/** The newest app release this server has to offer its clients (fork). */
+class EnvironmentMobileReleaseHttpApi extends HttpApiGroup.make("mobileRelease").add(
+  HttpApiEndpoint.get("android", "/api/mobile-release/android", {
+    headers: OptionalBearerHeaders,
+    success: AndroidReleaseResult,
+    error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
+  }).middleware(EnvironmentAuthenticatedAuth),
+) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
@@ -810,4 +820,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentProjectsHttpApi)
   .add(EnvironmentConnectHttpApi)
   .add(EnvironmentDecisionsHttpApi)
-  .add(EnvironmentQueueHttpApi) {}
+  .add(EnvironmentQueueHttpApi)
+  .add(EnvironmentMobileReleaseHttpApi) {}

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAdaptiveWorkspaceLayout } from "../layout/AdaptiveWorkspaceLayout";
 import { NativeHeaderToolbar } from "../../native/StackHeader";
 import { useSavedRemoteConnections } from "../../state/use-remote-environment-registry";
+import { AndroidUpdateRows } from "../updates/AndroidUpdateRow";
 import { SettingsRow } from "./components/SettingsRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsScreen } from "./components/SettingsScreen";
@@ -79,6 +80,10 @@ function LocalSettingsRouteScreen() {
 function SettingsIndexSections() {
   const { selectedTargets, projectGroups, selectedProjectKey } = useSettingsEnvironmentFilter();
   const noServerTargets = selectedTargets.length === 0;
+  const { savedConnectionsById } = useSavedRemoteConnections();
+  const environmentIds = Object.values(savedConnectionsById).map(
+    (connection) => connection.environmentId,
+  );
   const selectedProject = projectGroups.find((group) => group.key === selectedProjectKey);
   const scopedProjectMembers =
     selectedProject?.members
@@ -155,6 +160,7 @@ function SettingsIndexSections() {
       </SettingsSection>
 
       <SettingsSection title="App">
+        <AndroidUpdateRows environmentIds={environmentIds} />
         <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
         <SettingsRow icon="info.circle" label="About" target="SettingsAbout" />
       </SettingsSection>

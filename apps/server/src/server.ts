@@ -81,6 +81,8 @@ import * as DecisionService from "./decisions/DecisionService.ts";
 import * as ForkDatabase from "./forkDatabase/ForkDatabase.ts";
 import * as ResetQueueService from "./resetQueue/ResetQueueService.ts";
 import { queueHttpApiLayer } from "./resetQueue/http.ts";
+import { mobileReleaseApkRouteLayer, mobileReleaseHttpApiLayer } from "./mobileRelease/http.ts";
+import * as MobileReleaseService from "./mobileRelease/MobileReleaseService.ts";
 import { decisionMediaRouteLayer, decisionsHttpApiLayer } from "./decisions/http.ts";
 import { hasCloudPublicConfig } from "./cloud/publicConfig.ts";
 import { ProviderRegistryLive } from "./provider/Layers/ProviderRegistry.ts";
@@ -626,6 +628,7 @@ const RuntimeServicesLive = RuntimeCoreDependenciesLive.pipe(
   Layer.provideMerge(TraceDiagnostics.layer),
   Layer.provideMerge(AnalyticsService.layer),
   Layer.provideMerge(DecisionService.layer),
+  Layer.provideMerge(MobileReleaseService.layer),
   Layer.provideMerge(ForkDatabase.layer),
   Layer.provideMerge(ExternalLauncher.layer),
   Layer.provideMerge(RemoteOpenTargets.layer),
@@ -658,6 +661,7 @@ const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(projectHttpApiLayer),
       Layer.provide(decisionsHttpApiLayer),
       Layer.provide(queueHttpApiLayer),
+      Layer.provide(mobileReleaseHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),
@@ -665,6 +669,7 @@ const makeRoutesLayer = Layer.mergeAll(
     assetRouteLayer,
     attachmentUploadRouteLayer,
     decisionMediaRouteLayer,
+    mobileReleaseApkRouteLayer,
     deviceHubProxyRouteLayer,
     staticAndDevRouteLayer,
     websocketRpcRouteLayer,

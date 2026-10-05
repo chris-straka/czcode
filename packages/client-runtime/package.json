@@ -386,6 +386,10 @@
     "./state/queue": {
       "types": "./src/state/queue.ts",
       "default": "./src/state/queue.ts"
+    },
+    "./state/mobileRelease": {
+      "types": "./src/state/mobileRelease.ts",
+      "default": "./src/state/mobileRelease.ts"
     }
   },
   "scripts": {

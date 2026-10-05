@@ -1,5 +1,6 @@
 import { Connection } from "@cz/client-runtime/connection";
 import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
+import * as MobileReleaseHttp from "@cz/client-runtime/state/mobileRelease";
 import { QueueHttp } from "@cz/client-runtime/state/queue";
 import { ShellSnapshotLoader } from "@cz/client-runtime/state/shell";
 import {
@@ -31,6 +32,7 @@ const snapshotLoaderLayer = Layer.mergeAll(
   ThreadHistoryController.layer,
   DecisionsHttp.layer,
   QueueHttp.layer,
+  MobileReleaseHttp.layer,
 );
 
 type ConnectionLayerSource =
