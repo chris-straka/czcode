@@ -8,6 +8,8 @@ import {
 } from "@cz/contracts";
 import { assert, describe, it } from "@effect/vitest";
 
+import { createModelCapabilities } from "@cz/shared/model";
+
 import { findProject, followUpFor, pickModel } from "./DecisionFollowUps.ts";
 
 const item = (overrides: Partial<DecisionItem>): DecisionItem => ({
@@ -136,5 +138,47 @@ describe("pickModel", () => {
       model: "gpt-b",
     });
     assert.isNull(pickModel({ provider: "grok", candidates: [], providers }));
+  });
+
+  it("swaps a saved variant the model doesn't offer for the model's default", () => {
+    const opencode = ProviderInstanceId.make("opencode");
+    const withVariants = [
+      {
+        instanceId: opencode,
+        models: [
+          {
+            slug: "opencode/free",
+            name: "Free",
+            isCustom: false,
+            capabilities: createModelCapabilities({
+              optionDescriptors: [
+                {
+                  id: "variant",
+                  label: "Variant",
+                  type: "select",
+                  options: [
+                    { id: "low", label: "Low" },
+                    { id: "high", label: "High", isDefault: true },
+                  ],
+                },
+              ],
+            }),
+          },
+        ],
+      },
+    ] as unknown as ReadonlyArray<ServerProvider>;
+    const saved = (value: string) => ({
+      instanceId: opencode,
+      model: "opencode/free",
+      options: [{ id: "variant", value }],
+    });
+    assert.deepEqual(
+      pickModel({ provider: null, candidates: [saved("max")], providers: withVariants }),
+      saved("high"),
+    );
+    assert.deepEqual(
+      pickModel({ provider: null, candidates: [saved("low")], providers: withVariants }),
+      saved("low"),
+    );
   });
 });

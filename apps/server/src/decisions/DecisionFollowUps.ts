@@ -18,6 +18,10 @@ import type {
   ServerProvider,
 } from "@cz/contracts";
 import { ThreadId } from "@cz/contracts";
+import {
+  buildExplicitProviderOptionSelectionsFromDescriptors,
+  getProviderOptionDescriptors,
+} from "@cz/shared/model";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -96,7 +100,9 @@ export function findProject(projects: ReadonlyArray<Project>, name: string): Pro
 /**
  * The model for a follow-up: the asking thread's (if it's on the named
  * provider), then the project's and the environment's defaults, then the
- * provider's own default model.
+ * provider's own default model. Saved options the model no longer offers (a
+ * "max" variant on a model without one) fall back to its defaults, as the
+ * composer does, so the run doesn't fail at the provider.
  */
 export function pickModel(input: {
   readonly provider: string | null;
@@ -108,7 +114,7 @@ export function pickModel(input: {
   const chosen = input.candidates.find(
     (selection): selection is ModelSelection => selection != null && fits(selection),
   );
-  if (chosen) return chosen;
+  if (chosen) return withOfferedOptions(chosen, input.providers);
   const provider = input.providers.find(
     (candidate) =>
       (input.provider === null || candidate.instanceId === input.provider) &&
@@ -116,6 +122,22 @@ export function pickModel(input: {
   );
   const model = provider?.models.find((entry) => entry.isDefault) ?? provider?.models[0];
   return provider && model ? { instanceId: provider.instanceId, model: model.slug } : null;
+}
+
+function withOfferedOptions(
+  selection: ModelSelection,
+  providers: ReadonlyArray<ServerProvider>,
+): ModelSelection {
+  const caps = providers
+    .find((provider) => provider.instanceId === selection.instanceId)
+    ?.models.find((model) => model.slug === selection.model)?.capabilities;
+  if (!caps || !selection.options?.length) return selection;
+  const options = buildExplicitProviderOptionSelectionsFromDescriptors(
+    getProviderOptionDescriptors({ caps, selections: selection.options }),
+    selection.options,
+  );
+  const { options: _saved, ...rest } = selection;
+  return options ? { ...rest, options } : rest;
 }
 
 const make = Effect.gen(function* () {
