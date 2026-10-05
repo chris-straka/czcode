@@ -103,6 +103,8 @@ import { UsageLimitAccountScreen } from "./features/usage/UsageLimitsPooled";
 import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
+import { DecisionRouteScreen } from "./features/decisions/DecisionRouteScreen";
+import { DecisionsRouteScreen } from "./features/decisions/DecisionsRouteScreen";
 import { SettingsRouteScreen } from "./features/settings/SettingsRouteScreen";
 import { SettingsThreadsRouteScreen } from "./features/settings/SettingsThreadsRouteScreen";
 import { SettingsEnvironmentFilterProvider } from "./features/settings/settings-environment-filter";
@@ -523,6 +525,8 @@ const NewTaskSheetStack = createNativeStackNavigator({
 // not flip the sidebar in or change the active thread.
 const WORKSPACE_OVERLAY_ROUTES = new Set([
   "Connections",
+  "Decisions",
+  "Decision",
   "ConnectionsNew",
   "GitBranches",
   "GitCommit",
@@ -817,6 +821,16 @@ const RootStackConfig = createNativeStackNavigator({
         ...LEGAL_DOCUMENT_HEADER_OPTIONS,
         title: "Legal",
       },
+    }),
+    Decisions: createNativeStackScreen({
+      screen: DecisionsRouteScreen,
+      linking: "decisions",
+      options: { title: "Decisions", presentation: "card", headerShown: false },
+    }),
+    Decision: createNativeStackScreen({
+      screen: DecisionRouteScreen,
+      linking: "decisions/:environmentId/:id",
+      options: { title: "Decision", presentation: "card", headerShown: false },
     }),
     Connections: createNativeStackScreen({
       screen: ConnectionsRouteScreen,

@@ -1,4 +1,5 @@
 import { Connection } from "@cz/client-runtime/connection";
+import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
 import { ShellSnapshotLoader } from "@cz/client-runtime/state/shell";
 import {
   boundedThreadSnapshotLoaderLayer,
@@ -27,6 +28,7 @@ const snapshotLoaderLayer = Layer.mergeAll(
   boundedThreadSnapshotLoaderLayer,
   ShellSnapshotLoader.layer,
   ThreadHistoryController.layer,
+  DecisionsHttp.layer,
 );
 
 type ConnectionLayerSource =
