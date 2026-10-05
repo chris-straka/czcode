@@ -33,10 +33,10 @@ const tuiConfigDir = Effect.gen(function* () {
   return path.join(base, "czcode", "tui");
 });
 
-// A runtime specifier keeps the client (and its DOM-typed code) out of the
-// server's type program; `@cz/tui/api` carries the contract instead.
-const TUI_MODULE = "@cz/tui";
-const loadTui = () => import(TUI_MODULE) as Promise<TuiModule>;
+// Loaded lazily so `cz serve` never pays for Ink and React. The package's
+// "types" entry declares only runTui, keeping its DOM-typed client code out
+// of the server's type program.
+const loadTui = (): Promise<TuiModule> => import("@cz/tui");
 
 export const tuiCommand = Command.make("tui", { baseDir: baseDirFlag }).pipe(
   Command.withDescription("Open the terminal app (threads, decisions, queue) for this machine."),

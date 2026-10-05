@@ -8,15 +8,15 @@ import { RegistryContext } from "@effect/atom-react";
 import { render } from "ink";
 import { createElement as h } from "react";
 
-import type { RunTuiOptions } from "./api.ts";
+import type { RunTuiOptions, TuiModule } from "./api.ts";
 import { makeTuiRuntime } from "./runtime/connection.ts";
 import { makeTuiAtoms } from "./state/atoms.ts";
 import { App } from "./ui/App.ts";
 
 export type { LocalServer, RunTuiOptions } from "./api.ts";
 
-/** Runs the TUI until the user quits. */
-export async function runTui(options: RunTuiOptions): Promise<void> {
+/** Runs the TUI until the user quits. Typed for other packages by entry.d.ts. */
+export const runTui: TuiModule["runTui"] = async (options: RunTuiOptions) => {
   const tuiRuntime = makeTuiRuntime(options);
   const atoms = makeTuiAtoms(tuiRuntime);
   const app = render(
@@ -29,4 +29,4 @@ export async function runTui(options: RunTuiOptions): Promise<void> {
   );
   await app.waitUntilExit();
   tuiRuntime.registry.dispose();
-}
+};

@@ -4,7 +4,7 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./src/entry.d.ts",
       "default": "./src/index.ts"
     },
     "./api": {
