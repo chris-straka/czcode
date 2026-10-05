@@ -31,12 +31,14 @@ export const LEGACY_DECISION_KIND_MAP = {
   trend: "pitch",
 } as const satisfies Record<string, DecisionKind>;
 
+const isDecisionKind = Schema.is(DecisionKind);
+
 /** Reads a stored kind, mapping pre-redesign names. Unknown kinds give null. */
 export function normalizeDecisionKind(kind: string): DecisionKind | null {
   if (Object.hasOwn(LEGACY_DECISION_KIND_MAP, kind)) {
     return LEGACY_DECISION_KIND_MAP[kind as keyof typeof LEGACY_DECISION_KIND_MAP];
   }
-  return Schema.is(DecisionKind)(kind) ? kind : null;
+  return isDecisionKind(kind) ? kind : null;
 }
 
 export const DecisionItemStatus = Schema.Literals(["open", "answered", "expired", "withdrawn"]);
