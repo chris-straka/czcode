@@ -32,6 +32,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as PubSub from "effect/PubSub";
+import * as Stream from "effect/Stream";
 import * as Schema from "effect/Schema";
 
 import * as ServerConfig from "../config.ts";
@@ -92,6 +93,8 @@ export class DecisionService extends Context.Service<
     readonly mediaPath: (key: string) => Effect.Effect<Option.Option<string>>;
     /** Applies defaults to (or expires) open items past `expires_at`. Returns how many. */
     readonly expireDue: Effect.Effect<number, DecisionStorageError>;
+    /** Ids of items as they are submitted or closed (answered, withdrawn, expired). */
+    readonly changes: Stream.Stream<string>;
     /** Inserts an item (and answer) as-is, keeping its id and times. Skips ids already present. */
     readonly importItem: (
       item: DecisionItem,
@@ -505,6 +508,7 @@ const make = Effect.gen(function* () {
     putMedia,
     mediaPath,
     expireDue,
+    changes: Stream.fromPubSub(changes),
     importItem,
   });
 });

@@ -166,4 +166,31 @@ it.layer(TestLayer)("ResetQueueService", (it) => {
       assert.equal(missing._tag, "QueuedRunNotFoundError");
     }),
   );
+
+  it.effect("follow-ups start now when quota is free, else at the reset; one per decision", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(NIGHT);
+      const queue = yield* ResetQueueService.ResetQueueService;
+
+      windows = [window(40, NIGHT + 3 * HOUR, "session")];
+      const free = yield* queue.enqueue(
+        task("resume-free", { start: "when-available", decisionId: "dec-free" }),
+      );
+      assert.equal(free.dueReason, "available");
+      assert.equal(free.dueAt, NIGHT);
+
+      windows = [window(100, NIGHT + 3 * HOUR, "session")];
+      const spent = yield* queue.enqueue(
+        task("resume-spent", { start: "when-available", decisionId: "dec-spent" }),
+      );
+      assert.equal(spent.dueAt, NIGHT + 3 * HOUR);
+
+      assert.equal((yield* queue.forDecision("dec-free"))?.id, free.id);
+      assert.isNull(yield* queue.forDecision("dec-none"));
+      const again = yield* queue
+        .enqueue(task("resume-free", { decisionId: "dec-free" }))
+        .pipe(Effect.flip);
+      assert.equal(again._tag, "QueuedRunError");
+    }),
+  );
 });

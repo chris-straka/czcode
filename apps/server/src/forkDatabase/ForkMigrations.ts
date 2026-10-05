@@ -31,7 +31,10 @@ const decisionItems = Effect.gen(function* () {
   yield* sql`CREATE INDEX IF NOT EXISTS idx_decision_items_project ON decision_items(project, created_at)`;
 });
 
-/** Runs queued for a provider's next quota reset (ported from nightshift). */
+/**
+ * Runs queued for a provider's next quota reset (ported from nightshift). A
+ * decision's follow-up (resume or approved pitch) is one run at most.
+ */
 const queuedRuns = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   yield* sql`
@@ -40,10 +43,12 @@ const queuedRuns = Effect.gen(function* () {
       status TEXT NOT NULL,
       due_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
+      decision_id TEXT,
       run_json TEXT NOT NULL
     )
   `;
   yield* sql`CREATE INDEX IF NOT EXISTS idx_queued_runs_due ON queued_runs(status, due_at)`;
+  yield* sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_queued_runs_decision ON queued_runs(decision_id) WHERE decision_id IS NOT NULL`;
 });
 
 const loader = Migrator.fromRecord({

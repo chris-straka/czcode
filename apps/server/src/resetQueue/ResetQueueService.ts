@@ -31,6 +31,8 @@ export class ResetQueueService extends Context.Service<
   ResetQueueService,
   {
     readonly enqueue: (input: QueuedRunInput) => Effect.Effect<QueuedRun, QueuedRunError>;
+    /** The run that follows up a decision, if one was queued. */
+    readonly forDecision: (decisionId: string) => Effect.Effect<QueuedRun | null, QueuedRunError>;
     /** Queued runs by due time, then the 50 most recent others. */
     readonly list: Effect.Effect<ReadonlyArray<QueuedRun>, QueuedRunError>;
     readonly cancel: (
@@ -98,6 +100,7 @@ const make = Effect.gen(function* () {
             status: run.status,
             due_at: run.dueAt,
             created_at: run.createdAt,
+            decision_id: run.decisionId ?? null,
             run_json: json,
           })}
           ON CONFLICT(id) DO UPDATE SET
@@ -133,9 +136,14 @@ const make = Effect.gen(function* () {
         const provider = (yield* providers.getProviders).find(
           (candidate) => candidate.instanceId === input.modelSelection.instanceId,
         );
-        const reset = nextResetAt(provider?.usageLimits?.windows ?? [], now);
-        dueAt = reset ?? now;
-        dueReason = reset === null ? "unknown-reset" : "reset";
+        const windows = provider?.usageLimits?.windows ?? [];
+        const reset = nextResetAt(windows, now);
+        if (input.start === "when-available" && !windows.some((w) => w.usedPercent >= 100)) {
+          dueReason = "available";
+        } else {
+          dueAt = reset ?? now;
+          dueReason = reset === null ? "unknown-reset" : "reset";
+        }
       }
       const run: QueuedRun = {
         id: yield* crypto.randomUUIDv4.pipe(Effect.mapError(failure("Could not make an id."))),
@@ -149,6 +157,7 @@ const make = Effect.gen(function* () {
         dueAt,
         dueReason,
         source: input.source ?? "composer",
+        ...(input.decisionId === undefined ? {} : { decisionId: input.decisionId }),
         status: "queued",
         createdAt: now,
         startedAt: null,
@@ -159,6 +168,11 @@ const make = Effect.gen(function* () {
       return run;
     },
   );
+
+  const forDecision: ResetQueueService["Service"]["forDecision"] = (decisionId) =>
+    read(sql.and([sql`decision_id = ${decisionId}`]), "created", 1).pipe(
+      Effect.map((runs) => runs[0] ?? null),
+    );
 
   const list: ResetQueueService["Service"]["list"] = Effect.gen(function* () {
     const queued = yield* read(sql.and([sql`status = 'queued'`]), "due", 500);
@@ -203,7 +217,7 @@ const make = Effect.gen(function* () {
             text: run.prompt,
             attachments: [],
           },
-          createdBy: run.source === "composer" ? "user" : "system",
+          createdBy: run.source === "composer" || run.source === "cli" ? "user" : "system",
           creationSource: "server",
         }),
       );
@@ -233,7 +247,7 @@ const make = Effect.gen(function* () {
     return started;
   });
 
-  return ResetQueueService.of({ enqueue, list, cancel, runNow, startDue });
+  return ResetQueueService.of({ enqueue, forDecision, list, cancel, runNow, startDue });
 });
 
 /** The service alone; tests drive `startDue` themselves. */

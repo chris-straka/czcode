@@ -76,6 +76,7 @@ import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as AgentAwarenessRelay from "./relay/AgentAwarenessRelay.ts";
+import * as DecisionFollowUps from "./decisions/DecisionFollowUps.ts";
 import * as DecisionService from "./decisions/DecisionService.ts";
 import * as ForkDatabase from "./forkDatabase/ForkDatabase.ts";
 import * as ResetQueueService from "./resetQueue/ResetQueueService.ts";
@@ -634,7 +635,8 @@ const RuntimeServicesLive = RuntimeCoreDependenciesLive.pipe(
 );
 
 // The reset queue starts threads, so it sits above everything it launches with.
-const RuntimeDependenciesLive = ResetQueueService.layer.pipe(
+const RuntimeDependenciesLive = DecisionFollowUps.layer.pipe(
+  Layer.provideMerge(ResetQueueService.layer),
   Layer.provideMerge(RuntimeServicesLive),
 );
 
