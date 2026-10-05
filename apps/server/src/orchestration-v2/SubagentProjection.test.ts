@@ -13,7 +13,7 @@ import {
   ProviderInstanceId,
   ProviderThreadId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as DateTime from "effect/DateTime";
 
 import {

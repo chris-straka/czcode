@@ -1,0 +1,4 @@
+interface:
+  display_name: "cz App Testing"
+  short_description: "Test web and desktop in cz's Browser panel"
+  default_prompt: "Use $test-cz-app to verify the affected web or desktop flow through cz's Browser panel."

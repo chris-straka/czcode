@@ -6,11 +6,8 @@ import {
   type ProjectScopedServerSettingKey,
   type ServerSettings,
   type ServerSettingsPatch,
-} from "@t3tools/contracts";
-import {
-  clearProjectSettingsOverrides,
-  resolveProjectSettings,
-} from "@t3tools/shared/projectSettings";
+} from "@cz/contracts";
+import { clearProjectSettingsOverrides, resolveProjectSettings } from "@cz/shared/projectSettings";
 
 import type { SettingsTarget } from "./settings-environment-filter";
 

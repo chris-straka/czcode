@@ -1,9 +1,9 @@
-import { Connection } from "@t3tools/client-runtime/connection";
-import { ShellSnapshotLoader } from "@t3tools/client-runtime/state/shell";
+import { Connection } from "@cz/client-runtime/connection";
+import { ShellSnapshotLoader } from "@cz/client-runtime/state/shell";
 import {
   boundedThreadSnapshotLoaderLayer,
   ThreadHistoryController,
-} from "@t3tools/client-runtime/state/threads";
+} from "@cz/client-runtime/state/threads";
 import * as Layer from "effect/Layer";
 import { Atom } from "effect/unstable/reactivity";
 
@@ -58,7 +58,7 @@ export const connectionAtomRuntime: Atom.AtomRuntime<
   Layer.Success<ConnectionLayerSource>,
   Layer.Error<ConnectionLayerSource>
 > = hotSwappableAtomRuntime({
-  id: "t3.mobile.connection-runtime",
+  id: "cz.mobile.connection-runtime",
   hotModule: typeof module === "undefined" ? undefined : module.hot,
   registry: appAtomRegistry,
   layer: connectionLayer,

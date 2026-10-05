@@ -7,15 +7,11 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import {
-  type CursorSettings,
-  type ModelSelection,
-  type ProviderSetupError,
-} from "@t3tools/contracts";
-import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@t3tools/shared/git";
-import { extractJsonObject } from "@t3tools/shared/schemaJson";
+import { type CursorSettings, type ModelSelection, type ProviderSetupError } from "@cz/contracts";
+import { formatGeneratedBranchName, sanitizeFeatureBranchName } from "@cz/shared/git";
+import { extractJsonObject } from "@cz/shared/schemaJson";
 
-import { TextGenerationError } from "@t3tools/contracts";
+import { TextGenerationError } from "@cz/contracts";
 import * as TextGeneration from "./TextGeneration.ts";
 import {
   buildBranchNamePrompt,
@@ -87,7 +83,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       if (!cursorSettings.enabled) {
         return yield* new TextGenerationError({
           operation,
-          detail: "Cursor is disabled in T3 Code settings.",
+          detail: "Cursor is disabled in czcode settings.",
         });
       }
 
@@ -126,7 +122,7 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
             "Cursor text generation cannot enforce workspace isolation with a custom ~/.cursor/sandbox.json. Use another text-generation provider.",
         });
       }
-      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cursor-text-" });
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "cz-cursor-text-" });
       const agentOptions = {
         apiKey,
         mode: "plan",

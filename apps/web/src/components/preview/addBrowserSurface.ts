@@ -1,8 +1,5 @@
-import {
-  mapAtomCommandResult,
-  type AtomCommandResult,
-} from "@t3tools/client-runtime/state/runtime";
-import type { ScopedThreadRef } from "@t3tools/contracts";
+import { mapAtomCommandResult, type AtomCommandResult } from "@cz/client-runtime/state/runtime";
+import type { ScopedThreadRef } from "@cz/contracts";
 
 import type { BrowserSettingsReadError, OpenPreviewMutation } from "~/browser/openFileInPreview";
 import { useRightPanelStore } from "~/rightPanelStore";

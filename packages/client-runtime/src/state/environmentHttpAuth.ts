@@ -1,9 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import {
-  ORCHESTRATION_PROTOCOL_HEADER,
-  ORCHESTRATION_PROTOCOL_VERSION_TEXT,
-} from "@t3tools/contracts";
+import { ORCHESTRATION_PROTOCOL_HEADER, ORCHESTRATION_PROTOCOL_VERSION_TEXT } from "@cz/contracts";
 import * as Result from "effect/Result";
 import { FetchHttpClient, type HttpMethod } from "effect/unstable/http";
 

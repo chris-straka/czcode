@@ -8,11 +8,8 @@
  * @module provider/Layers/claudeResetCredits
  */
 import * as NodeOS from "node:os";
-import type {
-  ProviderConsumeResetCreditOutcome,
-  ServerProviderResetCredits,
-} from "@t3tools/contracts";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import type { ProviderConsumeResetCreditOutcome, ServerProviderResetCredits } from "@cz/contracts";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";

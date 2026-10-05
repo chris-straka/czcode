@@ -1,5 +1,5 @@
-import { DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER } from "@t3tools/contracts";
-import type { DesktopPreviewRecordingArtifact, ScopedThreadRef } from "@t3tools/contracts";
+import { DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER } from "@cz/contracts";
+import type { DesktopPreviewRecordingArtifact, ScopedThreadRef } from "@cz/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
 import { Atom } from "effect/unstable/reactivity";

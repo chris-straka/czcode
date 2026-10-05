@@ -1,5 +1,5 @@
-import type { ChatAttachment } from "@t3tools/contracts";
-import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
+import type { ChatAttachment } from "@cz/contracts";
+import { assistantCitationsToPlainText } from "@cz/shared/assistantCitations";
 
 export type ThreadTitleMessage = {
   readonly role: "user" | "assistant" | "system" | "reasoning";

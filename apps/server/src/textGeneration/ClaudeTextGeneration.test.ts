@@ -1,8 +1,8 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import { ClaudeSettings, ProviderInstanceId } from "@t3tools/contracts";
-import { HostProcessPlatform, isHostWindows } from "@t3tools/shared/hostProcess";
-import { createModelSelection } from "@t3tools/shared/model";
+import { ClaudeSettings, ProviderInstanceId } from "@cz/contracts";
+import { HostProcessPlatform, isHostWindows } from "@cz/shared/hostProcess";
+import { createModelSelection } from "@cz/shared/model";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -25,7 +25,7 @@ import { writeFakeCli } from "../testUtils/fakeCli.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 
 const ClaudeTextGenerationTestLayer = ServerConfig.ServerConfig.layerTest(process.cwd(), {
-  prefix: "t3code-claude-text-generation-test-",
+  prefix: "czcode-claude-text-generation-test-",
 }).pipe(Layer.provideMerge(NodeServices.layer));
 
 // The stub behaviour lives in Node so the same implementation runs on Windows,
@@ -67,64 +67,64 @@ function withFakeClaudeEnv<A, E, R>(
 ) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3code-claude-text-" });
+    const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "czcode-claude-text-" });
     const binDir = yield* makeFakeClaudeBinary(tempDir);
     const pathDelimiter = (yield* isHostWindows) ? ";" : ":";
     const previousPath = process.env.PATH;
-    const previousOutput = process.env.T3_FAKE_CLAUDE_OUTPUT;
-    const previousExitCode = process.env.T3_FAKE_CLAUDE_EXIT_CODE;
-    const previousStderr = process.env.T3_FAKE_CLAUDE_STDERR;
-    const previousArgsMustContain = process.env.T3_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
-    const previousArgsMustNotContain = process.env.T3_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
-    const previousStdinMustContain = process.env.T3_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
-    const previousConfigDirMustBe = process.env.T3_FAKE_CLAUDE_CONFIG_DIR_MUST_BE;
-    const previousCwdMustNotBe = process.env.T3_FAKE_CLAUDE_CWD_MUST_NOT_BE;
+    const previousOutput = process.env.CZ_FAKE_CLAUDE_OUTPUT;
+    const previousExitCode = process.env.CZ_FAKE_CLAUDE_EXIT_CODE;
+    const previousStderr = process.env.CZ_FAKE_CLAUDE_STDERR;
+    const previousArgsMustContain = process.env.CZ_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
+    const previousArgsMustNotContain = process.env.CZ_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
+    const previousStdinMustContain = process.env.CZ_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
+    const previousConfigDirMustBe = process.env.CZ_FAKE_CLAUDE_CONFIG_DIR_MUST_BE;
+    const previousCwdMustNotBe = process.env.CZ_FAKE_CLAUDE_CWD_MUST_NOT_BE;
 
     yield* Effect.acquireRelease(
       Effect.sync(() => {
         process.env.PATH = `${binDir}${pathDelimiter}${previousPath ?? ""}`;
-        process.env.T3_FAKE_CLAUDE_OUTPUT = input.output;
+        process.env.CZ_FAKE_CLAUDE_OUTPUT = input.output;
 
         if (input.exitCode !== undefined) {
-          process.env.T3_FAKE_CLAUDE_EXIT_CODE = String(input.exitCode);
+          process.env.CZ_FAKE_CLAUDE_EXIT_CODE = String(input.exitCode);
         } else {
-          delete process.env.T3_FAKE_CLAUDE_EXIT_CODE;
+          delete process.env.CZ_FAKE_CLAUDE_EXIT_CODE;
         }
 
         if (input.stderr !== undefined) {
-          process.env.T3_FAKE_CLAUDE_STDERR = input.stderr;
+          process.env.CZ_FAKE_CLAUDE_STDERR = input.stderr;
         } else {
-          delete process.env.T3_FAKE_CLAUDE_STDERR;
+          delete process.env.CZ_FAKE_CLAUDE_STDERR;
         }
 
         if (input.argsMustContain !== undefined) {
-          process.env.T3_FAKE_CLAUDE_ARGS_MUST_CONTAIN = input.argsMustContain;
+          process.env.CZ_FAKE_CLAUDE_ARGS_MUST_CONTAIN = input.argsMustContain;
         } else {
-          delete process.env.T3_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
+          delete process.env.CZ_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
         }
 
         if (input.argsMustNotContain !== undefined) {
-          process.env.T3_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN = input.argsMustNotContain;
+          process.env.CZ_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN = input.argsMustNotContain;
         } else {
-          delete process.env.T3_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
+          delete process.env.CZ_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
         }
 
         if (input.stdinMustContain !== undefined) {
-          process.env.T3_FAKE_CLAUDE_STDIN_MUST_CONTAIN = input.stdinMustContain;
+          process.env.CZ_FAKE_CLAUDE_STDIN_MUST_CONTAIN = input.stdinMustContain;
         } else {
-          delete process.env.T3_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
+          delete process.env.CZ_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
         }
 
         if (input.cwdMustNotBe !== undefined) {
-          process.env.T3_FAKE_CLAUDE_CWD_MUST_NOT_BE = input.cwdMustNotBe;
+          process.env.CZ_FAKE_CLAUDE_CWD_MUST_NOT_BE = input.cwdMustNotBe;
         } else {
-          delete process.env.T3_FAKE_CLAUDE_CWD_MUST_NOT_BE;
+          delete process.env.CZ_FAKE_CLAUDE_CWD_MUST_NOT_BE;
         }
 
         if (input.configDirMustBe !== undefined) {
-          process.env.T3_FAKE_CLAUDE_CONFIG_DIR_MUST_BE = input.configDirMustBe;
+          process.env.CZ_FAKE_CLAUDE_CONFIG_DIR_MUST_BE = input.configDirMustBe;
         } else {
-          delete process.env.T3_FAKE_CLAUDE_CONFIG_DIR_MUST_BE;
+          delete process.env.CZ_FAKE_CLAUDE_CONFIG_DIR_MUST_BE;
         }
       }),
       () =>
@@ -132,51 +132,51 @@ function withFakeClaudeEnv<A, E, R>(
           process.env.PATH = previousPath;
 
           if (previousOutput === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_OUTPUT;
+            delete process.env.CZ_FAKE_CLAUDE_OUTPUT;
           } else {
-            process.env.T3_FAKE_CLAUDE_OUTPUT = previousOutput;
+            process.env.CZ_FAKE_CLAUDE_OUTPUT = previousOutput;
           }
 
           if (previousExitCode === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_EXIT_CODE;
+            delete process.env.CZ_FAKE_CLAUDE_EXIT_CODE;
           } else {
-            process.env.T3_FAKE_CLAUDE_EXIT_CODE = previousExitCode;
+            process.env.CZ_FAKE_CLAUDE_EXIT_CODE = previousExitCode;
           }
 
           if (previousStderr === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_STDERR;
+            delete process.env.CZ_FAKE_CLAUDE_STDERR;
           } else {
-            process.env.T3_FAKE_CLAUDE_STDERR = previousStderr;
+            process.env.CZ_FAKE_CLAUDE_STDERR = previousStderr;
           }
 
           if (previousArgsMustContain === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
+            delete process.env.CZ_FAKE_CLAUDE_ARGS_MUST_CONTAIN;
           } else {
-            process.env.T3_FAKE_CLAUDE_ARGS_MUST_CONTAIN = previousArgsMustContain;
+            process.env.CZ_FAKE_CLAUDE_ARGS_MUST_CONTAIN = previousArgsMustContain;
           }
 
           if (previousArgsMustNotContain === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
+            delete process.env.CZ_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN;
           } else {
-            process.env.T3_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN = previousArgsMustNotContain;
+            process.env.CZ_FAKE_CLAUDE_ARGS_MUST_NOT_CONTAIN = previousArgsMustNotContain;
           }
 
           if (previousStdinMustContain === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
+            delete process.env.CZ_FAKE_CLAUDE_STDIN_MUST_CONTAIN;
           } else {
-            process.env.T3_FAKE_CLAUDE_STDIN_MUST_CONTAIN = previousStdinMustContain;
+            process.env.CZ_FAKE_CLAUDE_STDIN_MUST_CONTAIN = previousStdinMustContain;
           }
 
           if (previousCwdMustNotBe === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_CWD_MUST_NOT_BE;
+            delete process.env.CZ_FAKE_CLAUDE_CWD_MUST_NOT_BE;
           } else {
-            process.env.T3_FAKE_CLAUDE_CWD_MUST_NOT_BE = previousCwdMustNotBe;
+            process.env.CZ_FAKE_CLAUDE_CWD_MUST_NOT_BE = previousCwdMustNotBe;
           }
 
           if (previousConfigDirMustBe === undefined) {
-            delete process.env.T3_FAKE_CLAUDE_CONFIG_DIR_MUST_BE;
+            delete process.env.CZ_FAKE_CLAUDE_CONFIG_DIR_MUST_BE;
           } else {
-            process.env.T3_FAKE_CLAUDE_CONFIG_DIR_MUST_BE = previousConfigDirMustBe;
+            process.env.CZ_FAKE_CLAUDE_CONFIG_DIR_MUST_BE = previousConfigDirMustBe;
           }
         }),
     );

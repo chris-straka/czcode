@@ -1,4 +1,4 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId } from "@cz/contracts";
 
 export interface HomeListFilterMenuEnvironment {
   readonly environmentId: EnvironmentId;

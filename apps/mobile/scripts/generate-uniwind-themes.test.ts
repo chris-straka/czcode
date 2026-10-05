@@ -21,14 +21,14 @@ describe("generate mobile Uniwind themes", () => {
 
     expect(
       staleOutputs,
-      "Run `vp run --filter @t3tools/mobile generate` and commit the generated outputs.",
+      "Run `vp run --filter @cz/mobile generate` and commit the generated outputs.",
     ).toEqual([]);
   });
 
   it("registers every custom palette for both appearances", () => {
     expect(customThemeNames).toEqual([
-      "t3-chat-light",
-      "t3-chat-dark",
+      "cz-chat-light",
+      "cz-chat-dark",
       "grove-light",
       "grove-dark",
       "ocean-light",

@@ -6,8 +6,8 @@ import {
   type ProviderInstanceId,
   ProviderSetupError,
   type ProviderSetupInput,
-} from "@t3tools/contracts";
-import { resolveCommandPath } from "@t3tools/shared/shell";
+} from "@cz/contracts";
+import { resolveCommandPath } from "@cz/shared/shell";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -83,7 +83,7 @@ export const makeProviderInstallation = Effect.fn("makeProviderInstallation")(fu
       return yield* new ProviderSetupError({
         instanceId,
         operation,
-        detail: "Choose managed setup to install Codex in T3 Code.",
+        detail: "Choose managed setup to install Codex in czcode.",
       });
     }
     if (managedOnly && config.binaryPath && (!isCodex || config.binaryPath !== "codex")) {
@@ -91,7 +91,7 @@ export const makeProviderInstallation = Effect.fn("makeProviderInstallation")(fu
         instanceId,
         operation,
         detail:
-          "This instance uses a custom executable. Clear its binary path to manage installation in T3 Code.",
+          "This instance uses a custom executable. Clear its binary path to manage installation in czcode.",
       });
     }
     return { installation, driver: instance.driverKind };

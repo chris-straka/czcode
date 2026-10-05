@@ -1,11 +1,11 @@
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import { availableScratchWorkspaceRoot } from "@t3tools/client-runtime/operations/projects";
+import { scopeProjectRef } from "@cz/client-runtime/environment";
+import { availableScratchWorkspaceRoot } from "@cz/client-runtime/operations/projects";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import type { EnvironmentId } from "@t3tools/contracts";
+} from "@cz/client-runtime/state/runtime";
+import type { EnvironmentProject } from "@cz/client-runtime/state/shell";
+import type { EnvironmentId } from "@cz/contracts";
 import { useCallback } from "react";
 
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";

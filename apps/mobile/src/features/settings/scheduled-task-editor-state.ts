@@ -1,4 +1,4 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId } from "@cz/contracts";
 import { Atom } from "effect/unstable/reactivity";
 
 import { appAtomRegistry } from "../../state/atom-registry";

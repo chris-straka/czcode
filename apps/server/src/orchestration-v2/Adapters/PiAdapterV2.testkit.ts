@@ -20,7 +20,7 @@ import {
   type ProviderInstanceEnvironment,
   type ProviderReplayTranscript,
   type ProviderReplayEntry as ProviderReplayEntryType,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -132,8 +132,8 @@ function replayValueMatches(expected: unknown, actual: unknown): boolean {
   return Object.is(expected, actual);
 }
 
-/** PiRpc numbers its correlated requests `t3-N` per process. */
-const ADAPTER_REQUEST_ID = /^t3-\d+$/u;
+/** PiRpc numbers its correlated requests `cz-N` per process. */
+const ADAPTER_REQUEST_ID = /^cz-\d+$/u;
 
 function adapterRequestId(frame: unknown): string | undefined {
   const id = isRecord(frame) ? frame.id : undefined;

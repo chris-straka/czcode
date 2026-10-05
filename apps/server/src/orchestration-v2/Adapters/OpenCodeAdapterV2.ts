@@ -9,9 +9,9 @@ import type {
   Todo as OpenCodeTodo,
   ToolPart,
 } from "@opencode-ai/sdk/v2";
-import { HostProcessEnvironment } from "@t3tools/shared/hostProcess";
-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
-import { causeErrorTag } from "@t3tools/shared/observability";
+import { HostProcessEnvironment } from "@cz/shared/hostProcess";
+import { getModelSelectionStringOptionValue } from "@cz/shared/model";
+import { causeErrorTag } from "@cz/shared/observability";
 import {
   defaultInstanceIdForDriver,
   type ModelSelection,
@@ -37,7 +37,7 @@ import {
   type ProviderSessionId,
   type RuntimeRequestId,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -64,7 +64,7 @@ import {
   summarizeNativeProtocolPayload,
 } from "../../provider/NativeProtocolLogging.ts";
 import { mergeProviderInstanceEnvironment } from "../../provider/ProviderInstanceEnvironment.ts";
-import { t3OrchestrationSystemPrompt } from "../../provider/T3OrchestrationInstructions.ts";
+import { czOrchestrationSystemPrompt } from "../../provider/CzOrchestrationInstructions.ts";
 import { buildRuntimeInstructions } from "../../provider/RuntimeInstructions.ts";
 import * as OpenCodeRuntime from "../../provider/opencodeRuntime.ts";
 import * as IdAllocator from "../IdAllocator.ts";
@@ -969,12 +969,12 @@ export function makeOpenCodeAdapterV2(
         });
 
         const mcpSession = McpProviderSession.readMcpProviderSession(input.threadId);
-        const hasT3Mcp = mcpSession !== undefined && !connection.external;
-        const orchestrationSystemPrompt = t3OrchestrationSystemPrompt(hasT3Mcp);
-        if (hasT3Mcp) {
+        const hasCzMcp = mcpSession !== undefined && !connection.external;
+        const orchestrationSystemPrompt = czOrchestrationSystemPrompt(hasCzMcp);
+        if (hasCzMcp) {
           yield* OpenCodeRuntime.runOpenCodeSdk("mcp.add", () =>
             client.mcp.add({
-              name: "t3-code",
+              name: "czcode",
               config: {
                 type: "remote",
                 url: mcpSession.endpoint,

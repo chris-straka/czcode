@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["CzTerminalModule"],
+    "podspecPath": "CzTerminalNative.podspec"
+  },
+  "android": {
+    "modules": ["expo.modules.czterminal.CzTerminalModule"]
+  }
+}

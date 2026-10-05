@@ -14,7 +14,7 @@ import { composerFloatingLayerProps } from "./composerEventScope";
 import {
   alternateComposerDispatchAction,
   resolveComposerDispatchMode,
-} from "@t3tools/client-runtime/state/composer-dispatch";
+} from "@cz/client-runtime/state/composer-dispatch";
 
 interface PendingActionState {
   questionIndex: number;

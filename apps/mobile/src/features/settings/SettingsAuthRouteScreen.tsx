@@ -5,15 +5,15 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { View } from "react-native";
 
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
-import { T3ConnectProfilePage } from "../cloud/T3ConnectProfilePage";
+import { CzConnectProfilePage } from "../cloud/CzConnectProfilePage";
 
 // Custom rows in Clerk's native profile. Mirrors the web UserButton pages.
 const USER_PROFILE_CUSTOM_PAGES = [
   {
-    path: "t3-connect",
-    label: "T3 Connect",
+    path: "cz-connect",
+    label: "cz Connect",
     icon: "globe",
-    content: <T3ConnectProfilePage />,
+    content: <CzConnectProfilePage />,
   },
 ] satisfies UserProfileCustomPage[];
 

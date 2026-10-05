@@ -1,10 +1,6 @@
-import type {
-  BrowserNavigationTarget,
-  EnvironmentId,
-  PreviewUrlResolution,
-} from "@t3tools/contracts";
-import { isLoopbackHost, normalizePreviewUrl } from "@t3tools/shared/preview";
-import { isLocalLoopbackHost, isPrivateNetworkHost } from "@t3tools/shared/hostClassification";
+import type { BrowserNavigationTarget, EnvironmentId, PreviewUrlResolution } from "@cz/contracts";
+import { isLoopbackHost, normalizePreviewUrl } from "@cz/shared/preview";
+import { isLocalLoopbackHost, isPrivateNetworkHost } from "@cz/shared/hostClassification";
 
 import { readPreparedConnection } from "~/state/session";
 
@@ -13,7 +9,7 @@ export {
   isLocalLoopbackHost,
   isPrivateNetworkHost,
   isPublicFaviconHost,
-} from "@t3tools/shared/hostClassification";
+} from "@cz/shared/hostClassification";
 
 const readEnvironmentUrl = (environmentId: EnvironmentId): URL => {
   const connection = readPreparedConnection(environmentId);

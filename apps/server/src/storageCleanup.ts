@@ -1,7 +1,4 @@
-import {
-  OrchestrationV2AppThreadJson,
-  OrchestrationV2ProviderSessionJson,
-} from "@t3tools/contracts";
+import { OrchestrationV2AppThreadJson, OrchestrationV2ProviderSessionJson } from "@cz/contracts";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import type {
@@ -11,9 +8,9 @@ import type {
   ServerSettingsError,
   TerminalSummary,
   WorktreeCleanupRules,
-} from "@t3tools/contracts";
-import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+} from "@cz/contracts";
+import { resolveWorktreeCleanup } from "@cz/shared/projectSettings";
+import { makeDrainableWorker } from "@cz/shared/DrainableWorker";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";

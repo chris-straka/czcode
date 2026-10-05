@@ -1,7 +1,7 @@
 # AUR packaging
 
-This directory maintains the [`t3code-bin`](https://aur.archlinux.org/packages/t3code-bin) and
-[`t3code-nightly-bin`](https://aur.archlinux.org/packages/t3code-nightly-bin) packages. Both
+This directory maintains the [`czcode-bin`](https://aur.archlinux.org/packages/czcode-bin) and
+[`czcode-nightly-bin`](https://aur.archlinux.org/packages/czcode-nightly-bin) packages. Both
 repackage the official x86_64 AppImage from GitHub Releases.
 
 ## Publishing

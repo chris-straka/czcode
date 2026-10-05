@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["CzComposerEditorModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.czcomposereditor.CzComposerEditorModule"]
+  }
+}

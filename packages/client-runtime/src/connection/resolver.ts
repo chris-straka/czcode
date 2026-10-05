@@ -1,8 +1,5 @@
-import type {
-  AuthClientPresentationMetadata,
-  ExecutionEnvironmentDescriptor,
-} from "@t3tools/contracts";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
+import type { AuthClientPresentationMetadata, ExecutionEnvironmentDescriptor } from "@cz/contracts";
+import { withRelayClientTracing } from "@cz/shared/relayTracing";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -64,7 +61,7 @@ export class ConnectionResolver extends Context.Service<
       ConnectionAttemptError
     >;
   }
->()("@t3tools/client-runtime/connection/resolver/ConnectionResolver") {}
+>()("@cz/client-runtime/connection/resolver/ConnectionResolver") {}
 
 const isBearerProfile = Schema.is(BearerConnectionProfile);
 const isSshProfile = Schema.is(SshConnectionProfile);

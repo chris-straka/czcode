@@ -1,12 +1,9 @@
-import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
-export { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
+import { worktreeSetupAgentStarted } from "@cz/client-runtime/worktree-setup";
+export { worktreeSetupAgentStarted } from "@cz/client-runtime/worktree-setup";
 import * as Equal from "effect/Equal";
 import { shallow } from "zustand/vanilla/shallow";
-import { renderCodexDirectivesForCopy } from "@t3tools/client-runtime/codex-markdown-directives";
-import {
-  commandDisplayText,
-  commandProgramName,
-} from "@t3tools/client-runtime/work-log/command-label";
+import { renderCodexDirectivesForCopy } from "@cz/client-runtime/codex-markdown-directives";
+import { commandDisplayText, commandProgramName } from "@cz/client-runtime/work-log/command-label";
 import {
   liveActivityToolStatus,
   normalizeCompactToolLabel,
@@ -15,11 +12,11 @@ import {
   toolGroupAction,
   toolGroupSummaryKind,
   type ToolGroupSummaryKind,
-} from "@t3tools/client-runtime/work-log/presentation";
+} from "@cz/client-runtime/work-log/presentation";
 export {
   normalizeCompactToolLabel,
   toolGroupAction,
-} from "@t3tools/client-runtime/work-log/presentation";
+} from "@cz/client-runtime/work-log/presentation";
 import {
   deriveRevertTurnCountByUserMessageId,
   formatDuration,
@@ -40,22 +37,22 @@ import {
   type OrchestrationV2ProjectedTurnItem,
   type RunAttemptId,
   RunId,
-} from "@t3tools/contracts";
-import type { ThreadRunSummary } from "@t3tools/client-runtime/state/shell";
+} from "@cz/contracts";
+import type { ThreadRunSummary } from "@cz/client-runtime/state/shell";
 import {
-  resolveT3McpToolDefinition,
-  resolveT3McpToolPresentation,
-  type T3McpToolPresentation,
-} from "@t3tools/shared/t3McpToolPresentation";
-import { compactDynamicToolOutput } from "@t3tools/shared/toolOutput";
-import { dynamicToolTitle } from "@t3tools/shared/toolActivity";
+  resolveCzMcpToolDefinition,
+  resolveCzMcpToolPresentation,
+  type CzMcpToolPresentation,
+} from "@cz/shared/czMcpToolPresentation";
+import { compactDynamicToolOutput } from "@cz/shared/toolOutput";
+import { dynamicToolTitle } from "@cz/shared/toolActivity";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
 import {
   collectToolFilePaths,
   formatReadToolLabel,
   formatSearchToolLabel,
-} from "@t3tools/shared/toolActivity";
-import { isWindowsAbsolutePath } from "@t3tools/shared/path";
+} from "@cz/shared/toolActivity";
+import { isWindowsAbsolutePath } from "@cz/shared/path";
 
 function timelineEntryRunId(entry: TimelineEntry): RunId | null {
   if (entry.kind === "message") {
@@ -525,7 +522,7 @@ type MessagesTimelineRowContent =
       summaryKind: ToolGroupSummaryKind;
       toolSurface?: WorkLogEntry["toolSurface"];
       toolIcon?: WorkLogEntry["toolIcon"];
-      summaryToolIcon?: "browser" | "device" | "t3-code" | "pull-request";
+      summaryToolIcon?: "browser" | "device" | "czcode" | "pull-request";
       hasFailure: boolean;
     }
   | {
@@ -617,8 +614,8 @@ function workGroupId(timelineEntryId: string): string {
   return `work-group:${timelineEntryId}`;
 }
 
-export type TimelineToolPresentation = T3McpToolPresentation;
-export const resolveTimelineToolPresentation = resolveT3McpToolPresentation;
+export type TimelineToolPresentation = CzMcpToolPresentation;
+export const resolveTimelineToolPresentation = resolveCzMcpToolPresentation;
 
 function expandedWorkGroupRow(
   groupId: string,
@@ -1155,7 +1152,7 @@ function withoutSubagentDelegationRows(entries: ReadonlyArray<TimelineEntry>) {
       item?.type !== "dynamic_tool" ||
       item.runId === null ||
       (item.status !== "running" && item.status !== "completed") ||
-      resolveT3McpToolDefinition(item.toolName)?.summaryAction !== "delegate"
+      resolveCzMcpToolDefinition(item.toolName)?.summaryAction !== "delegate"
     )
       return true;
     const output = compactDynamicToolOutput(item.output);

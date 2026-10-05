@@ -1,10 +1,5 @@
 import { assert, it, vi } from "@effect/vitest";
-import {
-  CheckpointScopeId,
-  RunId,
-  ThreadId,
-  type OrchestrationV2ThreadShell,
-} from "@t3tools/contracts";
+import { CheckpointScopeId, RunId, ThreadId, type OrchestrationV2ThreadShell } from "@cz/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 

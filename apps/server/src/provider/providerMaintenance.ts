@@ -2,11 +2,11 @@ import {
   ProviderDriverKind,
   type ServerProvider,
   type ServerProviderVersionAdvisory,
-} from "@t3tools/contracts";
-import { compareSemverVersions } from "@t3tools/shared/semver";
-import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { causeErrorTag } from "@t3tools/shared/observability";
-import { resolveCommandPath } from "@t3tools/shared/shell";
+} from "@cz/contracts";
+import { compareSemverVersions } from "@cz/shared/semver";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
+import { causeErrorTag } from "@cz/shared/observability";
+import { resolveCommandPath } from "@cz/shared/shell";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -126,7 +126,7 @@ export interface ProviderVersionCacheEntry {
 }
 
 export const ProviderVersionCache = Context.Reference<Map<string, ProviderVersionCacheEntry>>(
-  "@t3tools/server/providerMaintenance/ProviderVersionCache",
+  "@cz/server/providerMaintenance/ProviderVersionCache",
   {
     defaultValue: () => new Map(),
   },
@@ -394,7 +394,7 @@ const runHomebrew = Effect.fn("runHomebrew")(function* (
 /**
  * Derive update capabilities from where the executable actually lives. Every
  * package-manager branch has evidence that the named tool owns that path, so
- * T3 Code never runs a package manager against an install it did not create.
+ * czcode never runs a package manager against an install it did not create.
  * An unproven install falls back to the provider's own updater, which detects
  * its installer itself, and stays manual-only without one.
  */

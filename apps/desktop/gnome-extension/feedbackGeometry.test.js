@@ -4,14 +4,14 @@ import { captureDestinationFrame, findCaptureDestination } from "./feedbackGeome
 const window = (pid, title) => ({ get_pid: () => pid, get_title: () => title });
 
 it("activates only a window of the process authenticated by D-Bus", () => {
-  const target = window(42, "T3 Code");
-  expect(findCaptureDestination([window(99, "T3 Code"), target], 42, "T3 Code")).toBe(target);
-  expect(findCaptureDestination([window(99, "T3 Code")], 42, "T3 Code")).toBeUndefined();
+  const target = window(42, "czcode");
+  expect(findCaptureDestination([window(99, "czcode"), target], 42, "czcode")).toBe(target);
+  expect(findCaptureDestination([window(99, "czcode")], 42, "czcode")).toBeUndefined();
   expect(findCaptureDestination([target], 42, "Title before navigation")).toBe(target);
 });
 
 it("does not guess between ambiguous windows from the same process", () => {
-  expect(findCaptureDestination([window(42, "T3"), window(42, "T3")], 42, "T3")).toBeUndefined();
+  expect(findCaptureDestination([window(42, "cz"), window(42, "cz")], 42, "cz")).toBeUndefined();
   expect(findCaptureDestination([window(42, "A"), window(42, "B")], 42, "C")).toBeUndefined();
 });
 

@@ -5,13 +5,13 @@ import type {
   EnvironmentId,
   ResolvedKeybindingsConfig,
   ScopedThreadRef,
-} from "@t3tools/contracts";
-import { filePreviewDelimiter } from "@t3tools/shared/delimitedPreview";
+} from "@cz/contracts";
+import { filePreviewDelimiter } from "@cz/shared/delimitedPreview";
 import {
   isWorkspaceAudioPreviewPath,
   isWorkspaceImagePreviewPath,
   isWorkspaceVideoPreviewPath,
-} from "@t3tools/shared/filePreview";
+} from "@cz/shared/filePreview";
 import { VirtualizedFile, type SelectedLineRange } from "@pierre/diffs";
 import { Editor } from "@pierre/diffs/editor";
 import { EditProvider, File, type FileOptions, Virtualizer } from "@pierre/diffs/react";
@@ -19,8 +19,8 @@ import { DiffWorkerPoolProvider } from "../DiffWorkerPoolProvider";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
+} from "@cz/client-runtime/state/runtime";
+import { mediaFileReference } from "@cz/client-runtime/media-reference";
 import { FolderTree, Globe2, WrapTextIcon } from "lucide-react";
 import { Code2, Eye, Table2 } from "lucide";
 import * as Schema from "effect/Schema";
@@ -112,10 +112,10 @@ interface FilePreviewPanelProps {
   workspaceMutationId: string | null;
 }
 
-const FILE_EXPLORER_STORAGE_KEY = "t3code.fileExplorerOpen";
-const RENDER_MARKDOWN_STORAGE_KEY = "t3code.renderMarkdown";
-const RENDER_BROWSER_FILE_STORAGE_KEY = "t3code.renderBrowserFile";
-const RENDER_TABLE_STORAGE_KEY = "t3code.renderTable";
+const FILE_EXPLORER_STORAGE_KEY = "czcode.fileExplorerOpen";
+const RENDER_MARKDOWN_STORAGE_KEY = "czcode.renderMarkdown";
+const RENDER_BROWSER_FILE_STORAGE_KEY = "czcode.renderBrowserFile";
+const RENDER_TABLE_STORAGE_KEY = "czcode.renderTable";
 type FilePostRender = NonNullable<FileOptions<unknown>["onPostRender"]>;
 
 function WorkspaceImagePreview(props: {

@@ -9,19 +9,19 @@ import type {
   ProviderOptionSelection,
   RuntimeMode,
   ServerProvider,
-} from "@t3tools/contracts";
+} from "@cz/contracts";
 import {
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
   DEFAULT_RUNTIME_MODE,
   DEFAULT_SERVER_SETTINGS,
   MessageId,
-  T3_PROJECT_FILE_NAME,
+  CZ_PROJECT_FILE_NAME,
   ThreadId,
-} from "@t3tools/contracts";
-import { sanitizeNewRefName } from "@t3tools/shared/git";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
+} from "@cz/contracts";
+import { sanitizeNewRefName } from "@cz/shared/git";
+import { resolveProjectSettings } from "@cz/shared/projectSettings";
+import { parseCzProjectFile } from "@cz/shared/czProjectFile";
 import * as Arr from "effect/Array";
 import { pipe } from "effect/Function";
 
@@ -91,14 +91,14 @@ import {
   useRemoteConnectionStatus,
   useSavedRemoteConnections,
 } from "../../state/use-remote-environment-registry";
-import { availableScratchWorkspaceRoot } from "@t3tools/client-runtime/operations/projects";
+import { availableScratchWorkspaceRoot } from "@cz/client-runtime/operations/projects";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import { isScratchProject } from "@t3tools/client-runtime/state/projects";
-import { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import { type VcsRef } from "@t3tools/client-runtime/state/vcs";
+} from "@cz/client-runtime/state/runtime";
+import { isScratchProject } from "@cz/client-runtime/state/projects";
+import { EnvironmentProject } from "@cz/client-runtime/state/shell";
+import { type VcsRef } from "@cz/client-runtime/state/vcs";
 import {
   buildHomeProjectScopes,
   sortHomeProjectScopes,
@@ -479,24 +479,24 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   const attachments = selectedProjectDraft.attachments;
   // Default mode until the user picks one explicitly — same resolution web
   // uses for new draft threads: per-project setting, then the repo's
-  // checked-in t3.json, then the server's configured default.
-  const t3ProjectFileQuery = useEnvironmentQuery(
+  // checked-in cz.json, then the server's configured default.
+  const czProjectFileQuery = useEnvironmentQuery(
     selectedProject !== null && selectedProject.workspaceRoot !== ""
       ? projectEnvironment.readFile({
           environmentId: selectedProject.environmentId,
-          input: { cwd: selectedProject.workspaceRoot, relativePath: T3_PROJECT_FILE_NAME },
+          input: { cwd: selectedProject.workspaceRoot, relativePath: CZ_PROJECT_FILE_NAME },
         })
       : null,
   );
-  const t3ProjectFileData = t3ProjectFileQuery.data as ProjectReadFileResult | null;
-  const t3ProjectFile = useMemo(
+  const czProjectFileData = czProjectFileQuery.data as ProjectReadFileResult | null;
+  const czProjectFile = useMemo(
     () =>
-      t3ProjectFileData === null || t3ProjectFileData.truncated
+      czProjectFileData === null || czProjectFileData.truncated
         ? null
-        : parseT3ProjectFile(t3ProjectFileData.contents),
-    [t3ProjectFileData],
+        : parseCzProjectFile(czProjectFileData.contents),
+    [czProjectFileData],
   );
-  // Environment settings with the project's overrides and its t3.json
+  // Environment settings with the project's overrides and its cz.json
   // applied; the aggregate's own legacy fields still count until the server
   // folds them.
   const projectSettings = useMemo(
@@ -505,9 +505,9 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
         selectedEnvironmentServerConfig?.settings ?? DEFAULT_SERVER_SETTINGS,
         selectedProject?.id ?? null,
         selectedProject,
-        t3ProjectFile,
+        czProjectFile,
       ),
-    [selectedEnvironmentServerConfig?.settings, selectedProject, t3ProjectFile],
+    [selectedEnvironmentServerConfig?.settings, selectedProject, czProjectFile],
   );
   // A thread without a project runs in a plain folder, so worktree mode
   // would leave it unsendable: it is always local and offers no choice.
@@ -518,11 +518,11 @@ export function NewTaskFlowProvider(props: React.PropsWithChildren) {
   // While the file read is pending and nothing above it decided, the
   // resolved default is provisional. Nothing may write it into the draft
   // during that window (the auto-branch effect does), or the frozen interim
-  // value beats the t3.json default once it loads.
+  // value beats the cz.json default once it loads.
   const defaultWorkspaceModeSettled =
     selectedProjectDraft.workspaceSelection?.mode !== undefined ||
     projectSettings.sources.defaultThreadEnvMode !== "environment" ||
-    !t3ProjectFileQuery.isPending;
+    !czProjectFileQuery.isPending;
   const workspaceMode = canChooseWorkspace
     ? (selectedProjectDraft.workspaceSelection?.mode ?? defaultWorkspaceMode)
     : "local";
