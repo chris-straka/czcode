@@ -161,10 +161,11 @@ else
   codex login --device-auth
 fi
 
-step "Sign in: OpenCode (pick your provider, e.g. Muse, and paste its key)"
+step "Sign in: OpenCode"
 opencode auth list || true
-read -r -p "Add an OpenCode login now? [Y/n] " answer < /dev/tty
-case "$answer" in [nN]*) ;; *) opencode auth login ;; esac
+echo "Skip this to have the Mac copy its OpenCode login (your Muse key) here over Tailscale."
+read -r -p "Add an OpenCode login by hand now? [y/N] " answer < /dev/tty
+case "$answer" in [yY]*) opencode auth login ;; *) ;; esac
 
 step "GitHub (so agents here can push)"
 git config --global user.name > /dev/null || git config --global user.name "Chris Straka"
