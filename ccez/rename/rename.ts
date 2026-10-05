@@ -121,6 +121,18 @@ function main(): void {
     if (dir) execFileSync("mkdir", ["-p", join(root, dir)]);
     git("mv", "-k", from, to);
   }
+  // Renamed workspace packages sort differently; let pnpm re-serialize the
+  // lockfile (no resolution changes) so a later `pnpm install` leaves it be.
+  const pnpm = (...extra: string[]) =>
+    execFileSync("pnpm", ["install", "--lockfile-only", "--ignore-scripts", ...extra], {
+      cwd: root,
+      stdio: "ignore",
+    });
+  try {
+    pnpm("--offline");
+  } catch {
+    pnpm();
+  }
   // Renamed identifiers change line lengths; reflow with the repo's own
   // formatter so the output matches what upstream's tooling would write.
   execFileSync("vp", ["fmt"], { cwd: root, stdio: "ignore" });
