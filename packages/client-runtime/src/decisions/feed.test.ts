@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { filterChips, filterFeed, orderFeed } from "./feed.ts";
-import { normalizeKind, type Item } from "./schema.ts";
+import { normalizeDecisionKind, type DecisionItem } from "@cz/contracts";
 
-const item = (overrides: Partial<Item> & Pick<Item, "id">): Item => ({
+const item = (overrides: Partial<DecisionItem> & Pick<DecisionItem, "id">): DecisionItem => ({
   project: "misc",
   kind: "pick",
   title: overrides.id,
@@ -11,6 +11,9 @@ const item = (overrides: Partial<Item> & Pick<Item, "id">): Item => ({
   body_md: "",
   media: [],
   options: [],
+  max_choices: 1,
+  steps: [],
+  context_media_idx: null,
   priority: 0,
   created_by: "test",
   thread: null,
@@ -71,11 +74,11 @@ describe("filters", () => {
   });
 });
 
-describe("normalizeKind", () => {
+describe("normalizeDecisionKind", () => {
   it("maps pre-redesign kinds and rejects unknown ones", () => {
-    expect(normalizeKind("approve")).toBe("review");
-    expect(normalizeKind("trend")).toBe("pitch");
-    expect(normalizeKind("listen")).toBe("listen");
-    expect(normalizeKind("fleet")).toBeNull();
+    expect(normalizeDecisionKind("approve")).toBe("review");
+    expect(normalizeDecisionKind("trend")).toBe("pitch");
+    expect(normalizeDecisionKind("listen")).toBe("listen");
+    expect(normalizeDecisionKind("fleet")).toBeNull();
   });
 });

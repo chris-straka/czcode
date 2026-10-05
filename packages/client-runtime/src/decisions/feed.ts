@@ -3,7 +3,7 @@
  *
  * @module feed
  */
-import type { DecisionKind, Item } from "./schema.ts";
+import type { DecisionItem, DecisionKind } from "@cz/contracts";
 
 /** Projects that sort ahead of the rest, highest first (ccez/DECISIONS.md). */
 export const DEFAULT_PROJECT_ORDER: readonly string[] = ["hll"];
@@ -20,9 +20,9 @@ function projectRank(project: string, order: readonly string[]): number {
  * priority, then the item's own priority, then oldest first.
  */
 export function orderFeed(
-  items: readonly Item[],
+  items: readonly DecisionItem[],
   projectOrder: readonly string[] = DEFAULT_PROJECT_ORDER,
-): Item[] {
+): DecisionItem[] {
   return items
     .filter((item) => item.status === "open")
     .toSorted(
@@ -39,7 +39,7 @@ export interface FeedFilter {
   readonly kinds?: ReadonlySet<DecisionKind>;
 }
 
-export function filterFeed(items: readonly Item[], filter: FeedFilter): Item[] {
+export function filterFeed(items: readonly DecisionItem[], filter: FeedFilter): DecisionItem[] {
   return items.filter(
     (item) =>
       (!filter.projects?.size || filter.projects.has(item.project)) &&
@@ -48,7 +48,7 @@ export function filterFeed(items: readonly Item[], filter: FeedFilter): Item[] {
 }
 
 /** Chip values for the feed's filter row, most common first. */
-export function filterChips(items: readonly Item[]): {
+export function filterChips(items: readonly DecisionItem[]): {
   readonly projects: readonly string[];
   readonly kinds: readonly DecisionKind[];
 } {

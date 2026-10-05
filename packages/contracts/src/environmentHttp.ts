@@ -5,6 +5,7 @@ import * as HttpApi from "effect/unstable/httpapi/HttpApi";
 import * as HttpApiEndpoint from "effect/unstable/httpapi/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/unstable/httpapi/HttpApiGroup";
 import * as HttpApiMiddleware from "effect/unstable/httpapi/HttpApiMiddleware";
+import * as HttpApiSchema from "effect/unstable/httpapi/HttpApiSchema";
 import * as HttpServerRespondable from "effect/unstable/http/HttpServerRespondable";
 import * as HttpServerResponse from "effect/unstable/http/HttpServerResponse";
 
@@ -41,6 +42,22 @@ import {
   OrchestrationV2ThreadDetailSnapshot,
   OrchestrationV2ThreadHistoryPage,
 } from "./orchestrationV2.ts";
+import {
+  DecisionAnswer,
+  DecisionAnswerInput,
+  DecisionClosedError,
+  DecisionInvalidError,
+  DecisionItem,
+  DecisionItemWithAnswer,
+  DecisionListQuery,
+  DecisionListResult,
+  DecisionMediaRef,
+  DecisionMediaUploadQuery,
+  DecisionNotFoundError,
+  DecisionStorageError,
+  DecisionSubmitInput,
+  DecisionWaitQuery,
+} from "./decisions.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import {
   PullRequestDiffInput,
@@ -651,10 +668,96 @@ class EnvironmentConnectHttpApi extends HttpApiGroup.make("connect")
     }),
   ) {}
 
+const DecisionIdParams = Schema.Struct({ id: Schema.String });
+const DecisionReadErrors = [
+  DecisionNotFoundError,
+  DecisionStorageError,
+  EnvironmentScopeRequiredError,
+  EnvironmentInternalError,
+] as const;
+const DecisionWriteErrors = [
+  ...DecisionReadErrors,
+  DecisionInvalidError,
+  DecisionClosedError,
+] as const;
+
+/** Decisions agents ask the owner (fork: ccez/DECISIONS.md). */
+class EnvironmentDecisionsHttpApi extends HttpApiGroup.make("decisions")
+  .add(
+    HttpApiEndpoint.get("list", "/api/decisions", {
+      headers: OptionalBearerHeaders,
+      query: DecisionListQuery,
+      success: DecisionListResult,
+      error: DecisionReadErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("history", "/api/decisions/history", {
+      headers: OptionalBearerHeaders,
+      query: DecisionListQuery,
+      success: DecisionListResult,
+      error: DecisionReadErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("get", "/api/decisions/:id", {
+      headers: OptionalBearerHeaders,
+      params: DecisionIdParams,
+      success: DecisionItemWithAnswer,
+      error: DecisionReadErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("wait", "/api/decisions/:id/wait", {
+      headers: OptionalBearerHeaders,
+      params: DecisionIdParams,
+      query: DecisionWaitQuery,
+      success: DecisionItemWithAnswer,
+      error: DecisionReadErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("submit", "/api/decisions", {
+      headers: OptionalBearerHeaders,
+      payload: DecisionSubmitInput,
+      success: DecisionItem,
+      error: DecisionWriteErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("answer", "/api/decisions/:id/answer", {
+      headers: OptionalBearerHeaders,
+      params: DecisionIdParams,
+      payload: DecisionAnswerInput,
+      success: DecisionAnswer,
+      error: DecisionWriteErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("withdraw", "/api/decisions/:id/withdraw", {
+      headers: OptionalBearerHeaders,
+      params: DecisionIdParams,
+      success: DecisionItem,
+      error: DecisionWriteErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("upload", "/api/decisions/media", {
+      headers: OptionalBearerHeaders,
+      query: DecisionMediaUploadQuery,
+      payload: Schema.Uint8Array.pipe(
+        HttpApiSchema.asUint8Array({ contentType: "application/octet-stream" }),
+      ),
+      success: DecisionMediaRef,
+      error: DecisionWriteErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
   .add(EnvironmentOrchestrationHttpApi)
   .add(EnvironmentPullRequestsHttpApi)
   .add(EnvironmentProjectsHttpApi)
-  .add(EnvironmentConnectHttpApi) {}
+  .add(EnvironmentConnectHttpApi)
+  .add(EnvironmentDecisionsHttpApi) {}

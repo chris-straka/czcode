@@ -370,6 +370,10 @@
     "./device/duo-control": {
       "types": "./src/device/duoControl.ts",
       "default": "./src/device/duoControl.ts"
+    },
+    "./decisions/feed": {
+      "types": "./src/decisions/feed.ts",
+      "default": "./src/decisions/feed.ts"
     }
   },
   "scripts": {
