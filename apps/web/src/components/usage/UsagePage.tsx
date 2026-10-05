@@ -75,6 +75,7 @@ import {
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { ResetQueueSection } from "./ResetQueueSection";
 import { UsageLimitsSection } from "./UsageLimits";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart } from "./UsageProviderChart";
@@ -491,7 +492,11 @@ export function UsagePage() {
                   ) : null
                 }
               />
-            ) : isPending ? (
+            ) : null}
+            {showingLimits && selectedEnvironments.length > 0 ? (
+              <ResetQueueSection environments={selectedEnvironments} now={limitsNow} />
+            ) : null}
+            {selectedEnvironments.length === 0 || showingLimits ? null : isPending ? (
               <UsageSkeleton />
             ) : (
               <>

@@ -549,6 +549,8 @@ import { fileAttachmentCapabilityBlockReason } from "./chat/composerAttachmentFi
 import { assetEnvironment } from "../state/assets";
 import { readPreparedConnection } from "../state/session";
 import { useAtomCommand } from "../state/use-atom-command";
+import { queueEnvironment } from "../state/queue";
+import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
 import { Button, InlineButton } from "./ui/button";
 import {
@@ -8338,6 +8340,61 @@ export default function ChatView(props: ChatViewProps) {
     }
   };
 
+  const enqueueForReset = useAtomCommand(queueEnvironment.enqueue, "queue for the next reset");
+  // "Run at next reset" (cz reset queue): a new thread's first message waits on
+  // the server and starts as that thread once the model's quota resets.
+  const canRunAtNextReset =
+    isLocalDraftThread && activeProject !== null && !composerHasNonPromptContent;
+  const onRunAtNextReset = async () => {
+    const sendCtx = composerRef.current?.getSendContext();
+    const text = promptRef.current.trim();
+    if (!sendCtx?.providerAvailable || !activeProject || !canRunAtNextReset || !text) return;
+    if (sendEnvMode === "worktree" && !activeThreadBranch) {
+      setThreadError(
+        activeThread?.id ?? null,
+        "Select a base branch before queueing in New worktree mode.",
+      );
+      return;
+    }
+    const result = await enqueueForReset({
+      environmentId,
+      input: {
+        title: truncate(text.split("\n")[0] ?? text),
+        prompt: formatOutgoingPrompt({
+          provider: sendCtx.selectedProvider,
+          model: sendCtx.selectedModel,
+          models: sendCtx.selectedProviderModels,
+          effort: sendCtx.selectedPromptEffort,
+          text,
+        }),
+        projectId: activeProject.id,
+        modelSelection: sendCtx.selectedModelSelection,
+        runtimeMode,
+        interactionMode: sendCtx.interactionMode,
+        workspaceStrategy:
+          sendEnvMode === "worktree" && activeThreadBranch
+            ? {
+                type: "worktree",
+                baseRef: activeThreadBranch,
+                ...(startFromOrigin ? { startFromOrigin: true } : {}),
+              }
+            : { type: "root", ...(activeThreadBranch ? { branch: activeThreadBranch } : {}) },
+        source: "composer",
+      },
+    });
+    if (result._tag !== "Success") return;
+    promptRef.current = "";
+    clearComposerDraftContent(composerDraftTarget);
+    composerRef.current?.resetCursorState();
+    toastManager.add(
+      stackedThreadToast({
+        type: "success",
+        title: "Queued for the next reset",
+        description: `Starts ${queuedRunStartLabel(result.value, Date.now())}. It's listed under Usage.`,
+      }),
+    );
+  };
+
   const onSend = async (
     e?: { preventDefault: () => void },
     dispatchMode: ComposerDispatchMode = "auto",
@@ -11208,6 +11265,9 @@ export default function ChatView(props: ChatViewProps) {
                                 !composerHasNonPromptContent
                                   ? openUsageLimits
                                   : undefined
+                              }
+                              onRunAtNextReset={
+                                canRunAtNextReset ? () => void onRunAtNextReset() : undefined
                               }
                               environmentUnavailable={activeEnvironmentUnavailableState}
                               activePendingApproval={activePendingApproval}

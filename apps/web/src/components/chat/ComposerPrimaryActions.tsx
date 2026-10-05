@@ -49,6 +49,8 @@ interface ComposerPrimaryActionsProps {
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
+  /** Adds a menu beside send that queues the draft for the model's next quota reset. */
+  onRunAtNextReset?: (() => void) | undefined;
 }
 
 const formatPendingPrimaryActionLabel = (input: {
@@ -101,6 +103,7 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
   onPreviousPendingQuestion,
   onInterrupt,
   onImplementPlanInNewThread,
+  onRunAtNextReset,
 }: ComposerPrimaryActionsProps) {
   const pointerFocusProps = preserveComposerFocusOnPointerDown
     ? { onPointerDown: preventPointerFocus }
@@ -326,10 +329,38 @@ export const ComposerPrimaryActions = memo(function ComposerPrimaryActions({
     </button>
   );
 
-  return (
+  const send = (
     <Tooltip key="submit">
       <TooltipTrigger render={<span className="inline-flex" />}>{sendButton}</TooltipTrigger>
       <TooltipPopup>{submitTooltip}</TooltipPopup>
     </Tooltip>
+  );
+  if (!onRunAtNextReset || isRunning || showResume || isEditingQueuedMessage) return send;
+  const laterDisabled =
+    isSendBusy || isSendDisabled || isConnecting || isEnvironmentUnavailable || !hasSendableContent;
+  return (
+    <div className="flex items-center gap-0.5">
+      <Menu>
+        <MenuTrigger
+          render={
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Send options"
+              disabled={laterDisabled}
+              {...pointerFocusProps}
+            />
+          }
+        >
+          <ChevronDownIcon className="size-3.5" />
+        </MenuTrigger>
+        <MenuPopup align="end" side="top" {...composerFloatingLayerProps}>
+          <MenuItem disabled={laterDisabled} onClick={onRunAtNextReset}>
+            Run at next reset
+          </MenuItem>
+        </MenuPopup>
+      </Menu>
+      {send}
+    </div>
   );
 });
