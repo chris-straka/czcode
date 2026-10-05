@@ -3,7 +3,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppearancePreferences } from "../features/settings/appearance/AppearancePreferencesProvider";
 
 import { AppText as Text } from "./AppText";
-import { BrandMark } from "./BrandMark";
 
 export function LoadingScreen(props: {
   readonly message: string;
@@ -17,7 +16,6 @@ export function LoadingScreen(props: {
     <View className="flex-1 bg-screen" style={{ paddingTop: insets.top }}>
       <StatusBar barStyle={colorScheme === "dark" ? "light-content" : "dark-content"} />
       <View className="flex-1 items-center justify-center gap-5 px-6">
-        <BrandMark compact />
         {messagePlacement === "above-spinner" ? (
           <Text className="font-cz-bold text-lg text-foreground">{props.message}</Text>
         ) : null}

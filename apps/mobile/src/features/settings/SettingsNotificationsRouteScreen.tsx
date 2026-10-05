@@ -334,7 +334,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
 
       Alert.alert(
         "Disable notifications",
-        "Open system Settings to disable notifications for czcode.",
+        "Open system Settings to disable notifications for this app.",
         [
           { text: "Cancel", style: "cancel" },
           { text: "Open Settings", onPress: () => void Linking.openSettings() },
@@ -486,7 +486,7 @@ function ConfiguredSettingsNotificationsRouteScreen() {
                 void openAndroidLiveUpdateSettings().catch(() => {
                   Alert.alert(
                     "Couldn't open Settings",
-                    "Open Android Settings, select czcode, then enable Live Updates in Notifications.",
+                    "Open Android Settings, select this app, then enable Live Updates in Notifications.",
                   );
                 });
               }}
