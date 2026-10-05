@@ -57,8 +57,11 @@ export const rules: readonly Rule[] = [
   [/T3(?: |\+|%20)Code/g, app],
   [/T3CODE_/g, `${CLI}_`],
   [/T3CODE/g, app.toUpperCase()],
-  [/T3[-_]?Code/g, App],
-  [/t3[-_ ]?code/gi, app],
+  [/T3_CODE(?![A-Za-z0-9])/g, CLI],
+  [/T3_CODE(?=_)/g, CLI],
+  // Never into "codex": T3_CODEX_* and t3Codex are cz + Codex.
+  [/T3[-_]?Code(?![xX])/g, App],
+  [/t3[-_ ]?code(?![xX])/gi, app],
   [/T3TOOLS/g, ORG],
   [/T3Tools/g, Org],
   [/t3tools/g, org],
