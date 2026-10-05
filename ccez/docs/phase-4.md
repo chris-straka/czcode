@@ -39,10 +39,18 @@ desktop, and Android.
 
 - I walked the web feed and views with Playwright on imported real items
   (desk and phone widths), with no page errors.
+- **Web, every kind, automated** (2026-10-05): `node ccez/tests/decisions-web.ts`
+  starts a throwaway server, asks one decision of each kind, and answers each
+  through the UI in headless Chrome: a pick, a redline, keep plus "more like
+  these", a passage comment, the playtest form, a reorder, a pitch answered
+  from its card after an Undo, a file upload, and a redo from a failed
+  timeline step. Every answer read back from the server matched, with no
+  page errors (about 30 seconds).
 
 ## Not done
 
-- Per-kind Playwright and Maestro test suites.
+- The Android suite (Maestro): no phone was attached when the web suite was
+  written.
 - The owner answering one of each kind on the S24.
 - inbox.ccez.uk is shut down (2026-10-05). The owner had never answered an
   item and kept nothing, so there was no import. The Worker and its D1
