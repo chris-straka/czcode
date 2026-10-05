@@ -38,6 +38,8 @@ else
 fi
 
 git checkout --quiet main
+# .gitattributes marks fork-owned files merge=ours; the driver keeps main's copy.
+git config merge.ours.driver true
 if ! git merge --no-edit upstream-cz; then
   dropped=$(node -e 'import("'"$here"'/map.ts").then(m => console.log(m.droppedPaths.join("\n")))')
   for path in $dropped; do git rm -rq --ignore-unmatch -- "$path"; done

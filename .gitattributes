@@ -3,3 +3,7 @@
 # Batch files need CRLF for cmd.exe to parse them reliably.
 *.cmd text eol=crlf
 *.bat text eol=crlf
+# Fork-owned files: an upstream sync keeps main's version (ccez/rename/sync.sh
+# enables the "ours" merge driver).
+/README.md merge=ours
+/LICENSE merge=ours

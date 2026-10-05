@@ -1,0 +1,6 @@
+czcode is a modified fork of T3 Code (https://github.com/pingdotgg/t3code),
+copyright (c) 2026 T3 Tools Inc., used under the MIT License (see LICENSE).
+
+Every T3 name in this repository was rewritten by the codemod in
+ccez/rename/, and Connect, the hosted relay, analytics, and the marketing
+site were removed. T3 Tools Inc. does not endorse or support this fork.
