@@ -118,7 +118,15 @@ export function DecisionScreen(props: {
     void answer({ environmentId: entry.environmentId, input: { id: item.id, answer: value } }).then(
       (result) => {
         if (result === null) return;
-        setStatus(`Answered: ${answerSummary(item, value)}`);
+        const summary = answerSummary(item, value);
+        // Text-only answers (request, playtest) summarize as a bare "Answered".
+        setStatus(
+          summary !== "Answered"
+            ? `Answered: ${summary}`
+            : value.comment
+              ? `Sent: ${value.comment}`
+              : "Sent.",
+        );
         props.onDone();
       },
     );
@@ -171,10 +179,9 @@ export function DecisionScreen(props: {
       if (verdicts && digit >= 1 && digit <= verdicts.length) {
         return setDraft({ ...draft, choice: verdicts[digit - 1]!.value });
       }
-      if (!selected) return;
       switch (item.kind) {
         case "pick":
-          if (input === " ") setDraft(togglePick(item, draft, selected.id));
+          if (selected && input === " ") setDraft(togglePick(item, draft, selected.id));
           return;
         case "rank":
           if (input === "J" || input === "K") {
@@ -184,6 +191,7 @@ export function DecisionScreen(props: {
           }
           return;
         case "listen":
+          if (!selected) return;
           if (input === " ") return toggleSound(selected.id, mediaPath, false);
           if (input === "y") return setDraft(react(draft, selected.id, "keep"));
           if (input === "x") return setDraft(react(draft, selected.id, "kill"));
@@ -214,7 +222,9 @@ export function DecisionScreen(props: {
           return;
         case "timeline":
           if (input === "a") return setDraft({ ...draft, choice: "approve", redoFrom: null });
-          if (input === "r") return setDraft({ ...draft, choice: "redo", redoFrom: selected.id });
+          if (input === "r" && selected) {
+            return setDraft({ ...draft, choice: "redo", redoFrom: selected.id });
+          }
           return;
         default:
           if (input === " " && (media?.type === "audio" || media?.type === "voice")) {
