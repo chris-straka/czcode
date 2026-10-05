@@ -70,13 +70,28 @@ fork-only edits are on `main`.
   ![icons](img/p1-icons.jpg)
   ![dmg](img/p1-dmg.jpg)
 
-## Not verified yet (needs the owner)
+## On the S24 and the Mac (2026-10-05)
 
-- The dev build on the S24 (launcher, splash, notification, About
-  screenshots).
-- The Mac desktop app window. It would open a window on the owner's screen,
-  so I'm asking first. The renderer is the web app shown above.
-- Settings descriptions still use the name in about 60 sentences ("Restart
-  czcode to finish…"). The plan's no-name list covers the chrome, welcome,
-  empty states, About, and notifications, which are done. Rewording every
-  settings sentence would conflict on each upstream sync.
+- **S24**: the release APK (`uk.ccez.cz`, signed with czcode's own key,
+  `ccez/release/android.sh`) installed over USB. The splash is the plain
+  background, and the launcher shows the box-arrow icon labelled "czcode".
+  The header reads "Threads", About shows only the version, and nothing
+  inside the app shows a name or logo. Paired over USB with a test server
+  holding the migrated data, it listed and opened the threads.
+
+  ![splash](img/p1-s24-01-splash.jpg)
+  ![threads](img/p1-s24-04-after-pair.jpg)
+  ![thread](img/p1-s24-05-thread.jpg)
+  ![about](img/p1-s24-07-about.jpg)
+  ![launcher](img/p1-s24-10-icon.jpg)
+
+- **Mac desktop app** (unsigned arm64 build): app name, window title, and
+  bundle id are czcode / `uk.ccez.cz`, with no brand in the window.
+
+  ![mac home](img/p1-mac-desk-1-home.jpg)
+  ![mac settings](img/p1-mac-desk-2.jpg)
+  ![mac connections](img/p1-mac-desk-3.jpg)
+
+- Still open: notification screenshots (push is off until P8). Settings
+  descriptions still use the name in about 60 sentences ("Restart czcode to
+  finish…"); rewording every one would conflict on each upstream sync.

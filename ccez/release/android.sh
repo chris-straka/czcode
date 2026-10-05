@@ -13,7 +13,7 @@ keystore="${CZ_ANDROID_KEYSTORE:-$HOME/.config/czcode/android-release.jks}"
 build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
 
 cd "$repo/apps/mobile"
-version=$(node -e 'console.log(require("./package.json").version)')
+version=$(APP_VARIANT=production npx expo config --json 2>/dev/null | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => console.log(JSON.parse(s).version))')
 APP_VARIANT=production EXPO_NO_GIT_STATUS=1 npx expo prebuild --clean --platform android --no-install
 (cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain)
 
