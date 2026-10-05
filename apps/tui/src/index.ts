@@ -25,8 +25,25 @@ export const runTui: TuiModule["runTui"] = async (options: RunTuiOptions) => {
       { value: tuiRuntime.registry },
       h(App, { atoms, cwd: options.cwd }),
     ),
-    { exitOnCtrlC: true },
+    {
+      exitOnCtrlC: true,
+      // Nothing left in the float's scrollback on exit.
+      alternateScreen: true,
+      // Esc and Alt+letter arrive unambiguously (nvim's terminal speaks the protocol).
+      kittyKeyboard: { mode: "enabled", flags: ["disambiguateEscapeCodes"] },
+    },
   );
-  await app.waitUntilExit();
-  tuiRuntime.registry.dispose();
+  // Closing the float, nvim, or the Ghostty tab hangs up. Unmount so the caller
+  // revokes this session; the terminal may already be gone, so drop write errors.
+  const onHangup = () => {
+    process.stdout.on("error", () => {});
+    app.unmount();
+  };
+  process.once("SIGHUP", onHangup);
+  try {
+    await app.waitUntilExit();
+  } finally {
+    process.off("SIGHUP", onHangup);
+    tuiRuntime.registry.dispose();
+  }
 };

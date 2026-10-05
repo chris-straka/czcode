@@ -36,7 +36,12 @@ const tuiConfigDir = Effect.gen(function* () {
 // Loaded lazily so `cz serve` never pays for Ink and React. The package's
 // "types" entry declares only runTui, keeping its DOM-typed client code out
 // of the server's type program.
-const loadTui = (): Promise<TuiModule> => import("@cz/tui");
+const loadTui = (): Promise<TuiModule> => {
+  // A neovim terminal reports TERM=xterm-256color and no COLORTERM, though
+  // Ghostty behind it draws truecolor. Set before Ink's colour library loads.
+  if (process.env.NVIM && process.env.FORCE_COLOR === undefined) process.env.FORCE_COLOR = "3";
+  return import("@cz/tui");
+};
 
 export const tuiCommand = Command.make("tui", { baseDir: baseDirFlag }).pipe(
   Command.withDescription("Open the terminal app (threads, decisions, queue) for this machine."),

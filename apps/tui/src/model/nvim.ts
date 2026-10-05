@@ -12,12 +12,19 @@ export function parentNvim(): string | null {
   return process.env.NVIM?.trim() || null;
 }
 
-/** Opens `command` in a new toggleterm float (a plain :terminal float without toggleterm). */
+/**
+ * Opens `command` in a new toggleterm float (a plain :terminal float without
+ * toggleterm). One float shows at a time, so open ones (this TUI's included)
+ * are hidden first, and the float closes when the command exits.
+ */
 export function floatTerminalLua(command: string): string {
   return `(function(cmd)
   local ok, terms = pcall(require, 'toggleterm.terminal')
   if ok then
-    terms.Terminal:new({ cmd = cmd, direction = 'float', close_on_exit = false }):toggle()
+    for _, other in ipairs(terms.get_all(true)) do
+      if other:is_open() and other.direction == 'float' then other:close() end
+    end
+    terms.Terminal:new({ cmd = cmd, direction = 'float', close_on_exit = true }):toggle()
     return 1
   end
   local buf = vim.api.nvim_create_buf(false, true)

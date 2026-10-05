@@ -55,5 +55,9 @@ describe("kitty placeholders", () => {
     expect(inlineImagesSupported({ TERM: "xterm-kitty" })).toBe(true);
     expect(inlineImagesSupported({ TERM_PROGRAM: "ghostty", TMUX: "/tmp/x" })).toBe(false);
     expect(inlineImagesSupported({ TERM_PROGRAM: "Apple_Terminal" })).toBe(false);
+    // Inside neovim, only when that neovim forwards the images.
+    const inNvim = { TERM_PROGRAM: "ghostty", NVIM: "/tmp/nvim.sock" };
+    expect(inlineImagesSupported(inNvim, () => true)).toBe(true);
+    expect(inlineImagesSupported(inNvim, () => false)).toBe(false);
   });
 });

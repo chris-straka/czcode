@@ -2,13 +2,14 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ThreadId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { Atom } from "effect/unstable/reactivity";
-import { Box, Text, useInput } from "ink";
-import { createElement as h, useMemo } from "react";
+import { Box, type DOMElement, Text } from "ink";
+import { createElement as h, useMemo, useRef } from "react";
 
 import { projectKey } from "../model/scope.ts";
 import { age, type EnvironmentShell, threadRows, threadState } from "../model/threadList.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useNow, useViewport } from "./hooks.ts";
+import { useClick, useKeys } from "./input.ts";
 
 export interface ThreadListProps {
   readonly atoms: TuiAtoms;
@@ -62,7 +63,7 @@ export function ThreadListScreen({
   const selected = Math.min(cursor, Math.max(0, rows.length - 1));
   const top = Math.max(0, Math.min(selected - Math.floor(visible / 2), rows.length - visible));
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.downArrow || input === "j") setCursor(Math.min(rows.length - 1, selected + 1));
       else if (key.upArrow || input === "k") setCursor(Math.max(0, selected - 1));
@@ -74,6 +75,19 @@ export function ThreadListScreen({
       }
     },
     { isActive: active },
+  );
+  const list = useRef<DOMElement>(null);
+  // A click selects a row; a click on the selected row opens it.
+  useClick(
+    list,
+    ({ row: offset }) => {
+      const index = top + offset;
+      const row = rows[index];
+      if (!row) return;
+      if (index === selected) onOpen(row.environmentId, row.thread.id);
+      else setCursor(index);
+    },
+    active,
   );
 
   if (shells.length === 0) {
@@ -88,7 +102,7 @@ export function ThreadListScreen({
   const projectWidth = Math.min(16, Math.floor(columns / 4));
   return h(
     Box,
-    { flexDirection: "column" },
+    { ref: list, flexDirection: "column" },
     rows.slice(top, top + visible).map((row, offset) => {
       const index = top + offset;
       const isSelected = index === selected;

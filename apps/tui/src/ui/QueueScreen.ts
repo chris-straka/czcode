@@ -4,12 +4,13 @@ import type { EnvironmentId, QueuedRun } from "@cz/contracts";
 import { formatResetsIn, providersWithLimits, remainingPercent } from "@cz/shared/usageLimits";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useMemo, useState, type ReactNode } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useCommand } from "./command.ts";
 import { useNow } from "./hooks.ts";
+import { useKeys } from "./input.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -68,7 +69,7 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
   const runNow = useCommand(atoms.queue.runNow);
   const selected = rows[Math.min(cursor, Math.max(0, rows.length - 1))];
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.downArrow || input === "j") setCursor(Math.min(rows.length - 1, cursor + 1));
       else if (key.upArrow || input === "k") setCursor(Math.max(0, cursor - 1));

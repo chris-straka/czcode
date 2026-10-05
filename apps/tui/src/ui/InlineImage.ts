@@ -10,7 +10,10 @@ import {
   transmitSequence,
 } from "../model/kitty.ts";
 
-let nextImageId = 0x00c0de;
+// Image ids share one store per terminal, so two `ct` floats in one Ghostty
+// window start from ids spread by process id. The id is also the placeholder's
+// 24-bit colour, so it stays below 0x1000000.
+let nextImageId = 0x100000 + ((process.pid * 40_503) % 0xe00000);
 
 /**
  * Draws a PNG inline with Kitty placeholders, sized to fit. Falls back to a

@@ -1,7 +1,7 @@
 import type { EnvironmentId, ThreadId } from "@cz/contracts";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, type DOMElement, Text, useApp } from "ink";
 import { useAtomValue } from "@effect/atom-react";
-import { createElement as h, useCallback, useEffect, useMemo, useState } from "react";
+import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext } from "./command.ts";
@@ -13,6 +13,7 @@ import { DiffScreen } from "./DiffScreen.ts";
 import { QueueScreen } from "./QueueScreen.ts";
 import { environmentShellsAtom, ThreadListScreen } from "./ThreadListScreen.ts";
 import { ThreadScreen } from "./ThreadScreen.ts";
+import { useClick, useKeys, useMouseRouter } from "./input.ts";
 
 const TABS = ["Threads", "Decisions", "Queue", "Hosts"] as const;
 type Tab = (typeof TABS)[number];
@@ -54,7 +55,21 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
   }, [status]);
 
   const atTop = overlay.kind === "none" && !decisionOpen;
-  useInput(
+  useMouseRouter();
+  const tabBar = useRef<DOMElement>(null);
+  useClick(
+    tabBar,
+    ({ column }) => {
+      let start = 0;
+      for (const [index, name] of TABS.entries()) {
+        const width = `${index + 1} ${name}`.length;
+        if (column >= start && column < start + width) return setTab(name);
+        start += width + 2;
+      }
+    },
+    atTop,
+  );
+  useKeys(
     (input, key) => {
       if (input === "q") return exit();
       const digit = Number(input);
@@ -134,7 +149,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
             { flexDirection: "column", marginBottom: 1 },
             h(
               Box,
-              null,
+              { ref: tabBar },
               ...TABS.map((name, index) =>
                 h(
                   Box,

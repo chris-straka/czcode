@@ -7,6 +7,7 @@
  *
  * @module kitty
  */
+import { execFileSync } from "node:child_process";
 
 /** Row/column diacritics from the Kitty spec (rowcolumn-diacritics.txt), first 64. */
 const DIACRITICS = [
@@ -20,18 +21,47 @@ const DIACRITICS = [
 export const MAX_PLACEHOLDER_CELLS = DIACRITICS.length;
 const PLACEHOLDER = String.fromCodePoint(0x10eeee);
 
-/** Terminals that draw Kitty placeholders. Inside tmux they'd need passthrough, so no. */
-export function inlineImagesSupported(env: NodeJS.ProcessEnv = process.env): boolean {
+const forwardsByNvim = new Map<string, boolean>();
+
+/** Whether the neovim at `socket` loaded the owner's Kitty passthrough hook. Asked once. */
+function nvimForwardsImages(socket: string): boolean {
+  let forwards = forwardsByNvim.get(socket);
+  if (forwards === undefined) {
+    try {
+      const answer = execFileSync(
+        "nvim",
+        ["--server", socket, "--remote-expr", "exists('#KittyPassthrough#TermRequest')"],
+        { timeout: 2000, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      );
+      forwards = answer.trim() === "1";
+    } catch {
+      forwards = false;
+    }
+    forwardsByNvim.set(socket, forwards);
+  }
+  return forwards;
+}
+
+/**
+ * Terminals that draw Kitty placeholders. Inside tmux they'd need passthrough,
+ * so no. Inside neovim (which passes TERM_PROGRAM on to its terminals), only
+ * when that neovim forwards the images: `nvim --clean` or one over ssh doesn't.
+ */
+export function inlineImagesSupported(
+  env: NodeJS.ProcessEnv = process.env,
+  forwardsImages: (socket: string) => boolean = nvimForwardsImages,
+): boolean {
   if (env.CZ_TUI_IMAGES === "0") return false;
   if (env.CZ_TUI_IMAGES === "1") return true;
   if (env.TMUX) return false;
   const program = env.TERM_PROGRAM?.toLowerCase() ?? "";
-  return (
+  const terminal =
     program === "ghostty" ||
     program === "wezterm" ||
     env.KITTY_WINDOW_ID !== undefined ||
-    (env.TERM ?? "").includes("kitty")
-  );
+    (env.TERM ?? "").includes("kitty");
+  const socket = env.NVIM?.trim();
+  return terminal && (!socket || forwardsImages(socket));
 }
 
 /** The APC chunks that transmit a PNG as a virtual placement of `columns` x `rows` cells. */

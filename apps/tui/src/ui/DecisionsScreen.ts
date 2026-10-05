@@ -2,14 +2,15 @@ import { useAtomValue } from "@effect/atom-react";
 import type { DecisionItemWithAnswer, EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
-import { Box, Text, useInput } from "ink";
-import { createElement as h, useMemo, useState } from "react";
+import { Box, type DOMElement, Text } from "ink";
+import { createElement as h, useMemo, useRef, useState } from "react";
 
 import { type DecisionEntry, decisionFeed, KIND_TAG } from "../model/decisionFeed.ts";
 import { age } from "../model/threadList.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { DecisionScreen } from "./DecisionScreen.ts";
 import { useNow, useViewport } from "./hooks.ts";
+import { useClick, useKeys } from "./input.ts";
 
 interface HostDecisions {
   readonly environmentId: EnvironmentId;
@@ -56,17 +57,29 @@ export function DecisionsScreen(props: {
   const visible = Math.max(3, height - 4);
   const selected = Math.min(cursor, Math.max(0, entries.length - 1));
   const top = Math.max(0, Math.min(selected - Math.floor(visible / 2), entries.length - visible));
+  const openEntry = (entry: DecisionEntry) => {
+    setOpen(entry);
+    props.onOpenChange(true);
+  };
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.downArrow || input === "j") setCursor(Math.min(entries.length - 1, selected + 1));
       else if (key.upArrow || input === "k") setCursor(Math.max(0, selected - 1));
-      else if (key.return && entries[selected]) {
-        setOpen(entries[selected]);
-        props.onOpenChange(true);
-      }
+      else if (key.return && entries[selected]) openEntry(entries[selected]);
     },
     { isActive: props.active && open === null },
+  );
+  const list = useRef<DOMElement>(null);
+  // A click selects a row; a click on the selected row opens it.
+  useClick(
+    list,
+    ({ row }) => {
+      const index = top + row;
+      if (index === selected && entries[index]) openEntry(entries[index]);
+      else if (index < entries.length) setCursor(index);
+    },
+    props.active && open === null,
   );
 
   if (open) {
@@ -90,7 +103,7 @@ export function DecisionsScreen(props: {
   const projectWidth = Math.min(14, Math.floor(columns / 5));
   return h(
     Box,
-    { flexDirection: "column" },
+    { ref: list, flexDirection: "column" },
     entries.slice(top, top + visible).map((entry, offset) => {
       const index = top + offset;
       const focused = index === selected;

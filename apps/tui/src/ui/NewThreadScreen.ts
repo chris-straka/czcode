@@ -10,7 +10,7 @@ import {
   type ThreadEnvMode,
   type VcsStatusResult,
 } from "@cz/contracts";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useContext, useMemo, useState } from "react";
 import { randomBytes, randomUUID } from "node:crypto";
 import { buildTemporaryWorktreeBranchName } from "@cz/shared/git";
@@ -24,6 +24,7 @@ import { StatusContext, useCommand } from "./command.ts";
 import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import { environmentShellsAtom } from "./ThreadListScreen.ts";
 import { TextInput } from "./TextInput.ts";
+import { useKeys } from "./input.ts";
 
 const NO_VCS_STATUS = Atom.make(AsyncResult.initial<VcsStatusResult | null, unknown>());
 
@@ -92,7 +93,7 @@ export function NewThreadScreen(props: {
       ? hosts.map((host) => host.label)
       : projects.map((project) => project.title);
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.escape) return props.onCancel();
       if (key.downArrow || input === "j") setCursor(Math.min(choices.length - 1, cursor + 1));
@@ -133,7 +134,7 @@ export function NewThreadScreen(props: {
   const vcsResult = useAtomValue(statusAtom);
   const vcsStatus = Option.getOrNull(AsyncResult.value(vcsResult));
   const baseBranch = vcsStatus?.isRepo ? vcsStatus.refName : null;
-  useInput(
+  useKeys(
     (_input, key) => {
       if (key.escape) return props.onCancel();
       if (key.tab) return setEnvModeChoice(envMode === "worktree" ? "local" : "worktree");

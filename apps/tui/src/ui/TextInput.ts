@@ -1,5 +1,6 @@
-import { Text, useInput } from "ink";
+import { Text } from "ink";
 import { createElement as h } from "react";
+import { useKeys } from "./input.ts";
 
 export interface TextInputProps {
   readonly value: string;
@@ -20,7 +21,7 @@ export function TextInput({
   active,
   multiline,
 }: TextInputProps) {
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.return) {
         if (multiline && key.meta) onChange(`${value}\n`);
@@ -33,7 +34,7 @@ export function TextInput({
       if (key.escape || key.tab || key.upArrow || key.downArrow || key.ctrl || key.meta) return;
       if (input) onChange(value + input);
     },
-    { isActive: active },
+    { isActive: active, allowMeta: true },
   );
   if (value === "" && placeholder) {
     return h(Text, { dimColor: true }, active ? `${placeholder}█` : placeholder);

@@ -3,13 +3,14 @@ import { AVAILABLE_CONNECTION_STATE } from "@cz/client-runtime/connection";
 import type { EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useState } from "react";
 
 import { hostStateLabel } from "../model/hosts.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useCommand } from "./command.ts";
 import { TextInput } from "./TextInput.ts";
+import { useKeys } from "./input.ts";
 
 /** Paired machines with their state; `p` pairs a new one from a `cz pair` link. */
 export function HostsScreen({
@@ -29,7 +30,7 @@ export function HostsScreen({
   const setEnabled = useCommand(atoms.catalog.setEnabled);
   const selected = entries[Math.min(cursor, entries.length - 1)];
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (input === "p") return setPairing("");
       if (key.downArrow || input === "j") setCursor(Math.min(entries.length - 1, cursor + 1));
@@ -41,7 +42,7 @@ export function HostsScreen({
     },
     { isActive: active && pairing === null },
   );
-  useInput(
+  useKeys(
     (_input, key) => {
       if (key.escape) setPairing(null);
     },

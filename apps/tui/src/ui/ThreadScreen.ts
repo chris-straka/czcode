@@ -8,7 +8,7 @@ import {
   type ThreadId,
 } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useContext, useMemo, useState } from "react";
 import { randomUUID } from "node:crypto";
 
@@ -25,6 +25,7 @@ import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
 import { TextInput } from "./TextInput.ts";
+import { useKeys } from "./input.ts";
 
 const TONE: Record<
   LineTone,
@@ -136,7 +137,7 @@ export function ThreadScreen(props: {
     });
   };
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.escape) return props.onBack();
       if (input === "i" || input === "r") return setComposing(true);
@@ -204,7 +205,7 @@ export function ThreadScreen(props: {
     },
     { isActive: props.active && !composing },
   );
-  useInput(
+  useKeys(
     (_input, key) => {
       if (key.escape) setComposing(false);
     },

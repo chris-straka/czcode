@@ -7,7 +7,7 @@ import {
   VERDICT_BUTTONS,
 } from "@cz/client-runtime/decisions/draft";
 import type { DecisionMediaRef } from "@cz/contracts";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChildProcess } from "node:child_process";
 
@@ -26,6 +26,7 @@ import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
 import { MediaView } from "./MediaView.ts";
 import { TextInput } from "./TextInput.ts";
+import { useKeys } from "./input.ts";
 
 type Typing =
   | { readonly field: "comment" }
@@ -151,7 +152,7 @@ export function DecisionScreen(props: {
     else openWithSystem(mediaPath);
   };
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.escape) {
         stop();
@@ -234,7 +235,7 @@ export function DecisionScreen(props: {
     },
     { isActive: props.active && typing === null },
   );
-  useInput(
+  useKeys(
     (_input, key) => {
       if (key.escape) setTyping(null);
     },

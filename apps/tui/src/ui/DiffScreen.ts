@@ -2,11 +2,12 @@ import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ThreadId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { Box, Text, useInput } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useMemo, useState } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useViewport } from "./hooks.ts";
+import { useKeys } from "./input.ts";
 
 const lineColor = (line: string) =>
   line.startsWith("+++") || line.startsWith("---")
@@ -43,7 +44,7 @@ export function DiffScreen(props: {
   const visible = Math.max(3, height - 3);
   const maxTop = Math.max(0, lines.length - visible);
 
-  useInput(
+  useKeys(
     (input, key) => {
       if (key.escape || input === "d") return props.onBack();
       if (input === "j" || key.downArrow) setTop(Math.min(maxTop, top + 1));
