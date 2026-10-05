@@ -12,6 +12,7 @@ import {
   type DecisionMediaRef,
   type DecisionMediaType,
   type DecisionOption,
+  type DecisionTimelineStep,
   normalizeDecisionKind,
 } from "@cz/contracts";
 import * as Clock from "effect/Clock";
@@ -100,6 +101,32 @@ export function optionsFor(
   }));
 }
 
+const StepsFile = Schema.fromJsonString(
+  Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      label: Schema.String,
+      status: Schema.Literals(["done", "failed", "skipped"]),
+      media_idx: Schema.optionalKey(Schema.NullOr(Schema.Number)),
+    }),
+  ),
+);
+
+/**
+ * Timeline steps from a `--steps-file` (a JSON array of {id, label, status,
+ * media_idx?}). A step without `media_idx` shows the file at its own position.
+ */
+export const stepsFromFile = (text: string, fileCount: number) =>
+  Schema.decodeEffect(StepsFile)(text).pipe(
+    Effect.map((steps): DecisionTimelineStep[] =>
+      steps.map((step, index) => ({
+        ...step,
+        media_idx: step.media_idx !== undefined ? step.media_idx : index < fileCount ? index : null,
+      })),
+    ),
+    Effect.mapError((error) => fail(`Can't read --steps-file: ${error.message}`)),
+  );
+
 /** "2h", "3d", "30m" after `now`, or an absolute date. */
 export const parseWhen = (value: string, now: number): number | null => {
   const relative = /^(\d+)(m|h|d)$/i.exec(value.trim());
@@ -150,6 +177,12 @@ const submitCommand = Command.make("submit", {
   body: Flag.String("body").pipe(Flag.optional),
   bodyFile: Flag.String("body-file").pipe(Flag.optional),
   option: Flag.String("option").pipe(Flag.atLeast(0)),
+  stepsFile: Flag.String("steps-file").pipe(
+    Flag.withDescription(
+      "Timeline: a JSON array of {id, label, status: done|failed|skipped, media_idx?}.",
+    ),
+    Flag.optional,
+  ),
   priority: Flag.String("priority").pipe(Flag.optional),
   createdBy: Flag.String("created-by").pipe(Flag.optional),
   thread: Flag.String("thread").pipe(Flag.optional),
@@ -189,6 +222,9 @@ const submitCommand = Command.make("submit", {
             ),
           );
         }
+        const steps = Option.isSome(flags.stepsFile)
+          ? yield* stepsFromFile(yield* fs.readFileString(flags.stepsFile.value), media.length)
+          : [];
         const now = yield* Clock.currentTimeMillis;
         const expiresAt = Option.isSome(flags.expires) ? parseWhen(flags.expires.value, now) : null;
         if (Option.isSome(flags.expires) && expiresAt === null) {
@@ -206,6 +242,7 @@ const submitCommand = Command.make("submit", {
             flags.option,
             flags.files.map((file) => path.basename(file)),
           ),
+          steps,
           priority: Number(Option.getOrElse(flags.priority, () => "0")) || 0,
           created_by: Option.getOrElse(flags.createdBy, () => "cli"),
           thread: Option.getOrNull(flags.thread),

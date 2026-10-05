@@ -100,7 +100,11 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
                 `${configs.size > 1 ? `${host} ` : ""}${provider.displayName ?? provider.instanceId}`,
               ),
             ),
-            h(Box, { width: 9, flexShrink: 0 }, h(Text, { dimColor: true }, window.label)),
+            h(
+              Box,
+              { width: 15, flexShrink: 0 },
+              h(Text, { dimColor: true, wrap: "truncate" }, window.label),
+            ),
             h(
               Text,
               { color: remaining < 15 ? "red" : remaining < 40 ? "yellow" : "green" },

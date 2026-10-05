@@ -113,11 +113,13 @@ free model), text captures in `img/p7-*.txt`:
 - **`o` on a remote host's thread:** it needs a second host with Tailscale
   SSH on. Only the command and the float opening were tested.
 
-## Not done
+## Follow-ups (2026-10-05)
 
-- **Timeline answers weren't tried live:** `cz inbox submit` can't create
-  steps. The keys are built, and the rules are shared.
-- **Usage limits weren't tried live:** the sandbox's only provider (OpenCode
-  free) reports none.
-- **The nvim and zsh edits are uncommitted** in their own dotfile repos.
-  This worktree agent can't run git outside czcode.
+- **Timeline answered live:** `cz inbox submit --steps-file` now takes the
+  steps (it couldn't before, which also blocked genforge's timeline). On a
+  throwaway server, `ct` opened the timeline, `j` `r` Enter sent "redo from
+  Rig", and `cz inbox get` read back `choice: redo, redo_from: rig`.
+- **Usage limits live:** the Queue tab showed real Codex and Claude session
+  and weekly bars with reset times. A long window name ("Weekly · Fable")
+  wrapped onto a second line; the label column is wider now and truncates.
+- **The nvim hook and `ct` alias** are committed in `~/config` (not pushed).

@@ -1,6 +1,7 @@
+import * as Effect from "effect/Effect";
 import { describe, expect, it } from "vite-plus/test";
 
-import { mediaTypeForFile, optionsFor, parseWhen } from "./inbox.ts";
+import { mediaTypeForFile, optionsFor, parseWhen, stepsFromFile } from "./inbox.ts";
 
 describe("cz inbox submit helpers", () => {
   it("makes one option per file for media kinds, and uses given labels otherwise", () => {
@@ -25,5 +26,25 @@ describe("cz inbox submit helpers", () => {
     expect(parseWhen("2h", 1_000)).toBe(1_000 + 2 * 3_600_000);
     expect(parseWhen("2026-10-09T00:00:00Z", 0)).toBe(Date.parse("2026-10-09T00:00:00Z"));
     expect(parseWhen("soon", 0)).toBeNull();
+  });
+
+  it("reads timeline steps, defaulting each step's media to the file at its position", async () => {
+    const steps = await Effect.runPromise(
+      stepsFromFile(
+        JSON.stringify([
+          { id: "blockout", label: "Blockout", status: "done" },
+          { id: "rig", label: "Rig", status: "failed" },
+          { id: "notes", label: "Notes", status: "skipped", media_idx: null },
+        ]),
+        2,
+      ),
+    );
+    expect(steps.map((step) => [step.id, step.media_idx])).toEqual([
+      ["blockout", 0],
+      ["rig", 1],
+      ["notes", null],
+    ]);
+    const bad = await Effect.runPromise(Effect.flip(stepsFromFile('[{"id":"x"}]', 0)));
+    expect(bad.message).toContain("--steps-file");
   });
 });
