@@ -32,6 +32,7 @@ import { servicePreflightCommand } from "./cli/servicePreflight.ts";
 import { themeCommand } from "./cli/theme.ts";
 import { traceCommand } from "./cli/trace.ts";
 import { triageCommand } from "./cli/triage.ts";
+import { tuiCommand } from "./cli/tui.ts";
 
 const CliRuntimeLayer = Layer.mergeAll(NodeServices.layer, NetService.layer);
 
@@ -54,6 +55,7 @@ export const makeCli = () =>
       pairCommand,
       inboxCommand,
       queueCommand,
+      tuiCommand,
       authCommand,
       projectCommand,
       serviceCommand,
