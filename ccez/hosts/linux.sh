@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Sets up an Ubuntu machine (or Ubuntu in WSL2, via windows.ps1) as a cz agent
-# host: tools, Tailscale, cz built from this repo and kept running as a systemd
-# user service on the tailnet, and the Claude, Codex, and OpenCode logins.
-# Safe to re-run: finished steps are skipped, and re-running updates cz.
+# Copy this line into an Ubuntu terminal (on Windows: the Ubuntu app, i.e. WSL):
 #
-#   bash ccez/hosts/linux.sh
-#   (fresh machine) curl -fsSL https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh -o /tmp/cz-host.sh && bash /tmp/cz-host.sh
+# curl -fsSL https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh -o /tmp/cz-host.sh && bash /tmp/cz-host.sh
 #
-# Logins are interactive: each prints a link or code to open on any device.
+# Sets up this machine as a cz agent host: tools, Tailscale, cz built from this
+# repo and kept running as a background service on the tailnet, and the Claude,
+# Codex, and OpenCode logins (each prints a link or code to open on any
+# device). Safe to re-run: finished steps are skipped, and re-running updates cz.
+#
+# Windows without Ubuntu yet: in PowerShell run `wsl --install`, restart, open
+# Ubuntu from the Start menu, pick a username and password, then run the line
+# above in it. On WSL this script also turns on systemd and keeps WSL running
+# after you log in to Windows.
 set -euo pipefail
 
 REPO_URL=https://github.com/chris-straka/czcode.git
@@ -19,9 +23,22 @@ have() { command -v "$1" > /dev/null 2>&1; }
 
 [ "$(id -u)" -ne 0 ] || { echo "Run as your normal user, not root (sudo is used where needed)." >&2; exit 1; }
 have apt-get || { echo "This script expects Ubuntu or Debian." >&2; exit 1; }
+in_wsl=false
+grep -qi microsoft /proc/version && in_wsl=true
 if [ "$(ps -p 1 -o comm=)" != "systemd" ]; then
-  echo "systemd isn't running. In WSL, windows.ps1 turns it on; elsewhere, enable systemd and re-run." >&2
-  exit 1
+  if ! $in_wsl; then
+    echo "systemd isn't running. Enable it and re-run." >&2
+    exit 1
+  fi
+  # WSL runs systemd only when /etc/wsl.conf asks, and only after a restart.
+  grep -q '^systemd *= *true' /etc/wsl.conf 2> /dev/null ||
+    printf '\n[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf > /dev/null
+  echo
+  echo "WSL needs a restart to turn on systemd. After this window closes, open"
+  echo "Ubuntu again and run the same command (press the up arrow to get it back)."
+  read -r -p "Press Enter to restart WSL. " _ < /dev/tty
+  /mnt/c/Windows/System32/wsl.exe --shutdown
+  exit 0
 fi
 
 step "Base tools"
@@ -100,6 +117,18 @@ sudo loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable "$UNIT" > /dev/null
 systemctl --user restart "$UNIT"
+
+if $in_wsl; then
+  step "Keep WSL running after you log in to Windows"
+  # WSL stops when nothing runs in it. A hidden startup script keeps an idle
+  # process alive, so the cz service keeps answering. No admin rights needed.
+  appdata=$(cd /mnt/c && /mnt/c/Windows/System32/cmd.exe /c 'echo %APPDATA%' | tr -d '\r')
+  startup="$(wslpath "$appdata")/Microsoft/Windows/Start Menu/Programs/Startup"
+  printf 'CreateObject("WScript.Shell").Run "wsl.exe -d %s --exec /bin/sleep infinity", 0, False\r\n' \
+    "$WSL_DISTRO_NAME" > "$startup/cz-wsl-keepalive.vbs"
+  (cd /mnt/c && /mnt/c/Windows/System32/wscript.exe "$(wslpath -w "$startup/cz-wsl-keepalive.vbs")")
+  echo "Added $startup/cz-wsl-keepalive.vbs"
+fi
 
 step "Coding agents"
 npm_global() { have "$1" || npm install -g "$2"; }

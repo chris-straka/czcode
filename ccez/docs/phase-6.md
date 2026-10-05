@@ -22,14 +22,15 @@ No store, no Apple Developer ID, no GitHub releases.
     `~/.local/bin/cz`. That command runs the installed app's own server, so
     `cz inbox`, `cz queue`, and `cz serve` always match the app.
 
-- **New agent hosts:** `ccez/hosts/windows.ps1` and `ccez/hosts/linux.sh`.
-  - On a Windows PC, `windows.ps1` (run in an administrator PowerShell)
-    installs WSL2 with Ubuntu, turns on systemd, and keeps WSL running
-    after logon. Then it runs `linux.sh` inside WSL.
-  - `linux.sh` also works alone on plain Ubuntu. It installs git, `gh`,
-    Node 24 (apt), Vite+ (the build tool), and Tailscale. It builds cz from this repo
-    and runs `cz serve` as the systemd user service `cz-host`, on the
-    tailnet through Tailscale Serve.
+- **New agent hosts:** one script, `ccez/hosts/linux.sh`. Its first lines
+  hold a one-line curl command to copy from GitHub.
+  - It works on plain Ubuntu and on Ubuntu in WSL2. A Windows PC only needs
+    `wsl --install` first. On WSL, the script turns on systemd (asking for
+    one WSL restart) and adds a hidden Startup-folder script, so WSL keeps
+    running after Windows logon. No admin PowerShell is needed.
+  - It installs git, `gh`, Node 24 (apt), Vite+ (the build tool), and
+    Tailscale. It builds cz from this repo and runs `cz serve` as the
+    systemd user service `cz-host`, on the tailnet through Tailscale Serve.
   - It installs Claude Code, Codex, and OpenCode, walks through each login,
     and prints a pairing link.
   - Re-running it skips finished steps and updates cz.
@@ -75,7 +76,7 @@ To roll back, quit czcode and open T3 Code. `~/.t3` is left untouched.
 
 ## Not done
 
-- `windows.ps1` and `linux.sh` haven't run on a real Windows PC or Ubuntu
+- `linux.sh` hasn't run on a real Windows PC or Ubuntu
   machine yet. Shellcheck passes, but nothing was available here to run
   them on.
 - The owner using only cz for three days.
