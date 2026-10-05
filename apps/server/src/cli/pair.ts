@@ -405,8 +405,11 @@ const resolveTailscalePairingBase = Effect.fn("pair.resolveTailscalePairingBase"
       servePort: input.servePort,
       ...(localTarget.localHost !== undefined ? { localHost: localTarget.localHost } : {}),
     }).pipe(
-      Effect.mapError(
-        (cause) => new TailscaleServeFailedError({ servePort: input.servePort, cause }),
+      // An unapproved tailnet's message already says what to do (open the link).
+      Effect.mapError((cause) =>
+        cause._tag === "TailscaleServeNotEnabledError"
+          ? cause
+          : new TailscaleServeFailedError({ servePort: input.servePort, cause }),
       ),
     );
     notes.push(

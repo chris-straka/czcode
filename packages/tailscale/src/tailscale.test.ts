@@ -14,6 +14,7 @@ import {
   buildTailscaleHttpsBaseUrl,
   disableTailscaleServe,
   ensureTailscaleServe,
+  TailscaleServeNotEnabledError,
   isTailscaleIpv4Address,
   parseTailscaleMagicDnsName,
   parseTailscaleStatus,
@@ -356,6 +357,40 @@ describe("tailscale", () => {
       // key cannot reach a log through it either.
       assert.equal(error.stderrDiagnostic, "permission-denied");
       assertCarriesNoSecret(error, "tskey-auth-secret-token-value");
+    });
+  });
+
+  it.effect("fails at once with the approval link when Serve isn't enabled on the tailnet", () => {
+    // `tailscale serve` prints the link and then waits for the approval.
+    const prompt =
+      "\nServe is not enabled on your tailnet.\nTo enable, visit:\n\n         https://login.tailscale.com/f/serve?node=abc123\n";
+    const layer = spawnerLayer(
+      ChildProcessSpawner.make(() =>
+        Effect.succeed(
+          ChildProcessSpawner.makeHandle({
+            pid: ChildProcessSpawner.ProcessId(1),
+            exitCode: Effect.never,
+            isRunning: Effect.succeed(true),
+            kill: () => Effect.void,
+            unref: Effect.succeed(Effect.void),
+            stdin: Sink.drain,
+            stdout: Stream.concat(Stream.make(encoder.encode(prompt)), Stream.never),
+            stderr: Stream.never,
+            all: Stream.empty,
+            getInputFd: () => Sink.drain,
+            getOutputFd: () => Stream.empty,
+          }),
+        ),
+      ),
+    );
+
+    return Effect.gen(function* () {
+      const error = yield* ensureTailscaleServe({ localPort: 13773 }).pipe(
+        Effect.flip,
+        Effect.provide(layer),
+      );
+      assert.instanceOf(error, TailscaleServeNotEnabledError);
+      assert.equal(error.enableUrl, "https://login.tailscale.com/f/serve?node=abc123");
     });
   });
 

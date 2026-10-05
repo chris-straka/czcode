@@ -111,7 +111,18 @@ export class TailscaleCommandTimeoutError extends Schema.TaggedError<TailscaleCo
   }
 }
 
+/** The tailnet hasn't enabled Serve; `tailscale serve` printed an approval link and waits. */
+export class TailscaleServeNotEnabledError extends Schema.TaggedError<TailscaleServeNotEnabledError>()(
+  "TailscaleServeNotEnabledError",
+  { enableUrl: Schema.String },
+) {
+  override get message(): string {
+    return `Tailscale Serve isn't enabled on your tailnet yet. Enable it once at ${this.enableUrl}, then try again.`;
+  }
+}
+
 export type TailscaleCommandError =
+  | TailscaleServeNotEnabledError
   | TailscaleCommandSpawnError
   | TailscaleCommandOutputError
   | TailscaleCommandExitError
@@ -285,6 +296,21 @@ export function buildTailscaleHttpsBaseUrl(input: {
   return url.toString();
 }
 
+// Printed to stdout by `tailscale serve` on a tailnet that hasn't enabled Serve.
+const SERVE_NOT_ENABLED =
+  /Serve is not enabled on your tailnet[\s\S]*?(https:\/\/login\.tailscale\.com\/\S+)/;
+
+/** The approval link, as soon as stdout shows it. Never completes otherwise. */
+const serveEnableLink = <E>(stdout: Stream.Stream<Uint8Array, E>) =>
+  stdout.pipe(
+    Stream.decodeText(),
+    Stream.scan("", (text, chunk) => text + chunk),
+    Stream.map((text) => SERVE_NOT_ENABLED.exec(text)?.[1]),
+    Stream.filter((url): url is string => url !== undefined),
+    Stream.runHead,
+    Effect.flatMap(Option.match({ onNone: () => Effect.never, onSome: Effect.succeed })),
+  );
+
 const runTailscaleCommand = (
   args: readonly string[],
   timeoutInput: Duration.Input,
@@ -306,12 +332,19 @@ const runTailscaleCommand = (
           Effect.fail(new TailscaleCommandSpawnError({ ...commandContext, cause })),
         ),
       );
-      const [stderr, exitCode] = yield* Effect.all(
+      const outputError = (cause: unknown) =>
+        new TailscaleCommandOutputError({ ...commandContext, cause });
+      const exited = Effect.all(
         [collectStderr(child.stderr), child.exitCode.pipe(Effect.map(Number))],
         { concurrency: "unbounded" },
-      ).pipe(
-        Effect.mapError((cause) => new TailscaleCommandOutputError({ ...commandContext, cause })),
+      ).pipe(Effect.mapError(outputError));
+      const needsApproval = serveEnableLink(child.stdout).pipe(
+        Effect.mapError(outputError),
+        Effect.flatMap((enableUrl) =>
+          Effect.fail(new TailscaleServeNotEnabledError({ enableUrl })),
+        ),
       );
+      const [stderr, exitCode] = yield* Effect.raceFirst(exited, needsApproval);
       if (exitCode !== 0) {
         return yield* new TailscaleCommandExitError({
           ...commandContext,
