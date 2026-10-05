@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { resolveAssetUrl } from "@cz/client-runtime/state/assets";
-import type { AndroidRelease, EnvironmentId } from "@cz/contracts";
+import type { EnvironmentId } from "@cz/contracts";
 import Constants from "expo-constants";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -39,13 +39,9 @@ function AndroidUpdateRow({ environmentId }: { readonly environmentId: Environme
     <SettingsRow
       icon="arrow.down.circle"
       label="Install update"
-      value={releaseLabel(release)}
+      value={`${release.version} (${release.versionCode})`}
       valuePosition="trailing"
       onPress={() => void Linking.openURL(url)}
     />
   );
-}
-
-function releaseLabel(release: AndroidRelease): string {
-  return `${release.version} (${release.versionCode}) · ${Math.round(release.sizeBytes / 1_000_000)} MB`;
 }
