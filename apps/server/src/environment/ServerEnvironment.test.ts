@@ -96,7 +96,7 @@ it.layer(NodeServices.layer)("ServerEnvironmentLive", (it) => {
       yield* fs.writeFileString(entry, "");
       yield* fs.writeFileString(
         `${prefix}/lib/node_modules/cz/package.json`,
-        '{"name":"cz","version":"0.0.45","bin":{"cz":"./dist/bin.mjs"}}',
+        '{"name":"cz","version":"0.0.46","bin":{"cz":"./dist/bin.mjs"}}',
       );
       yield* fs.symlink(entry, `${prefix}/bin/cz`);
       const config = yield* makeServerConfig(baseDir);

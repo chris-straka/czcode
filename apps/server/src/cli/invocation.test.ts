@@ -137,7 +137,7 @@ it.layer(NodeServices.layer)("manual server installation ownership", (it) => {
       yield* fs.writeFileString(entry, "");
       yield* fs.writeFileString(
         path.join(packageRoot, "package.json"),
-        '{"name":"cz","version":"0.0.45","bin":{"cz":"./dist/bin.mjs"}}',
+        '{"name":"cz","version":"0.0.46","bin":{"cz":"./dist/bin.mjs"}}',
       );
       const resolve = resolveServerInstallation.pipe(
         Effect.provideService(HostProcessArguments, ["node", entry]),
@@ -170,7 +170,7 @@ it.layer(NodeServices.layer)("manual server installation ownership", (it) => {
       yield* fs.writeFileString(entry, "");
       yield* fs.writeFileString(
         path.join(packageRoot, "package.json"),
-        '{"name":"cz","version":"0.0.45","bin":{"cz":"./bin/cz.js"},"optionalDependencies":{"@cz/cz-linux-x64":"0.0.45"}}',
+        '{"name":"cz","version":"0.0.46","bin":{"cz":"./bin/cz.js"},"optionalDependencies":{"@cz/cz-linux-x64":"0.0.46"}}',
       );
       yield* fs.symlink(launcher, path.join(prefix, "bin/cz"));
       const resolve = resolveServerInstallation.pipe(
@@ -180,7 +180,7 @@ it.layer(NodeServices.layer)("manual server installation ownership", (it) => {
       );
       for (const [version, expected] of [
         ["0.0.44", null],
-        ["0.0.45", { kind: "npm-global", prefix }],
+        ["0.0.46", { kind: "npm-global", prefix }],
       ]) {
         yield* fs.writeFileString(
           path.join(path.dirname(entry), "package.json"),
@@ -199,7 +199,7 @@ it.layer(NodeServices.layer)("manual server installation ownership", (it) => {
       for (const relative of [
         "project/node_modules/cz/dist/bin.mjs",
         "project/apps/server/dist/bin.mjs",
-        ".cz/runtime/0.0.45/cz",
+        ".cz/runtime/0.0.46/cz",
         "missing/dist/bin.mjs",
       ]) {
         const entry = path.join(root, relative);
