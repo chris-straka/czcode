@@ -142,7 +142,7 @@ describe("connection presentation", () => {
       traceId: "trace-retry",
     } as const;
     expect(connectionStatusText(connection)).toBe(
-      "Failed to connect. Reconnecting... Reason: Relay request timed out.",
+      "Failed to connect. Reconnecting... Reason: Relay request timed out. Check that czcode is open (or cz serve is running) on that machine, and that this device is on its network or tailnet (the Tailscale app connected).",
     );
     expect(connectionStatusTitle(connection)).toBe("Failed to connect. Reconnecting...");
   });

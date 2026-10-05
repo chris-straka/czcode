@@ -3,7 +3,7 @@ import type { EnvironmentId, ThreadId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { Atom } from "effect/unstable/reactivity";
 import { Box, type DOMElement, Text } from "ink";
-import { createElement as h, useMemo, useRef } from "react";
+import { createElement as h, useEffect, useMemo, useRef, useState } from "react";
 
 import { projectKey } from "../model/scope.ts";
 import { age, type EnvironmentShell, threadRows, threadState } from "../model/threadList.ts";
@@ -58,6 +58,12 @@ export function ThreadListScreen({
     [shells, scope],
   );
   const now = useNow(30_000);
+  // Connecting normally takes a moment; after that, say what to check.
+  const [slowStart, setSlowStart] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSlowStart(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
   const { rows: height, columns } = useViewport();
   const visible = Math.max(3, height - 4);
   const selected = Math.min(cursor, Math.max(0, rows.length - 1));
@@ -91,7 +97,13 @@ export function ThreadListScreen({
   );
 
   if (shells.length === 0) {
-    return h(Text, { dimColor: true }, "Connecting… (no environments yet)");
+    return h(
+      Text,
+      { dimColor: true },
+      slowStart
+        ? "No machine connected. Is czcode open on this machine (or cz serve running)? Other machines pair in Hosts (4)."
+        : "Connecting…",
+    );
   }
   if (rows.length === 0) {
     return h(Text, { dimColor: true }, "No threads yet.");

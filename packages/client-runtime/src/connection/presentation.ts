@@ -56,6 +56,10 @@ export function presentConnectionState(
   }
 }
 
+// What to check when a machine doesn't answer: its server, then this device's route to it.
+const UNREACHABLE_HINT =
+  "Check that czcode is open (or cz serve is running) on that machine, and that this device is on its network or tailnet (the Tailscale app connected).";
+
 export function connectionStatusText(connection: EnvironmentConnectionPresentation): string {
   switch (connection.phase) {
     case "available":
@@ -66,7 +70,7 @@ export function connectionStatusText(connection: EnvironmentConnectionPresentati
       return "Connecting...";
     case "reconnecting":
       return connection.error
-        ? `Failed to connect. Reconnecting... Reason: ${connection.error}`
+        ? `Failed to connect. Reconnecting... Reason: ${connection.error} ${UNREACHABLE_HINT}`
         : "Reconnecting...";
     case "connected":
       return "Connected";
