@@ -24,12 +24,7 @@ import * as Layer from "effect/Layer";
 import * as Stream from "effect/Stream";
 import { HttpClient } from "effect/unstable/http";
 
-/** The running server on this machine, with a session minted by `cz tui`. */
-export interface LocalServer {
-  readonly httpBaseUrl: string;
-  readonly bearerToken: string;
-  readonly label: string;
-}
+import type { LocalServer } from "../api.ts";
 
 export const LOCAL_CONNECTION_ID = "local:cz-tui";
 

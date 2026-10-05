@@ -8,12 +8,12 @@ import { RegistryContext } from "@effect/atom-react";
 import { render } from "ink";
 import { createElement as h } from "react";
 
-import { makeTuiRuntime, type TuiRuntimeOptions } from "./runtime/connection.ts";
+import type { RunTuiOptions } from "./api.ts";
+import { makeTuiRuntime } from "./runtime/connection.ts";
 import { makeTuiAtoms } from "./state/atoms.ts";
 import { App } from "./ui/App.ts";
 
-export type { LocalServer } from "./runtime/platform.ts";
-export type RunTuiOptions = TuiRuntimeOptions;
+export type { LocalServer, RunTuiOptions } from "./api.ts";
 
 /** Runs the TUI until the user quits. */
 export async function runTui(options: RunTuiOptions): Promise<void> {

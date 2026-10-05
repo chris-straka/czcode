@@ -23,20 +23,16 @@ import * as Socket from "effect/unstable/socket/Socket";
 import { Atom, AtomRegistry } from "effect/unstable/reactivity";
 import { webcrypto } from "node:crypto";
 
+import type { RunTuiOptions } from "../api.ts";
 import {
   capabilitiesLayer,
   connectivityLayer,
-  type LocalServer,
   platformSourceLayer,
   wakeupsLayer,
 } from "./platform.ts";
 import { connectionStorageLayer, memoryCacheLayer } from "./storage.ts";
 
-export interface TuiRuntimeOptions {
-  readonly local: LocalServer | null;
-  readonly configDir: string;
-  readonly appVersion: string;
-}
+export type TuiRuntimeOptions = RunTuiOptions;
 
 const cryptoLayer = Layer.succeed(
   Crypto.Crypto,
