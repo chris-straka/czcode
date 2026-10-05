@@ -1,37 +1,46 @@
 # Install czcode
 
-czcode runs coding agents on your computer and lets you control them from its
-desktop, web, or mobile app. Set up the machine where the agents will work first.
+czcode runs coding agents on your computers and lets you control them from its
+desktop app, terminal app, or Android app. Set up the machine where the agents will work first.
 
 ## Requirements
 
 You need an installed, authenticated provider before starting a thread. You can
 launch czcode and configure providers afterwards.
 
-## Command line
+czcode has no store listing, install site, or release downloads. Each part is
+built from a checkout of this repo.
+
+## Mac desktop app
+
+From a checkout on an Apple Silicon Mac:
 
 ```bash
-curl -fsSL https://cz.ccez.uk/install.sh | sh
+ccez/release/mac.sh --install
 ```
 
-On Windows, in PowerShell:
+This builds the app, replaces `/Applications/czcode.app`, and puts `cz` in
+`~/.local/bin`. That `cz` runs the installed app's own server, so the command
+line always matches the app. Quit czcode first; the script refuses while it
+runs. The app isn't signed, so open it the first time with right-click → Open.
 
-```powershell
-irm https://cz.ccez.uk/install.ps1 | iex
-```
+## Another computer as an agent host
 
-This puts `cz` in `~/.local/bin`. If your shell reports `command not found`
-afterwards, that directory is not on your `PATH` yet; the installer prints the
-line to add. Set `CZ_CHANNEL=nightly` to install the nightly train, or
-`CZ_VERSION` to pin an exact version.
+A Linux PC, or a Windows PC through WSL2 Ubuntu, is set up with one script.
+Follow `ccez/hosts/README.md`: it installs Tailscale, Node, the providers, and
+cz built from this repo, keeps `cz serve` running in the background, walks
+through each provider sign-in, and prints a pairing link.
 
-| Task                                             | Command                                                   |
-| ------------------------------------------------ | --------------------------------------------------------- |
-| Start the server and open the web app            | `cz`                                                      |
-| Start the server without a browser               | `cz serve`                                                |
-| Keep it running in the background (macOS, Linux) | `cz service install` ([details](./background-service.md)) |
-| Move to the newest release                       | `cz update`                                               |
-| Remove it again                                  | `cz uninstall`                                            |
+## Command line
+
+| Task                                  | Command               |
+| ------------------------------------- | --------------------- |
+| Start the server and open the web app | `cz`                  |
+| Start the server without a browser    | `cz serve`            |
+| Open the terminal app                 | `cz tui`              |
+| Pair a device over Tailscale          | `cz pair --tailscale` |
+| Ask the owner, read answers           | `cz inbox`            |
+| Run a task at the next quota reset    | `cz queue`            |
 
 Run `cz help` or `cz --help` for the full reference. To start in a new working
 directory, use an explicit path such as `cz ./my-project`. A bare directory name
@@ -40,48 +49,6 @@ is accepted only if it already exists.
 If `cz` or `cz start` reports an already running server, connect to that server
 instead. Stop it before starting a replacement, or use a different `--base-dir`
 for an independent server.
-
-To try czcode once without installing it, run `npx cz@latest` instead (needs
-Node.js for `npx`).
-
-### Intel Macs
-
-There is no `cz` executable for Intel Macs (the desktop app is available). To
-run a server there, build it from source with Node.js 24 and `vp`
-([Install vp](https://github.com/chris-straka/czcode#install-vp)):
-
-```bash
-git clone https://github.com/chris-straka/czcode
-cd czcode && vp i && vp run build:desktop
-node apps/server/dist/bin.mjs
-```
-
-`cz update` and the background service do not apply to a server run this way;
-update it with `git pull` and a rebuild.
-
-## Desktop app
-
-Download a release from [GitHub Releases](https://github.com/chris-straka/czcode/releases),
-or use a package manager:
-
-| Platform           | Install                           |
-| ------------------ | --------------------------------- |
-| Windows            | `winget install Ccez.Czcode`      |
-| macOS              | `brew install --cask czcode`      |
-| Debian, Ubuntu     | `sudo apt install ./Czcode-*.deb` |
-| Arch Linux         | `yay -S czcode-bin`               |
-| Arch Linux nightly | `yay -S czcode-nightly-bin`       |
-
-The `.deb` updates itself like the other desktop builds. It asks for your
-password to install each update. If your desktop has no password prompt, the
-update fails. Download the new `.deb` and install it the same way.
-
-### Windows Subsystem for Linux
-
-Choose a WSL distro in **Settings → Connections** to run agents and projects
-there. Install the provider CLIs inside that distro. czcode installs its own
-server runtime there automatically; the first launch after an app update can
-take longer.
 
 ### Open a project from a terminal
 
@@ -98,25 +65,21 @@ command cannot reach the app, start or update the desktop app and try again.
 
 ## Mobile app
 
-Install czcode from the
-[App Store](https://apps.apple.com/us/app/czcode-remote-claude-more/id6787819824) or
-[Google Play](https://play.google.com/store/apps/details?id=uk.ccez.cz).
-The phone connects to a server on another machine. Follow
-[remote access](./remote-access.md) to link it through cz Connect or a pairing URL.
+Android only. Build and install it with the phone on USB:
 
-Nightly builds need the beta app. The store apps cannot connect to them. A Nightly build also
-shows these links as QR codes in **Settings → General → Mobile app**.
+```bash
+ccez/release/android.sh --install
+```
 
-- **iPhone and iPad:** join the [TestFlight beta](https://testflight.apple.com/join/XgaxaRtd).
-- **Android:** join the [beta group](https://groups.google.com/g/czcode-v2-beta). With the same
-  Google account, open the [Google Play testing page](https://play.google.com/apps/testing/uk.ccez.cz)
-  and become a tester.
+After that, `android.sh --publish` offers new builds from the Mac, and the
+phone installs them from **Settings → App → Install update** (see
+[Updating](./updating.md#mobile-updates)). The phone connects to a server on
+another machine; follow [remote access](./remote-access.md) to pair it.
 
 If the app crashes during launch, open Settings → Diagnostics on the next launch
 that succeeds. It lists startup crashes from the last 7 days with the error and
-component stack that store crash reports leave out. Copy the report and paste it
-into a GitHub issue. Error messages can quote values from the app, so read it over
-before sharing.
+component stack. Error messages can quote values from the app, so read the
+report over before sharing it.
 
 ## Providers
 

@@ -26,7 +26,7 @@ code; review an agent's source and license before adding it.
 ## Where agents run
 
 Registry agents always run on the machine that hosts your czcode server. That stays true when you
-connect through `app.cz.ccez.uk`, cz Connect, or a relay.
+connect from another device.
 
 Agents install under `tools/<agent-id>/<version>/` inside cz home. czcode verifies SHA-256 when the Registry entry
 provides one; entries without a checksum retain the Registry's HTTPS distribution guarantee.

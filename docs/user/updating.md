@@ -38,39 +38,15 @@ Update the side the notice names, then reconnect.
 
 ## Update a connected server
 
-The offered action depends on how the server runs:
+czcode has no release downloads, so every machine updates by rebuilding from
+this repo's `main`. The in-app **Update server** and `cz update` look for
+releases and find none.
 
-| Action                     | What to do                                                                                                                                                                                      |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Update server**          | Keep the client open while it installs and reconnects. Supported background services update remotely. For a desktop-hosted server, this also closes and relaunches the desktop app on the host. |
-| **Update the desktop app** | Update the desktop app on the machine running the server, then reopen it if needed.                                                                                                             |
-| **Copy update command**    | Run the command on the named host to update the detected global npm install, then restart the server with your usual options.                                                                   |
-| **Copy relaunch command**  | Stop the command-line server on its host and relaunch with the copied command, keeping your usual subcommand and options. This does not update an installed `cz` command.                       |
+- **Mac:** quit czcode, pull `main`, and run `ccez/release/mac.sh --install`.
+- **Agent hosts:** run the host setup script again on the host. It pulls
+  `main`, rebuilds, and restarts the `cz-host` service.
 
-On the host, run:
-
-```sh
-cz update <client-version>
-```
-
-Replace `<client-version>` with the version shown in the notice. The command
-asks before restarting the background service; if you decline, run
-`cz service restart` when you are ready. For a server you started by hand,
-stop it and start it again afterwards with your usual options such as `--host`
-or `--tailscale-serve`.
-
-If you run the server with `npx` rather than an installed `cz`, there is
-nothing to update on the host: stop the server and relaunch it as
-`npx cz@<client-version>` with the same subcommand and options.
-
-## If an update fails
-
-Keep the client open until it reconnects or reports a failure. A failed service
-update can roll back to the previous version. If the update still fails:
-
-1. Retry the offered action once.
-2. Check that you updated the server's machine, not only the device you are using.
-3. For a command-line server, stop it and relaunch the exact version shown in the notice.
+Updating restarts that machine's server, so let active turns finish first.
 
 ## Update providers
 
@@ -81,25 +57,12 @@ offer a manual update command are not included.
 
 ## Mobile updates
 
-To update an environment from your phone, open **Settings → Environments** and
-select it. **Check for updates** finds the latest release on that environment's
-current release channel. Keep the app open while the environment updates and
-reconnects. Hosts that cannot update remotely show instructions for updating on
-the machine instead.
-
-The same page lets you refresh provider status and update supported providers.
-These controls require a connected environment and permission to operate it.
-Provider update checks and restart continuation preferences are in
-**Settings → Maintenance**. If provider update checks are disabled, enable them
-there before refreshing to find newer versions.
+From your phone, open **Settings → Environments** and select a machine to
+refresh provider status and update supported providers. These controls require
+a connected environment and permission to operate it. Provider update checks
+and restart continuation preferences are in **Settings → Maintenance**.
 
 On Android, a paired machine can offer its own newer build: **Settings → App →
 Install update** appears when one has an APK newer than yours. Tapping it
 downloads the APK in your browser; open the download to install it over the
 current app. Android asks once to allow installs from your browser.
-
-Install App Store or Google Play releases as usual. The mobile app can also
-download updates in the background and apply them when you next leave the app.
-It saves drafts and queued messages before restarting. If you keep the app open
-for a long time, it may ask to install immediately; choosing **Later** leaves the
-update queued for the next suitable moment.

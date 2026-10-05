@@ -217,7 +217,7 @@ describe("cz pair", () => {
     ).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("directs to cz serve or cz connect when no server is running", () =>
+  it.effect("directs to cz serve or the desktop app when no server is running", () =>
     Effect.gen(function* () {
       const baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "cz-pair-none-test-"));
 
@@ -229,8 +229,8 @@ describe("cz pair", () => {
         typeof error === "object" && error !== null && "cause" in error ? error.cause : error,
       );
       assert.include(rendered, "No running czcode server found.");
-      assert.include(rendered, "npx cz serve");
-      assert.include(rendered, "npx cz connect");
+      assert.include(rendered, "`cz serve`");
+      assert.include(rendered, "desktop app");
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 

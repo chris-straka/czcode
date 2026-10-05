@@ -81,7 +81,7 @@ export class NoRunningServerError extends Schema.TaggedError<NoRunningServerErro
     return [
       "No running czcode server found.",
       ...this.checkedStatePaths.map((statePath) => `  checked ${statePath}`),
-      "Start one with `npx cz serve`, or connect this machine with cz Connect: `npx cz connect`.",
+      "Start one with `cz serve`, or open the czcode desktop app.",
     ].join("\n");
   }
 }
