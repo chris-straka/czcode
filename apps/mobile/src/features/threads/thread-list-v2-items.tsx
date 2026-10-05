@@ -23,6 +23,7 @@ import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSw
 
 import type { ThreadListProvider } from "../../state/thread-list-environments";
 import { SymbolView } from "../../components/AppSymbol";
+import { useThreadOpenDecisionCount } from "../../state/decisions";
 import { AppText as Text } from "../../components/AppText";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
@@ -577,6 +578,7 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
   const theme = useUniwindTheme();
   const sidebarPane = props.pane === "sidebar";
   const selected = props.selected === true;
+  const openDecisionCount = useThreadOpenDecisionCount(thread.environmentId, thread.id);
   const rowAppearance = getThreadListV2RowAppearance(theme, sidebarPane, selected);
 
   const status = resolveThreadListV2Status(thread);
@@ -941,6 +943,19 @@ export const ThreadListV2Row = memo(function ThreadListV2Row(props: {
           {props.projectTitle ?? props.project?.title ?? ""}
         </Text>
         {props.hasQueuedMessages ? <QueuedMessageIcon selected={selected} /> : null}
+        {openDecisionCount > 0 ? (
+          <View
+            accessible
+            accessibilityLabel={`${openDecisionCount} decision${openDecisionCount === 1 ? "" : "s"} waiting on you`}
+          >
+            <SymbolView
+              name="tray"
+              size={12}
+              tintColorClassName={rowAppearance.mutedIconTintClassName}
+              type="monochrome"
+            />
+          </View>
+        ) : null}
         {pinnedRow ? (
           <SymbolView
             name="pin"

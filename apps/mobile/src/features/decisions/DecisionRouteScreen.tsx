@@ -117,9 +117,24 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
         title={entry.item.kind}
         subtitle={`${entry.item.project} · ${entry.environmentLabel}`}
         onBack={() => navigation.goBack()}
-        {...(params.session === "1"
-          ? { actions: [{ accessibilityLabel: "Skip", icon: "chevron.right", onPress: goNext }] }
-          : {})}
+        actions={[
+          ...(entry.item.thread
+            ? [
+                {
+                  accessibilityLabel: "Open thread",
+                  icon: "text.bubble" as const,
+                  onPress: () =>
+                    navigation.navigate("Thread", {
+                      environmentId: String(entry.environmentId),
+                      threadId: entry.item.thread!,
+                    }),
+                },
+              ]
+            : []),
+          ...(params.session === "1"
+            ? [{ accessibilityLabel: "Skip", icon: "chevron.right" as const, onPress: goNext }]
+            : []),
+        ]}
       />
       {pending ? (
         <View className="m-4 flex-row items-center gap-3 rounded-xl bg-subtle p-4">

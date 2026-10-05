@@ -134,6 +134,7 @@ import {
 } from "./ThreadComposer";
 import { ThreadFeed, type ThreadFeedHistoryControls } from "./ThreadFeed";
 import { useThreadTurnSubagents } from "./ThreadAgentsSheet";
+import { ThreadDecisionsBanner } from "../decisions/ThreadDecisionsBanner";
 import { ComposerQueuedEditBanner } from "./ComposerQueuedEdit";
 import { useThreadQueuedCount } from "./ThreadQueueControl";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
@@ -1185,6 +1186,10 @@ export const ThreadDetailScreen = memo(function ThreadDetailScreen(props: Thread
                     />
                   </Animated.View>
                 ) : null}
+                <ThreadDecisionsBanner
+                  environmentId={props.environmentId}
+                  threadId={props.selectedThread.id}
+                />
                 <UsageLimitRecoveryCard
                   key={props.selectedThread.latestRun?.runId}
                   thread={props.selectedThread}
