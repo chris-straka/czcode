@@ -5,6 +5,7 @@ import {
   ThreadHistoryController,
 } from "@cz/client-runtime/state/threads";
 import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
+import { QueueHttp } from "@cz/client-runtime/state/queue";
 import { PullRequestDiffLoader } from "@cz/client-runtime/state/pull-requests";
 import * as Layer from "effect/Layer";
 import { Atom } from "effect/unstable/reactivity";
@@ -26,6 +27,7 @@ const snapshotLoaderLayer = Layer.mergeAll(
   ThreadHistoryController.layer,
   PullRequestDiffLoader.layer,
   DecisionsHttp.layer,
+  QueueHttp.layer,
 );
 
 type ConnectionLayerSource =

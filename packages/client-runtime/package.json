@@ -382,6 +382,10 @@
     "./decisions/draft": {
       "types": "./src/decisions/draft.ts",
       "default": "./src/decisions/draft.ts"
+    },
+    "./state/queue": {
+      "types": "./src/state/queue.ts",
+      "default": "./src/state/queue.ts"
     }
   },
   "scripts": {
