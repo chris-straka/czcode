@@ -1,11 +1,7 @@
 # Product usage data
 
-The czcode server sends product usage events to PostHog, associated with a hashed account or
-installation identifier. Events include the provider, model, reasoning effort, permission mode,
-turn result, duration, and main-agent token totals when available.
+czcode collects no product usage data. The server, desktop app, and mobile
+app send no analytics events anywhere.
 
-Events do not include prompts, responses, file contents, authentication tokens, conversation IDs,
-raw provider events, or child-agent output. Child-agent token use is excluded from the totals.
-
-To disable collection, set `CZ_TELEMETRY_ENABLED=false` in the server's environment before
-starting it. This stops product events from being recorded or sent.
+Traces and logs stay on the machine that runs the server unless you point
+the `CZ_OTLP_*` settings at a collector of your own.
