@@ -32,7 +32,9 @@ tile_png() { # size bg margin radius out
   edge=$(awk "BEGIN{printf \"%d\", $1*(1-2*$3)}")
   r=$(awk "BEGIN{printf \"%d\", $1*$4}")
   mark_png "$edge" 1 "$tmp/t.png"
-  magick -size "${edge}x${edge}" xc:none -fill "$2" -draw "roundrectangle 0,0,$((edge - 1)),$((edge - 1)),$r,$r" \
+  shape="roundrectangle 0,0,$((edge - 1)),$((edge - 1)),$r,$r"
+  [ "$r" -eq 0 ] && shape="rectangle 0,0,$((edge - 1)),$((edge - 1))"
+  magick -size "${edge}x${edge}" xc:none -fill "$2" -draw "$shape" \
     "$tmp/t.png" -composite -background none -gravity center -extent "$1x$1" "$5"
 }
 ico() { # tile.png out.ico

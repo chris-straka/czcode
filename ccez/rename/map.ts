@@ -104,4 +104,9 @@ export const skipFiles: readonly string[] = [
 
 // Upstream paths main has deleted. A sync keeps them deleted when upstream
 // edits them (see sync.sh).
-export const droppedPaths: readonly string[] = ["apps/marketing"];
+export const droppedPaths: readonly string[] = [
+  "apps/marketing",
+  // Replaced by ccez/brand/apply.sh, which renders the launcher mark.
+  "scripts/export-brand-icons.ts",
+  "scripts/export-android-icons.ts",
+];

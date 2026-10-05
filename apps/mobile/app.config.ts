@@ -18,7 +18,7 @@ const personalTeamBundleIdentifier = repoEnv.CZ_IOS_PERSONAL_TEAM_BUNDLE_ID?.tri
 const IOS_BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 
 const fromRepoRoot = (relativePath: string) => `../../${relativePath}`;
-// Android layers are rendered by scripts/export-android-icons.ts from the Icon Composer sources.
+// Android layers are rendered by ccez/brand/apply.sh from the chosen launcher mark.
 // The wordmark sits inside the adaptive safe zone; the variant artwork is a full-bleed background.
 const androidAdaptiveForeground = "./assets/android-icon-foreground.png";
 
