@@ -374,6 +374,10 @@
     "./decisions/feed": {
       "types": "./src/decisions/feed.ts",
       "default": "./src/decisions/feed.ts"
+    },
+    "./state/decisions": {
+      "types": "./src/state/decisions.ts",
+      "default": "./src/state/decisions.ts"
     }
   },
   "scripts": {

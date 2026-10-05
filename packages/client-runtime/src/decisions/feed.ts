@@ -16,22 +16,30 @@ function projectRank(project: string, order: readonly string[]): number {
 }
 
 /**
- * Open items in the order the owner sees them: blocking first, then project
+ * The order the owner sees open items in: blocking first, then project
  * priority, then the item's own priority, then oldest first.
  */
+export function compareFeedItems(
+  a: DecisionItem,
+  b: DecisionItem,
+  projectOrder: readonly string[] = DEFAULT_PROJECT_ORDER,
+): number {
+  return (
+    Number(b.blocking) - Number(a.blocking) ||
+    projectRank(a.project, projectOrder) - projectRank(b.project, projectOrder) ||
+    b.priority - a.priority ||
+    a.created_at - b.created_at
+  );
+}
+
+/** Open items in feed order (see {@link compareFeedItems}). */
 export function orderFeed(
   items: readonly DecisionItem[],
   projectOrder: readonly string[] = DEFAULT_PROJECT_ORDER,
 ): DecisionItem[] {
   return items
     .filter((item) => item.status === "open")
-    .toSorted(
-      (a, b) =>
-        Number(b.blocking) - Number(a.blocking) ||
-        projectRank(a.project, projectOrder) - projectRank(b.project, projectOrder) ||
-        b.priority - a.priority ||
-        a.created_at - b.created_at,
-    );
+    .toSorted((a, b) => compareFeedItems(a, b, projectOrder));
 }
 
 export interface FeedFilter {
