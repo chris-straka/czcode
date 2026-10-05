@@ -36,6 +36,8 @@ export const rules: readonly Rule[] = [
   // Package scopes.
   [/@t3tools\//g, `@${cli}/`],
   [/@t3code\//g, `@${cli}/`],
+  // Gradle and CocoaPods name scoped packages "<scope>-<name>".
+  [/(?<![A-Za-z0-9])t3tools-(?=[a-z])/g, `${cli}-`],
   [/@t3code(?![A-Za-z0-9-])/g, `@${cli}`],
 
   // Reverse-DNS ids (bundle ids, Android packages, launchd labels) and the
