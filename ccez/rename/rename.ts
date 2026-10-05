@@ -14,7 +14,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { rules, skipFiles, skipPrefixes } from "./map.ts";
+import { binaryRules, rules, skipFiles, skipPrefixes } from "./map.ts";
 
 const args = process.argv.slice(2);
 const check = args.includes("--check");
@@ -50,6 +50,19 @@ function isBinary(bytes: Buffer): boolean {
   return bytes.subarray(0, 8000).includes(0);
 }
 
+function renameBinary(bytes: Buffer): Buffer {
+  let out = bytes;
+  for (const [from, to] of binaryRules) {
+    const needle = Buffer.from(from, "latin1");
+    if (!out.includes(needle)) continue;
+    out = Buffer.from(out);
+    for (let at = out.indexOf(needle); at !== -1; at = out.indexOf(needle, at + needle.length)) {
+      out.write(to, at, "latin1");
+    }
+  }
+  return out;
+}
+
 function main(): void {
   const files = git("ls-files", "-z").split("\0").filter(Boolean);
   const changed: string[] = [];
@@ -69,7 +82,13 @@ function main(): void {
     } catch {
       continue; // submodule or deleted in the working tree
     }
-    if (isBinary(bytes)) continue;
+    if (isBinary(bytes)) {
+      const next = renameBinary(bytes);
+      if (next === bytes) continue;
+      changed.push(path);
+      if (!check) writeFileSync(join(root, path), next);
+      continue;
+    }
     const text = bytes.toString("utf8");
     const next = renameText(text);
     if (next === text) continue;
@@ -102,6 +121,9 @@ function main(): void {
     if (dir) execFileSync("mkdir", ["-p", join(root, dir)]);
     git("mv", "-k", from, to);
   }
+  // Renamed identifiers change line lengths; reflow with the repo's own
+  // formatter so the output matches what upstream's tooling would write.
+  execFileSync("vp", ["fmt"], { cwd: root, stdio: "ignore" });
   console.log(`rename: rewrote ${changed.length} files, moved ${moves.length} paths`);
 }
 
