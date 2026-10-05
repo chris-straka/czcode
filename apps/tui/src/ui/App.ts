@@ -8,11 +8,12 @@ import { StatusContext } from "./command.ts";
 import { HostsScreen } from "./HostsScreen.ts";
 import { NewThreadScreen } from "./NewThreadScreen.ts";
 import { projectScope } from "../model/scope.ts";
+import { DecisionsScreen } from "./DecisionsScreen.ts";
 import { DiffScreen } from "./DiffScreen.ts";
 import { environmentShellsAtom, ThreadListScreen } from "./ThreadListScreen.ts";
 import { ThreadScreen } from "./ThreadScreen.ts";
 
-const TABS = ["Threads", "Hosts"] as const;
+const TABS = ["Threads", "Decisions", "Hosts"] as const;
 type Tab = (typeof TABS)[number];
 
 type Overlay =
@@ -36,6 +37,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
   const [tab, setTab] = useState<Tab>("Threads");
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
   const [listCursor, setListCursor] = useState(0);
+  const [decisionOpen, setDecisionOpen] = useState(false);
   // Opens on the project containing the cwd (one Ghostty tab per project); `a` shows all.
   const [allProjects, setAllProjects] = useState(false);
   const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
@@ -50,7 +52,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
     return () => clearTimeout(timer);
   }, [status]);
 
-  const atTop = overlay.kind === "none";
+  const atTop = overlay.kind === "none" && !decisionOpen;
   useInput(
     (input, key) => {
       if (input === "q") return exit();
@@ -96,6 +98,13 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       onStarted: openThread,
       onCancel: back,
       scope: scope?.keys ?? null,
+    });
+  } else if (tab === "Decisions") {
+    body = h(DecisionsScreen, {
+      atoms,
+      active: true,
+      scopeNames: allProjects || scope === null ? null : scope.names,
+      onOpenChange: setDecisionOpen,
     });
   } else if (tab === "Hosts") {
     body = h(HostsScreen, { atoms, active: true });
