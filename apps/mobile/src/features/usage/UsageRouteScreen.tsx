@@ -38,6 +38,7 @@ import { SettingsSection } from "../settings/components/SettingsSection";
 import { UsageDailyChart } from "./UsageDailyChart";
 import { toggleUsageEnvironment } from "./usageEnvironmentSelection";
 import { useRefreshLimits } from "./UsageLimitsSection";
+import { ResetQueueSection } from "./ResetQueueSection";
 import { UsageLimitsSection } from "./UsageLimitsPooled";
 import { ControlPillMenu } from "../../components/ControlPill";
 import { SymbolView } from "../../components/AppSymbol";
@@ -285,19 +286,29 @@ export function UsageRouteScreen() {
           className="gap-6"
         >
           {showingLimits ? (
-            <UsageLimitsSection
-              now={limits.now}
-              failedLabels={limits.failedLabels}
-              selectedEnvironmentIds={selectedEnvironmentIds}
-              cursorPrompt={
-                cursorAccessEnvironments.length > 0 ? (
-                  <CursorEnableLimits
-                    environments={cursorAccessEnvironments}
-                    onEnabled={refreshAfterCursorEnable}
-                  />
-                ) : null
-              }
-            />
+            <>
+              <UsageLimitsSection
+                now={limits.now}
+                failedLabels={limits.failedLabels}
+                selectedEnvironmentIds={selectedEnvironmentIds}
+                cursorPrompt={
+                  cursorAccessEnvironments.length > 0 ? (
+                    <CursorEnableLimits
+                      environments={cursorAccessEnvironments}
+                      onEnabled={refreshAfterCursorEnable}
+                    />
+                  ) : null
+                }
+              />
+              <ResetQueueSection
+                environments={environments.filter(
+                  (environment) =>
+                    selectedEnvironmentIds === null ||
+                    selectedEnvironmentIds.has(environment.environmentId),
+                )}
+                now={limits.now}
+              />
+            </>
           ) : (
             <>
               {/* Period and metric together: neither applies to Limits, and

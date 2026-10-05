@@ -108,7 +108,9 @@ import { useEnvironmentServerConfig, useProjects, useThreadShells } from "../../
 import { useProjectClone } from "../../state/projectClones";
 import { projectEnvironment } from "../../state/projects";
 import { sourceControlEnvironment } from "../../state/sourceControl";
+import { queueEnvironment } from "../../state/queue";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import { ProjectCloneBanner } from "../../components/ProjectCloneBanner";
 import {
   isModelSelectionUnavailable,
@@ -239,6 +241,7 @@ export function NewTaskDraftScreen(props: {
     selectedProject.environmentId === props.initialProjectRef.environmentId;
   const cloneBlocksStart =
     awaitingKnownClone || (projectClone !== null && projectClone.phase !== "done");
+  const enqueueForReset = useAtomCommand(queueEnvironment.enqueue, "queue for the next reset");
   const cancelProjectClone = useAtomCommand(sourceControlEnvironment.cancelProjectClone, {
     reportFailure: false,
   });
@@ -1207,6 +1210,55 @@ export function NewTaskDraftScreen(props: {
     [composerMenu, flow, selectedEnvironmentServerConfig],
   );
 
+  // "Run at next reset" (cz reset queue): the prompt waits on the server and
+  // starts as a new thread once the model's quota resets. Text only.
+  async function handleRunAtNextReset(): Promise<void> {
+    const selectedProject = flow.selectedProject;
+    const draftKey = flow.draftKey;
+    if (!selectedProject || !draftKey || flow.submitting) return;
+    const draft = getComposerDraftSnapshot(draftKey);
+    const modelSelection =
+      resolveSelectableModelSelection(
+        selectedEnvironmentServerConfig,
+        draft.modelSelection ?? null,
+      ) ?? flow.selectedModel;
+    const workspaceMode = draft.workspaceSelection?.mode ?? flow.workspaceMode;
+    const branch = draft.workspaceSelection?.branch ?? flow.selectedBranchName;
+    const text = draft.text.trim();
+    if (!modelSelection || text.length === 0 || (workspaceMode === "worktree" && !branch)) return;
+    if (draft.attachments.length > 0 || (draft.context?.records.length ?? 0) > 0) {
+      Alert.alert("Run at next reset", "Queued tasks carry text only. Remove attachments first.");
+      return;
+    }
+    flow.setSubmitting(true);
+    const result = await enqueueForReset({
+      environmentId: selectedProject.environmentId,
+      input: {
+        title: text.split("\n")[0]!.slice(0, 80),
+        prompt: text,
+        projectId: selectedProject.id,
+        modelSelection,
+        runtimeMode: flow.runtimeMode,
+        interactionMode: flow.interactionMode,
+        workspaceStrategy:
+          workspaceMode === "worktree" && branch
+            ? { type: "worktree", baseRef: branch }
+            : { type: "root", ...(branch ? { branch } : {}) },
+        source: "composer",
+      },
+    }).finally(() => flow.setSubmitting(false));
+    if (result._tag !== "Success") return;
+    clearComposerDraftContent(draftKey, {
+      clearModelSelection: true,
+      clearWorkspaceSelection: true,
+    });
+    Alert.alert(
+      "Queued for the next reset",
+      `Starts ${queuedRunStartLabel(result.value, Date.now())}. It's listed under Usage.`,
+    );
+    setSubmitNavigationAction(CommonActions.goBack());
+  }
+
   async function handleStart(): Promise<void> {
     if (voiceInput.blocksSubmission || pendingPastedTextAttachmentCountRef.current > 0) return;
     const selectedProject = flow.selectedProject;
@@ -1812,6 +1864,18 @@ export function NewTaskDraftScreen(props: {
                   disabled={!canStart}
                   icon={queuesInsteadOfStarting ? "tray.and.arrow.up" : "arrow.up"}
                   onPress={() => void handleStart()}
+                  onLongPress={
+                    environmentConnected && !editingPendingTask
+                      ? () =>
+                          Alert.alert("Send", undefined, [
+                            {
+                              text: "Run at next reset",
+                              onPress: () => void handleRunAtNextReset(),
+                            },
+                            { text: "Cancel", style: "cancel" },
+                          ])
+                      : undefined
+                  }
                   variant="primary"
                 />
               ) : null}
