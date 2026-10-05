@@ -1,8 +1,8 @@
 # Environment authentication
 
-The environment issues its own sessions and enforces their capabilities. Cloud
-identity and relay credentials belong to a separate trust boundary, described in
-[cz Connect](./cz-connect.md). A relay token is never an environment login.
+The environment issues its own sessions and enforces their capabilities. There is
+no cloud identity: a device reaches an environment directly (LAN or Tailscale) and
+pairs with it.
 
 ## Authority survives transport changes
 

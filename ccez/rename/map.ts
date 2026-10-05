@@ -114,4 +114,12 @@ export const droppedPaths: readonly string[] = [
   // Replaced by ccez/brand/apply.sh, which renders the launcher mark.
   "scripts/export-brand-icons.ts",
   "scripts/export-android-icons.ts",
+  // No hosted Connect service: devices reach machines over Tailscale.
+  "infra/relay",
+  ".github/workflows/deploy-relay.yml",
+  "patches/alchemy@2.0.0-beta.79.patch",
+  "docs/internals/cz-connect.md",
+  "docs/operations/connect-setup.md",
+  "docs/operations/relay-observability.md",
+  "docs/operations/android-notifications.md",
 ];

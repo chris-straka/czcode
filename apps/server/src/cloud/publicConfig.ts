@@ -207,8 +207,5 @@ export function makeCloudCliOAuthConfig({
 
 export const cloudCliOAuthConfig = makeCloudCliOAuthConfig();
 
-export const hasCloudPublicConfig = Boolean(
-  (normalizeSecureRelayUrl(process.env.CZ_RELAY_URL ?? "") ?? buildTimeRelayUrl) &&
-  (process.env.CZ_CLERK_PUBLISHABLE_KEY?.trim() || buildTimeClerkPublishableKey) &&
-  (process.env.CZ_CLERK_CLI_OAUTH_CLIENT_ID?.trim() || buildTimeClerkCliOAuthClientId),
-);
+// czcode has no hosted Connect service: devices reach machines over Tailscale.
+export const hasCloudPublicConfig = false;

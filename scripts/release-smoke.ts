@@ -20,7 +20,6 @@ const workspaceFiles = [
   "apps/mobile/modules/cz-markdown-text/package.json",
   "apps/mobile/modules/cz-review-diff/package.json",
   "apps/mobile/modules/cz-terminal/package.json",
-  "infra/relay/package.json",
   "oxlint-plugin-czcode/package.json",
   "packages/client-runtime/package.json",
   "packages/contracts/package.json",

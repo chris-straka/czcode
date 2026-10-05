@@ -70,8 +70,8 @@ export function resolveRelayTracingConfig() {
 }
 
 export function hasCloudPublicConfig(): boolean {
-  const config = resolveCloudPublicConfig();
-  return Boolean(config.clerkPublishableKey && config.clerkJwtTemplate && config.relayUrl);
+  // czcode has no hosted Connect service: devices reach machines over Tailscale.
+  return false;
 }
 
 export function resolveRelayClerkTokenOptions() {

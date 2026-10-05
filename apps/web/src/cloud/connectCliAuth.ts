@@ -14,9 +14,8 @@ function resolveConnectCliOAuthClientId(): string | null {
 }
 
 export function hasConnectCliAuthConfig(): boolean {
-  return Boolean(
-    resolveCloudPublicConfig().clerkPublishableKey && resolveConnectCliOAuthClientId(),
-  );
+  // czcode has no hosted Connect service: devices reach machines over Tailscale.
+  return false;
 }
 
 /**
