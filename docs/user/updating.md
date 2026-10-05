@@ -93,6 +93,11 @@ Provider update checks and restart continuation preferences are in
 **Settings → Maintenance**. If provider update checks are disabled, enable them
 there before refreshing to find newer versions.
 
+On Android, a paired machine can offer its own newer build: **Settings → App →
+Install update** appears when one has an APK newer than yours. Tapping it
+downloads the APK in your browser; open the download to install it over the
+current app. Android asks once to allow installs from your browser.
+
 Install App Store or Google Play releases as usual. The mobile app can also
 download updates in the background and apply them when you next leave the app.
 It saves drafts and queued messages before restarting. If you keep the app open
