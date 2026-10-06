@@ -354,17 +354,19 @@ function sourceProviderKind(source: AddProjectRemoteSource): AddProjectRemotePro
   return source === "url" ? null : source;
 }
 
+/**
+ * Only providers set up on this machine (installed and signed in). The rest
+ * stay in Settings -> Source Control instead of crowding Add project (fork:
+ * the owner's call); a Git URL still clones from anywhere.
+ */
 function sortAddProjectProviderSources(
   readinessBySource: AddProjectRemoteSourceReadiness,
 ): ReadonlyArray<AddProjectRemoteProviderKind> {
-  return REMOTE_PROJECT_PROVIDER_SOURCES.toSorted((left, right) => {
-    const leftReady = readinessBySource[left].ready;
-    const rightReady = readinessBySource[right].ready;
-    if (leftReady !== rightReady) {
-      return leftReady ? -1 : 1;
-    }
-    return remoteProjectSourceLabel(left).localeCompare(remoteProjectSourceLabel(right));
-  });
+  return REMOTE_PROJECT_PROVIDER_SOURCES.filter(
+    (source) => readinessBySource[source].ready,
+  ).toSorted((left, right) =>
+    remoteProjectSourceLabel(left).localeCompare(remoteProjectSourceLabel(right)),
+  );
 }
 
 type AddProjectRemoteSourceReadiness = Record<
