@@ -151,7 +151,7 @@ Architecture and its constraints: `docs/internals/overview.md`. Glossary: `docs/
 
 - Complexity belongs at the adapter boundary. Orchestration stays pure, UI stays dumb.
 - Server features are services; transports stay thin. A `ws.ts` RPC handler, HTTP route, or MCP tool decodes input, calls one service method, and maps errors. See [Effect services](docs/internals/effect-services.md).
-- `apps/web/src/components/ui` exports own their look. Pick a `variant` or `size`; do not restyle one with `className`. If none fits and the look is a generic concept, add a variant to the component; a look that belongs to one feature stays in that feature's own component, not in `components/ui`. Layout classes (width, flex, margin, position) belong on the parent. `shadcn/no-restyle` fails lint on violations.
+- `apps/web/src/components/ui` exports own their look. Pick a `variant` or `size`; do not restyle one with `className`. If none fits and the look is a generic concept, add a variant to the component; a look that belongs to one feature stays in that feature's own component, not in `components/ui`. Layout classes (width, flex, margin, position) belong on the parent. `shadcn/no-restyle` fails lint on violations. See [Web UI](docs/internals/web-ui.md).
 - Inferred types over annotations. `any` is the enemy.
 - Comments describe how a thing is used, and move when the code moves. To be used mostly to describe functions, not to annotate every line of behavior.
 - Our users drive agents all day and notice a dropped frame, a lying spinner, and a stale label. No continuously repainting animations; they peg the GPU on high-refresh displays.
@@ -164,6 +164,6 @@ Architecture and its constraints: `docs/internals/overview.md`. Glossary: `docs/
 
 ## Upstream
 
-czcode is a fork of T3 Code (the `upstream` remote). Last synced: upstream `a1d9d72aef` on 2026-10-04, merged into main as `upstream-cz` `0cd7be2f2e`. Sync only when the owner asks; there is no scheduled sync. Never open issues or pull requests on the upstream repository; `gh` in this checkout defaults to the fork (`chris-straka/czcode`).
+czcode is a fork of the project at the `upstream` remote. Last synced: upstream `570b72d839` on 2026-10-05, merged into main as `upstream-cz` `aedefd0b76`. Sync only when the owner asks; there is no scheduled sync. Never open issues or pull requests on the upstream repository; `gh` in this checkout defaults to the fork (`chris-straka/czcode`).
 
-To sync, run `ccez/rename/sync.sh` on a clean main. It regenerates `upstream-cz` (the rename codemod over `upstream/main`) and merges it. Resolve conflicts; when upstream adds a T3 name the rules miss, fix the rule in `ccez/rename/map.ts`, not the output. Then run `ccez/rename/check` plus typecheck and tests for what changed, rebuild (`ccez/release/mac.sh --install`), and update the "Last synced" line above.
+To sync, run `ccez/rename/sync.sh` on a clean main. It regenerates `upstream-cz` (the rename codemod over `upstream/main`) and merges it. Resolve conflicts; when upstream adds an old name the rules miss, fix the rule in `ccez/rename/map.ts`, not the output. Then run `ccez/rename/check` plus typecheck and tests for what changed, rebuild (`ccez/release/mac.sh --install`), and update the "Last synced" line above.

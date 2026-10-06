@@ -15,7 +15,7 @@ import { createElement as h, useContext, useMemo, useState } from "react";
 import { randomBytes, randomUUID } from "node:crypto";
 import { buildTemporaryWorktreeBranchName } from "@cz/shared/git";
 import * as Option from "effect/Option";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 
 import { hostModels, liveProjects, newThreadModel } from "../model/hosts.ts";
 import { projectKey } from "../model/scope.ts";

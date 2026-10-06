@@ -59,7 +59,9 @@ import * as DesktopShellEnvironment from "./shell/DesktopShellEnvironment.ts";
 import * as DesktopSshEnvironment from "./ssh/DesktopSshEnvironment.ts";
 import * as DesktopSshPasswordPrompts from "./ssh/DesktopSshPasswordPrompts.ts";
 import * as DesktopState from "./app/DesktopState.ts";
+import * as DesktopLegacyLocalStorage from "./app/DesktopLegacyLocalStorage.ts";
 import * as DesktopTelemetryPublisher from "./telemetry/DesktopTelemetryPublisher.ts";
+import * as DesktopRendererHistory from "./telemetry/DesktopRendererHistory.ts";
 import * as DesktopUpdates from "./updates/DesktopUpdates.ts";
 import * as BrowserImport from "./preview/BrowserImport/BrowserImport.ts";
 import * as LinuxBrowserSecret from "./preview/BrowserImport/LinuxBrowserSecret.ts";
@@ -79,7 +81,7 @@ if (process.argv.includes("--version")) {
   Electron.app.exit(0);
 }
 
-const desktopEnvironmentLayer = Layer.unwrap(
+const layerDesktopEnvironment = Layer.unwrap(
   Effect.gen(function* () {
     const metadata = yield* Effect.service(ElectronApp.ElectronApp).pipe(
       Effect.flatMap((app) => app.metadata),
@@ -112,7 +114,7 @@ const resolveDesktopSshCliRunner = (
   return { archiveVersion: environment.appVersion };
 };
 
-const desktopSshEnvironmentLayer = Layer.unwrap(
+const layerDesktopSshEnvironment = Layer.unwrap(
   Effect.gen(function* () {
     const environment = yield* DesktopEnvironment.DesktopEnvironment;
     return DesktopSshEnvironment.layer({
@@ -121,7 +123,7 @@ const desktopSshEnvironmentLayer = Layer.unwrap(
   }),
 );
 
-const electronLayer = Layer.mergeAll(
+const layerElectron = Layer.mergeAll(
   ElectronApp.layer,
   ElectronDialog.layer,
   ElectronMenu.layer,
@@ -135,45 +137,47 @@ const electronLayer = Layer.mergeAll(
   DesktopIpc.layer(Electron.ipcMain),
 );
 
-const desktopFoundationLayer = Layer.mergeAll(
+const layerDesktopFoundation = Layer.mergeAll(
   MacPermissions.layer,
   DesktopState.layer,
   DesktopShutdown.layer,
+  DesktopLegacyLocalStorage.layer,
   DesktopAppSettings.layer,
   DesktopClientSettings.layer,
   DesktopConnectionCatalogStore.layer.pipe(Layer.provideMerge(DesktopSavedEnvironments.layer)),
   DesktopAssets.layer,
   DesktopObservability.layer,
-).pipe(Layer.provideMerge(desktopEnvironmentLayer));
+  DesktopRendererHistory.layer,
+).pipe(Layer.provideMerge(layerDesktopEnvironment));
 
-const desktopSshLayer = desktopSshEnvironmentLayer.pipe(
+const layerDesktopSsh = layerDesktopSshEnvironment.pipe(
   Layer.provideMerge(DesktopSshPasswordPrompts.layer()),
 );
 
-const desktopServerExposureLayer = DesktopServerExposure.layer.pipe(
+const layerDesktopServerExposure = DesktopServerExposure.layer.pipe(
   Layer.provideMerge(DesktopNetworkInterfaces.layer),
-  Layer.provideMerge(desktopFoundationLayer),
+  Layer.provideMerge(layerDesktopFoundation),
 );
 
-const desktopPreviewLayer = PreviewManager.layer.pipe(
+const layerDesktopPreview = PreviewManager.layer.pipe(
   // Merged rather than provided so the IPC handlers can reach the import
   // service alongside the manager; both sit on the same BrowserSession.
   Layer.provideMerge(BrowserImport.layer.pipe(Layer.provide(LinuxBrowserSecret.layer))),
   Layer.provideMerge(BrowserSession.layer),
-  Layer.provideMerge(desktopFoundationLayer),
+  Layer.provideMerge(layerDesktopFoundation),
 );
 
-const desktopWindowLayer = DesktopWindow.layer.pipe(
-  Layer.provideMerge(desktopServerExposureLayer),
-  Layer.provideMerge(desktopPreviewLayer),
+const layerDesktopWindow = DesktopWindow.layer.pipe(
+  Layer.provideMerge(layerDesktopServerExposure),
+  Layer.provideMerge(layerDesktopPreview),
 );
 
-const desktopSnapShotLayer = DesktopSnapShot.layer.pipe(
-  Layer.provideMerge(desktopWindowLayer),
-  Layer.provideMerge(desktopFoundationLayer),
+const layerDesktopSnapShot = DesktopSnapShot.layer.pipe(
+  Layer.provideMerge(layerDesktopWindow),
+  Layer.provideMerge(layerDesktopFoundation),
 );
-const desktopAppActivationLayer = DesktopAppActivation.layer.pipe(
-  Layer.provide(desktopWindowLayer),
+const layerDesktopAppActivation = DesktopAppActivation.layer.pipe(
+  Layer.provide(layerDesktopWindow),
 );
 
 // Pool layer instantiates the backend factory once for the Windows
@@ -181,53 +185,53 @@ const desktopAppActivationLayer = DesktopAppActivation.layer.pipe(
 // the pool now; the legacy DesktopBackendManager service is gone. The
 // WSL second instance gets registered later in the migration. See
 // DesktopBackendPool.ts header for the full rollout plan.
-const desktopBackendLayer = DesktopBackendPool.layer.pipe(
+const layerDesktopBackend = DesktopBackendPool.layer.pipe(
   Layer.provideMerge(DesktopAppIdentity.layer),
   Layer.provideMerge(DesktopBackendConfiguration.layer),
   Layer.provideMerge(DesktopWslEnvironment.layer),
   Layer.provideMerge(DesktopWslServerTree.layer),
   Layer.provideMerge(DesktopTelemetryPublisher.layer),
-  Layer.provideMerge(desktopWindowLayer),
+  Layer.provideMerge(layerDesktopWindow),
 );
 
 // WSL orchestrator hangs off the backend layer because it needs the
 // pool + configuration + serverExposure; it pulls NetService and the
 // foundation services through the same provideMerge chain.
-const desktopWslBackendLayer = DesktopWslBackend.layer.pipe(
-  Layer.provideMerge(desktopBackendLayer),
+const layerDesktopWslBackend = DesktopWslBackend.layer.pipe(
+  Layer.provideMerge(layerDesktopBackend),
 );
 
-const desktopLocalEnvironmentAuthLayer = DesktopLocalEnvironmentAuth.layer.pipe(
-  Layer.provideMerge(desktopBackendLayer),
+const layerDesktopLocalEnvironmentAuth = DesktopLocalEnvironmentAuth.layer.pipe(
+  Layer.provideMerge(layerDesktopBackend),
 );
 
-const desktopApplicationLayer = Layer.mergeAll(
+const layerDesktopApplication = Layer.mergeAll(
   DesktopLifecycle.layer,
-  desktopAppActivationLayer,
+  layerDesktopAppActivation,
   DesktopApplicationMenu.layer,
   DesktopLinuxUrlHandler.layer,
   DesktopShellEnvironment.layer,
-  desktopSshLayer,
+  layerDesktopSsh,
 ).pipe(
-  Layer.provideMerge(desktopSnapShotLayer),
+  Layer.provideMerge(layerDesktopSnapShot),
   Layer.provideMerge(DesktopUpdates.layer),
-  Layer.provideMerge(desktopWslBackendLayer),
-  Layer.provideMerge(desktopLocalEnvironmentAuthLayer),
+  Layer.provideMerge(layerDesktopWslBackend),
+  Layer.provideMerge(layerDesktopLocalEnvironmentAuth),
 );
 
-const desktopApplicationRuntimeLayer = desktopApplicationLayer.pipe(
+const layerDesktopApplicationRuntime = layerDesktopApplication.pipe(
   Layer.provideMerge(NodeServices.layer),
   Layer.provideMerge(NodeHttpClient.layerUndici),
   Layer.provideMerge(NetService.layer),
-  Layer.provideMerge(electronLayer),
+  Layer.provideMerge(layerElectron),
 );
 
-const desktopRuntimeLayer = desktopApplicationRuntimeLayer.pipe(
+const layerDesktopRuntime = layerDesktopApplicationRuntime.pipe(
   Layer.provideMerge(ElectronShell.layer),
-  Layer.provideMerge(desktopEnvironmentLayer),
+  Layer.provideMerge(layerDesktopEnvironment),
   Layer.provideMerge(NodeServices.layer),
   Layer.provideMerge(ElectronApp.layer),
   Layer.provideMerge(DesktopPreReadyPlatform.layer),
 );
 
-DesktopApp.program.pipe(Effect.provide(desktopRuntimeLayer), NodeRuntime.runMain);
+DesktopApp.program.pipe(Effect.provide(layerDesktopRuntime), NodeRuntime.runMain);

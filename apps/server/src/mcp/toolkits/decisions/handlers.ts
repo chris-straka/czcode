@@ -16,10 +16,12 @@ const make = Effect.gen(function* () {
     ask_owner: (input) =>
       Effect.gen(function* () {
         const scope = yield* McpInvocationContext.McpInvocationContext;
+        // A client caller (not an agent in a thread) has no thread to link.
+        const threadId = scope.thread?.threadId ?? null;
         return yield* decisions.submit({
           ...input,
-          thread: scope.threadId,
-          created_by: `thread/${scope.threadId}`,
+          thread: threadId,
+          created_by: threadId ? `thread/${threadId}` : "mcp",
         });
       }),
     upload_decision_media: (input) =>

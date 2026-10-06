@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import type { PendingThreadRequests } from "@cz/client-runtime/state/thread-requests";
 import type { EnvironmentThread } from "@cz/client-runtime/state/shell";
 import type { EnvironmentId, OrchestrationV2ThreadProjection, ThreadId } from "@cz/contracts";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { environmentThreadDetails, useEnvironmentThread } from "./threads";
 import { useThreadSelection } from "./use-thread-selection";

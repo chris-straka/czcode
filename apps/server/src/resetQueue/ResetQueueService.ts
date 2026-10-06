@@ -23,7 +23,7 @@ import * as Schema from "effect/Schema";
 
 import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
-import * as ProviderRegistry from "../provider/Services/ProviderRegistry.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 
 const POLL_INTERVAL = Duration.seconds(30);
 

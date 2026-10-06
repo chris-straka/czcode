@@ -1,5 +1,11 @@
 import { scopedProjectKey, scopeProjectRef } from "../environment/scoped.ts";
-import type { EnvironmentId, ScopedProjectRef, SidebarProjectGroupingMode } from "@cz/contracts";
+import {
+  repositoryGroupingDisplayNameOf,
+  repositoryGroupingKeyOf,
+  type EnvironmentId,
+  type ScopedProjectRef,
+  type SidebarProjectGroupingMode,
+} from "@cz/contracts";
 import type { ClientSettings } from "@cz/contracts/settings";
 
 import type { EnvironmentProject } from "./models.ts";
@@ -96,7 +102,9 @@ function deriveRepositoryScopedKey(
   project: Pick<EnvironmentProject, "workspaceRoot" | "repositoryIdentity">,
   groupingMode: SidebarProjectGroupingMode,
 ): string | null {
-  const canonicalKey = project.repositoryIdentity?.canonicalKey;
+  const canonicalKey = project.repositoryIdentity
+    ? repositoryGroupingKeyOf(project.repositoryIdentity)
+    : null;
   if (!canonicalKey) {
     return null;
   }
@@ -154,7 +162,9 @@ export function deriveProjectGroupLabel(input: {
 }): string {
   const sharedTitles = uniqueNonEmptyValues(input.members.map((member) => member.title));
   const sharedDisplayNames = uniqueNonEmptyValues(
-    input.members.map((member) => member.repositoryIdentity?.displayName),
+    input.members.map((member) =>
+      member.repositoryIdentity ? repositoryGroupingDisplayNameOf(member.repositoryIdentity) : null,
+    ),
   );
   const sharedRepositoryNames = uniqueNonEmptyValues(
     input.members.map((member) => member.repositoryIdentity?.name),

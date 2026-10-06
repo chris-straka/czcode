@@ -2,8 +2,8 @@ import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { Command } from "effect/unstable/cli";
-import * as CliError from "effect/unstable/cli/CliError";
+import { Argument, Command } from "effect/cli";
+import * as CliError from "effect/cli/CliError";
 
 import {
   adoptLegacyEnv,
@@ -34,7 +34,7 @@ import { traceCommand } from "./cli/trace.ts";
 import { triageCommand } from "./cli/triage.ts";
 import { tuiCommand } from "./cli/tui.ts";
 
-const CliRuntimeLayer = Layer.mergeAll(NodeServices.layer, NetService.layer);
+const layerCliRuntime = Layer.mergeAll(NodeServices.layer, NetService.layer);
 
 export const makeCli = () =>
   Command.make("cz", { ...sharedServerCommandFlags }).pipe(
@@ -87,5 +87,5 @@ export function runCli() {
       yield* Effect.logWarning(LEGACY_HOME_MIGRATED_MESSAGE);
     }
     return yield* Command.run(cli, { version: packageJson.version });
-  }).pipe(Effect.scoped, Effect.provide(CliRuntimeLayer), NodeRuntime.runMain);
+  }).pipe(Effect.scoped, Effect.provide(layerCliRuntime), NodeRuntime.runMain);
 }

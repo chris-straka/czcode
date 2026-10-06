@@ -87,6 +87,13 @@ describe("resolveCzMcpToolPresentation", () => {
     }
   });
 
+  it("matches OpenCode 2's per-thread server names, whose thread ids hold underscores", () => {
+    expect(
+      resolveCzMcpToolPresentation("czcode-thread_opencode2-adapter_delegate_task")?.displayName,
+    ).toBe("Delegate a child task");
+    expect(resolveCzMcpToolPresentation("czcode-thread_opencode2-adapter_not_a_tool")).toBeNull();
+  });
+
   it("keeps unknown MCP tools on the generic renderer path", () => {
     expect(resolveCzMcpToolPresentation("mcp__github__search_issues")).toBeNull();
     expect(resolveCzMcpToolPresentation("czcode.not_a_real_tool")).toBeNull();

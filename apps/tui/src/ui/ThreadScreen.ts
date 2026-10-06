@@ -8,7 +8,7 @@ import {
   type ThreadId,
 } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { Box, Text } from "ink";
 import { createElement as h, useContext, useEffect, useMemo, useState } from "react";
 import { randomUUID } from "node:crypto";

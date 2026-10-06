@@ -1,6 +1,6 @@
 import type { EnvironmentId, ServerProvider, UsageSummary, UsageSummaryInput } from "@cz/contracts";
 import * as Schema from "effect/Schema";
-import type { AtomRegistry } from "effect/unstable/reactivity";
+import type { AtomRegistry } from "effect/reactivity";
 
 import { EnvironmentRpcUnavailableError } from "../rpc/client.ts";
 import type { createEnvironmentPresentationAtoms } from "./presentation.ts";

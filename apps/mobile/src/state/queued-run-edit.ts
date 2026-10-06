@@ -20,7 +20,7 @@ import type {
   RunId,
   UploadChatAttachment,
 } from "@cz/contracts";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 import { useAtomValue } from "@effect/atom-react";
 
 import { uploadedComposerContext } from "../lib/composerContext";

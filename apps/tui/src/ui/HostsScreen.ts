@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { AVAILABLE_CONNECTION_STATE } from "@cz/client-runtime/connection";
 import type { EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { Box, Text } from "ink";
 import { createElement as h, useState } from "react";
 

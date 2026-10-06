@@ -4,8 +4,8 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import { HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { HttpClient, HttpClientRequest } from "effect/http";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 export const DEFAULT_TAILSCALE_SERVE_PORT = 443;
 export const TAILSCALE_STATUS_TIMEOUT = Duration.millis(1_500);
@@ -304,7 +304,10 @@ const SERVE_NOT_ENABLED =
 const serveEnableLink = <E>(stdout: Stream.Stream<Uint8Array, E>) =>
   stdout.pipe(
     Stream.decodeText(),
-    Stream.scan("", (text, chunk) => text + chunk),
+    Stream.scan(
+      () => "",
+      (text: string, chunk: string) => text + chunk,
+    ),
     Stream.map((text) => SERVE_NOT_ENABLED.exec(text)?.[1]),
     Stream.filter((url): url is string => url !== undefined),
     Stream.runHead,

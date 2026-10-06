@@ -15,7 +15,7 @@ import * as TestClock from "effect/testing/TestClock";
 import * as ServerConfig from "../config.ts";
 import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
-import * as ProviderRegistry from "../provider/Services/ProviderRegistry.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ResetQueueService from "./ResetQueueService.ts";
 
 const NIGHT = Date.parse("2026-10-05T22:00:00Z");

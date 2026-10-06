@@ -2,7 +2,7 @@ import type { EnvironmentPresentation, NetworkStatus } from "@cz/client-runtime/
 import type { EnvironmentCatalogState } from "@cz/client-runtime/state/connections";
 import type { EnvironmentId } from "@cz/contracts";
 import { createEnvironmentSummaryAtoms } from "@cz/client-runtime/state/presentation";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { projectWorkspaceConnectionState } from "./workspaceModel";
 

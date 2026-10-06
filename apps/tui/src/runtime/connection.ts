@@ -9,10 +9,10 @@ import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
 import { QueueHttp } from "@cz/client-runtime/state/queue";
 import * as HostWakeHttp from "@cz/client-runtime/state/hostWake";
 import { ManagedRelay } from "@cz/client-runtime/relay";
-import { remoteHttpClientLayer } from "@cz/client-runtime/rpc";
+import { layerRemoteHttpClient } from "@cz/client-runtime/rpc";
 import { ShellSnapshotLoader } from "@cz/client-runtime/state/shell";
 import {
-  boundedThreadSnapshotLoaderLayer,
+  BoundedThreadSnapshotLoader,
   ThreadHistoryController,
 } from "@cz/client-runtime/state/threads";
 import { RelayWebClientId } from "@cz/contracts/relay";
@@ -20,8 +20,8 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Socket from "effect/unstable/socket/Socket";
-import { Atom, AtomRegistry } from "effect/unstable/reactivity";
+import * as Socket from "effect/socket/Socket";
+import { Atom, AtomRegistry } from "effect/reactivity";
 import { webcrypto } from "node:crypto";
 
 import type { RunTuiOptions } from "../api.ts";
@@ -55,7 +55,7 @@ const relaySignerLayer = Layer.succeed(
 );
 
 export function makeTuiRuntime(options: TuiRuntimeOptions) {
-  const httpClientLayer = remoteHttpClientLayer(fetch);
+  const httpClientLayer = layerRemoteHttpClient(fetch);
   const baseLayer = Layer.mergeAll(
     httpClientLayer,
     cryptoLayer,
@@ -75,7 +75,7 @@ export function makeTuiRuntime(options: TuiRuntimeOptions) {
     platformSourceLayer(options.local),
   ).pipe(Layer.provideMerge(baseLayer));
   const loaders = Layer.mergeAll(
-    boundedThreadSnapshotLoaderLayer,
+    BoundedThreadSnapshotLoader.layer,
     ShellSnapshotLoader.layer,
     ThreadHistoryController.layer,
     DecisionsHttp.layer,

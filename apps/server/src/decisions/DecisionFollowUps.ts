@@ -29,7 +29,7 @@ import * as Stream from "effect/Stream";
 
 import * as OrchestratorV2 from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
-import * as ProviderRegistry from "../provider/Services/ProviderRegistry.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ResetQueueService from "../resetQueue/ResetQueueService.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as DecisionService from "./DecisionService.ts";

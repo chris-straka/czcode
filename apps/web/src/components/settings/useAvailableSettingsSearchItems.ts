@@ -22,6 +22,8 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
   const desktopWsl = useEnvironmentQuery(
     isElectron && !localEnvironmentDisabled ? desktopWslStateAtom : null,
   );
+  // No Connect (fork): never a managed tunnel.
+  const managedTunnelActive = false;
   const canManageLocalBackend =
     !localEnvironmentDisabled &&
     (isElectron ||
@@ -59,8 +61,10 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
         }),
         hasThreadAutoSettlement:
           getThreadAutoSettlementSearchAvailability(environments).eligibleEnvironmentIds.length > 0,
+        managedTunnelActive,
       }),
     [
+      managedTunnelActive,
       canManageLocalBackend,
       desktopWsl.data,
       desktopWsl.error,

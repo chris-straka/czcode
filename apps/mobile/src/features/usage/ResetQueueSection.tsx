@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import type { EnvironmentId, QueuedRun } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { View } from "react-native";
 
 import { AppText as Text } from "../../components/AppText";

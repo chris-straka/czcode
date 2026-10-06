@@ -10,7 +10,7 @@ import { compareFeedItems } from "@cz/client-runtime/decisions/feed";
 import { createDecisionEnvironmentAtoms } from "@cz/client-runtime/state/decisions";
 import type { DecisionItemWithAnswer, EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 
 import { connectionAtomRuntime } from "../connection/runtime";
 import { environmentPresentations } from "./presentation";

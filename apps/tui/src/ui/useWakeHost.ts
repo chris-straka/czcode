@@ -4,7 +4,7 @@ import { wakeHostFromUrl, wakeHostThroughAny } from "@cz/client-runtime/state/ho
 import { runAtomCommand } from "@cz/client-runtime/state/runtime";
 import type { EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { useCallback, useContext } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";

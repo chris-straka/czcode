@@ -3,7 +3,7 @@ import { resolveAssetUrl } from "@cz/client-runtime/state/assets";
 import type { EnvironmentId } from "@cz/contracts";
 import Constants from "expo-constants";
 import * as Option from "effect/Option";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { useState } from "react";
 import { Alert, Linking, Platform } from "react-native";
 

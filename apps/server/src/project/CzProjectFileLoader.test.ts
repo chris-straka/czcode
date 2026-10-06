@@ -10,7 +10,7 @@ import { LEGACY_PROJECT_FILE_NAME } from "@cz/shared/legacyNames";
 
 import * as CzProjectFileLoader from "./CzProjectFileLoader.ts";
 
-const TestLayer = Layer.empty.pipe(
+const layerTest = Layer.empty.pipe(
   Layer.provideMerge(CzProjectFileLoader.layer),
   Layer.provideMerge(NodeServices.layer),
 );
@@ -32,7 +32,7 @@ const writeProjectFile = Effect.fn("writeProjectFile")(function* (
   yield* fileSystem.writeFileString(path.join(cwd, name), contents).pipe(Effect.orDie);
 });
 
-it.layer(TestLayer)("CzProjectFileLoader", (it) => {
+it.layer(layerTest)("CzProjectFileLoader", (it) => {
   describe("load", () => {
     it.effect("loads and decodes a valid cz.json", () =>
       Effect.gen(function* () {

@@ -2,7 +2,7 @@ import type { EnvironmentPresentation, PreparedConnection } from "@cz/client-run
 import { connectionCatalogDisplayUrl } from "@cz/client-runtime/connection";
 import type { EnvironmentId, ServerConfig } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import type { SavedRemoteConnection } from "../lib/connection";
 import type { EnvironmentRuntimeState } from "./remote-runtime-types";

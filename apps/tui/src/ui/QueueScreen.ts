@@ -3,7 +3,7 @@ import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import type { EnvironmentId, QueuedRun } from "@cz/contracts";
 import { formatResetsIn, providersWithLimits, remainingPercent } from "@cz/shared/usageLimits";
 import * as Option from "effect/Option";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 import { Box, Text } from "ink";
 import { createElement as h, useMemo, useState, type ReactNode } from "react";
 

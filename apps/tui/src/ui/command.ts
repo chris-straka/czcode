@@ -1,7 +1,7 @@
 import { RegistryContext } from "@effect/atom-react";
 import { type AtomCommand, runAtomCommand } from "@cz/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { createContext, useCallback, useContext } from "react";
 
 /** Where the TUI shows command failures: one status line, never the console. */
