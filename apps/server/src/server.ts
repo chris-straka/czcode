@@ -73,6 +73,7 @@ import * as DecisionFollowUps from "./decisions/DecisionFollowUps.ts";
 import * as DecisionService from "./decisions/DecisionService.ts";
 import * as ForkDatabase from "./forkDatabase/ForkDatabase.ts";
 import * as ResetQueueService from "./resetQueue/ResetQueueService.ts";
+import * as AgentScopesService from "./agentScopes/AgentScopesService.ts";
 import * as HostSleepService from "./hostSleep/HostSleepService.ts";
 import { queueHttpApiLayer } from "./resetQueue/http.ts";
 import { threadsHttpApiLayer } from "./threadControl/http.ts";
@@ -657,6 +658,7 @@ const layerRuntimeServices = layerRuntimeCoreDependencies.pipe(
 const layerRuntimeDependencies = DecisionFollowUps.layer.pipe(
   // Sleeps a spare host when idle; reads the queue to wake for its next run.
   Layer.provideMerge(HostSleepService.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+  Layer.provideMerge(AgentScopesService.layer),
   Layer.provideMerge(ResetQueueService.layer),
   Layer.provideMerge(layerRuntimeServices),
 );

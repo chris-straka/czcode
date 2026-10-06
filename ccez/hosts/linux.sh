@@ -119,6 +119,11 @@ After=network-online.target
 [Service]
 Environment=CZ_TAILSCALE_SERVE=1
 Environment=CZ_SLEEP_WHEN_IDLE_MINUTES=$sleep_minutes
+# Each agent runs in its own scope, so running out of memory ends that agent
+# rather than the server and every other thread (AgentScopesService).
+Environment=CZ_AGENT_SCOPES=1
+# A process the kernel kills for memory doesn't stop the server with it.
+OOMPolicy=continue
 # systemd's default PATH lacks the agents and toolchains installed in your
 # home (rustup, a Go tarball in ~/.local/go, go install).
 Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.local/go/bin:$HOME/go/bin:/usr/local/bin:/usr/bin:/bin

@@ -35,6 +35,11 @@ wakes itself for its next queued run. Waking takes about 30 seconds. Set
 `CZ_SLEEP_WHEN_IDLE_MINUTES` in the service to change the wait, or `0` to keep
 it on. The log of when it slept is `host-sleep.jsonl` in its cz home.
 
+Each agent on a Linux host runs in its own systemd scope. If the host runs out
+of memory, only the agent using the most stops (its thread shows the failure);
+the server and other threads keep going. `systemctl --user status 'cz-agent-*'`
+shows each agent's memory.
+
 On Windows, the script also keeps WSL running after you log in to Windows and
 turns off sleep while plugged in. WSL starts only after a Windows login, so a
 PC that restarts (for example after Windows Update) needs someone to log in, or
