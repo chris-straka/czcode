@@ -17,7 +17,7 @@ update cz.
 
 - **Claude:** sign in with this computer's browser. Claude shows a code to
   paste back into the terminal.
-- **Codex and GitHub:** open the link on any device and enter the code. For
+- **Codex (optional; answer N to skip) and GitHub:** open the link on any device and enter the code. For
   Codex, first turn on "Enable device code sign-in for Codex" in ChatGPT's
   settings.
 - **OpenCode:** skip it. The Mac copies its login here over Tailscale.

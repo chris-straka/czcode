@@ -251,13 +251,20 @@ else
   claude auth login
 fi
 
-step "Sign in: Codex"
+step "Sign in: Codex (optional)"
 if codex login status > /dev/null 2>&1; then
   echo "Already signed in."
 else
-  echo "If OpenAI says device codes are off: in ChatGPT's settings, turn on"
-  echo "\"Enable device code sign-in for Codex\", then run this script again."
-  codex login --device-auth
+  # Threads default to Claude Opus; Codex is only for when you want it.
+  read -r -p "Sign in to Codex on this machine? [y/N] " answer < /dev/tty
+  case "$answer" in
+    [yY]*)
+      echo "Open the link on any device and enter the code. If OpenAI says device codes"
+      echo "are off, turn on \"Enable device code sign-in for Codex\" in ChatGPT's settings."
+      codex login --device-auth
+      ;;
+    *) echo "Skipped. Run \`codex login --device-auth\` later if you want Codex here." ;;
+  esac
 fi
 
 step "Sign in: OpenCode"
