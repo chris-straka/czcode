@@ -191,7 +191,7 @@ cat << DONE
 
 Done. This host is $tailscale_name.
 Hardware: $(nproc) cores, $(free -g | awk '/^Mem:/ {print $2}') GB memory, $(df -h --output=avail "$HOME" | tail -1 | tr -d ' ') free disk.
-GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2> /dev/null || echo "no NVIDIA GPU visible (training here would be CPU-only)")
+GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2> /dev/null || lspci 2> /dev/null | sed -n 's/.*\(VGA\|3D\) [^:]*: //p' | head -1 || echo "none found")
 - Open the pairing link above on each device that should use this host.
 - Copy ~/SWE/AGENTS.md from the Mac to the same path here, and clone your
   projects under ~/SWE with the same git origins.
