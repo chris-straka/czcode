@@ -33,7 +33,7 @@ tailscale serve --https=443 off
 If that port is already in use, choose another with
 `--tailscale-serve-port`. See `cz pair --help` for other pairing options.
 
-To turn a spare Linux or Windows PC into an agent host, run the host setup
+To turn a spare Linux or Windows PC, or a Mac account, into an agent host, run the host setup
 script from `ccez/hosts` on it. It installs Tailscale and the providers, keeps
 `cz serve` running, and prints a pairing link at the end.
 

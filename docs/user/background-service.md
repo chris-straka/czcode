@@ -45,6 +45,19 @@ turns off sleep while plugged in. WSL starts only after a Windows login, so a
 PC that restarts (for example after Windows Update) needs someone to log in, or
 automatic sign-in, before its agents come back.
 
+On a Mac agent host (`ccez/hosts/mac.sh`), `cz serve` runs as the launchd
+agent `uk.ccez.cz-host` in the agent account, and restarts if it stops. It
+runs while that account is logged in, so after a restart log in to it once;
+switching to another account keeps it running. While it runs on power, the
+Mac doesn't sleep; the display can.
+
+| Task    | Command                                               |
+| ------- | ----------------------------------------------------- |
+| Status  | `launchctl print gui/$(id -u)/uk.ccez.cz-host`        |
+| Log     | `tail -f ~/Library/Logs/cz-host.log`                  |
+| Restart | `launchctl kickstart -k gui/$(id -u)/uk.ccez.cz-host` |
+| Stop    | `launchctl bootout gui/$(id -u)/uk.ccez.cz-host`      |
+
 `cz service`, `cz update`, and `cz uninstall` manage downloaded releases, which
 czcode doesn't publish, so they don't apply.
 

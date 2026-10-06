@@ -26,8 +26,8 @@ runs. The app isn't signed, so open it the first time with right-click → Open.
 
 ## Another computer as an agent host
 
-A Linux PC, or a Windows PC through WSL2 Ubuntu, is set up with one script.
-Follow `ccez/hosts/README.md`: it installs Tailscale, Node, the providers, and
+A Linux PC, a Windows PC through WSL2 Ubuntu, or a separate account on a Mac
+is set up with one script. Follow `ccez/hosts/README.md`: it installs Tailscale, Node, the providers, and
 cz built from this repo, keeps `cz serve` running in the background, walks
 through each provider sign-in, and prints a pairing link.
 

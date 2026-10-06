@@ -1,5 +1,8 @@
 # Set up a computer as a cz agent host
 
+Linux and Windows PCs use `linux.sh` (below). Macs use `mac.sh`
+([A Mac](#a-mac)).
+
 **Windows, first time only:** open PowerShell, run `wsl --install`, restart,
 open **Ubuntu** from the Start menu, and pick a username and password.
 **A PC running Ubuntu itself:** open Terminal.
@@ -44,3 +47,39 @@ From another machine, quote the path so `~` expands on the host:
 `ssh -t b@basement 'bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh'`.
 To leave groups out, set `CZ_TOOLS_SKIP`, for example
 `CZ_TOOLS_SKIP="android blender"`.
+
+## A Mac
+
+`mac.sh` is made for a separate macOS account on a Mac someone else also
+uses, such as a family member's Mac Studio. Everything goes in that account's
+home folder except Homebrew and Tailscale, which the whole Mac shares. It
+never touches other accounts. It stops and says why if this Mac already has
+the Tailscale app or another account's Homebrew.
+
+1. In **System Settings → Users & Groups**, add an account for the agents
+   and make it an **Administrator** (only the first run needs that; switch it
+   back to Standard afterwards if you like).
+2. Log in to that account, open **Terminal**, and paste:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/mac.sh -o /tmp/cz-host.sh && bash /tmp/cz-host.sh
+```
+
+It installs Homebrew, Tailscale, cz, the build tools (`build-tools-mac.sh`;
+set `CZ_HOST_TOOLS=0` before the command to skip them), Claude Code, Codex,
+and OpenCode. cz runs as a launchd agent that restarts if it stops. Sign-ins
+and the pairing link work as on Linux; Claude opens this Mac's browser.
+
+- **Staying awake:** while cz runs and the Mac is on power, the Mac doesn't
+  sleep (`caffeinate`). The display still sleeps and the screen can lock.
+  There's no Wake-on-LAN.
+- **After a restart:** cz runs while the agent account is logged in. Log in
+  to it once, then switch back to another account from the menu bar (fast
+  user switching); cz keeps running in the background.
+- **Status and logs:** `launchctl print gui/$(id -u)/uk.ccez.cz-host` and
+  `~/Library/Logs/cz-host.log`.
+
+To add or update the build tools on a Mac that's already set up, run
+`bash ~/SWE/czcode/ccez/hosts/build-tools-mac.sh` (no password needed).
+`CZ_TOOLS_SKIP` works as on Linux. To see every step without running
+anything, put `CZ_HOST_DRY_RUN=1` before either script.
