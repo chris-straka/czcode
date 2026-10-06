@@ -225,7 +225,7 @@ if [ -d "$HOME/SWE/games/tools/gk" ] && ! have gk; then
 fi
 
 step "Check"
-for t in cargo go java kotlinc mvn gradle python3 uv node bun pnpm dotnet docker kubectl kind tilt \
+for t in cargo go java kotlinc mvn python3 uv node bun pnpm dotnet docker kubectl kind tilt \
   clang mold sccache cmake ffmpeg magick blender sdkmanager adb cargo-ndk wrangler gltfpack typst rg fd jq; do
   if have "$t"; then printf '  ok  %s\n' "$t"; else printf '  --  %s\n' "$t"; fi
 done
