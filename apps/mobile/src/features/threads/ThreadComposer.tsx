@@ -63,6 +63,7 @@ import {
 import { appAtomRegistry } from "../../state/atom-registry";
 import type { ComposerDocumentAttachment } from "../../lib/composerContext";
 import { useProject, useThreadShells } from "../../state/entities";
+import { useWakeEnvironment } from "../../state/hostWake";
 import { scopeProjectRef } from "@cz/client-runtime/environment";
 
 import { AppText as Text } from "../../components/AppText";
@@ -374,6 +375,20 @@ export function ComposerSurface(props: {
 
 export const ThreadComposer = memo(function ThreadComposer(props: ThreadComposerProps) {
   const project = useProject(scopeProjectRef(props.environmentId, props.selectedThread.projectId));
+  // Opening a thread on a host that stays unreachable wakes it, once per visit.
+  const wakeEnvironment = useWakeEnvironment();
+  const unreachableRef = useRef(props.connectionState !== "connected");
+  unreachableRef.current = props.connectionState !== "connected";
+  const wakeRef = useRef(wakeEnvironment);
+  wakeRef.current = wakeEnvironment;
+  const wakeEnvironmentId = props.environmentId;
+  const wakeThreadId = props.selectedThread.id;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (unreachableRef.current) void wakeRef.current(wakeEnvironmentId);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [wakeEnvironmentId, wakeThreadId]);
   const { themeVariables: materialTheme } = useAppearancePreferences();
   const composerPanel = materialTheme["--color-composer-panel"];
   const navigation = useNavigation();

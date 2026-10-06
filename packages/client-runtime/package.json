@@ -390,6 +390,10 @@
     "./state/mobileRelease": {
       "types": "./src/state/mobileRelease.ts",
       "default": "./src/state/mobileRelease.ts"
+    },
+    "./state/hostWake": {
+      "types": "./src/state/hostWake.ts",
+      "default": "./src/state/hostWake.ts"
     }
   },
   "scripts": {

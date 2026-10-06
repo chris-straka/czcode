@@ -7,6 +7,7 @@
 import { Connection } from "@cz/client-runtime/connection";
 import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
 import { QueueHttp } from "@cz/client-runtime/state/queue";
+import * as HostWakeHttp from "@cz/client-runtime/state/hostWake";
 import { ManagedRelay } from "@cz/client-runtime/relay";
 import { remoteHttpClientLayer } from "@cz/client-runtime/rpc";
 import { ShellSnapshotLoader } from "@cz/client-runtime/state/shell";
@@ -79,6 +80,7 @@ export function makeTuiRuntime(options: TuiRuntimeOptions) {
     ThreadHistoryController.layer,
     DecisionsHttp.layer,
     QueueHttp.layer,
+    HostWakeHttp.layer,
   );
   const connectionLayer = loaders.pipe(
     Layer.provideMerge(

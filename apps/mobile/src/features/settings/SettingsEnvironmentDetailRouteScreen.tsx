@@ -8,8 +8,10 @@ import { Alert, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText as Text } from "../../components/AppText";
+import { MaterialButton } from "../../components/MaterialButton";
 import { ProviderIcon } from "../../components/ProviderIcon";
 import { ScreenScrollView } from "../../components/ScreenScrollView";
+import { useWakeEnvironment } from "../../state/hostWake";
 import { serverEnvironment } from "../../state/server";
 import { environmentSession } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -67,6 +69,8 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
   useEffect(() => () => checkController.current?.abort(), []);
 
   const connected = environment?.isEnabled === true && environment.connectionState === "connected";
+  const wakeEnvironment = useWakeEnvironment();
+  const [wakeNote, setWakeNote] = useState<string | null>(null);
   const allowed =
     !AsyncResult.isFailure(sessionResult) && canMaintainEnvironment(session, connected);
   const running = updateState.status === "running";
@@ -182,6 +186,29 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                 })
               }
             />
+            {!connected && environment.isEnabled ? (
+              <View className="gap-2 px-2">
+                <MaterialButton
+                  label="Wake"
+                  tone="primary"
+                  onPress={() => {
+                    setWakeNote("Waking…");
+                    void wakeEnvironment(environment.environmentId).then((result) =>
+                      setWakeNote(
+                        result === "sent"
+                          ? "Waking. It reconnects by itself, usually within 30 seconds."
+                          : result === "unknown"
+                            ? "No connected machine on its network knows how to wake it."
+                            : "This environment has no address to wake it by.",
+                      ),
+                    );
+                  }}
+                />
+                {wakeNote ? (
+                  <Text className="text-sm text-foreground-muted">{wakeNote}</Text>
+                ) : null}
+              </View>
+            ) : null}
             {!connected ? (
               <Text className="px-2 text-sm text-foreground-muted">
                 Connect this environment to manage it.

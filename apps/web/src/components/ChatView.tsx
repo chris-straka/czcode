@@ -401,6 +401,8 @@ import { sourceControlEnvironment } from "../state/sourceControl";
 import { useProjectClone } from "../state/projectClones";
 import { projectCloneDisplayName, projectCloneProgressSummary } from "@cz/contracts";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
+import { useWakeEnvironment } from "../state/hostWake";
+import { wakeHostFromUrl } from "@cz/client-runtime/state/hostWake";
 import {
   resolveThreadDetailRef,
   useProject,
@@ -3004,6 +3006,52 @@ export default function ChatView(props: ChatViewProps) {
   const serverUpdateFailureDismissed =
     serverUpdateState === dismissedServerUpdateState ||
     isServerUpdateFailureDismissed(serverUpdateState);
+  const wakeEnvironment = useWakeEnvironment();
+  const [wakingEnvironmentId, setWakingEnvironmentId] = useState<EnvironmentId | null>(null);
+  const activeEnvironmentWakeable = wakeHostFromUrl(activeEnvironment?.displayUrl ?? null) !== null;
+  const handleWakeActiveEnvironment = useCallback(
+    async (manual: boolean) => {
+      if (!activeEnvironment) return;
+      setWakingEnvironmentId(activeEnvironment.environmentId);
+      const result = await wakeEnvironment(activeEnvironment);
+      setWakingEnvironmentId(null);
+      if (result === "sent") {
+        toastManager.add(
+          stackedThreadToast({
+            type: "success",
+            title: `Waking ${activeEnvironment.label}`,
+            description: "It reconnects by itself, usually within 30 seconds.",
+          }),
+        );
+      } else if (result === "unknown" && manual) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: `Couldn't wake ${activeEnvironment.label}`,
+            description: "No connected machine on its network knows how to wake it.",
+          }),
+        );
+      }
+    },
+    [activeEnvironment, wakeEnvironment],
+  );
+  // Opening a thread on a sleeping host wakes it, once per visit and only with
+  // this window showing, so an app left open never keeps the host awake.
+  const autoWokenThreadKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeEnvironmentUnavailable || !activeEnvironmentWakeable || activeThreadKey === null) {
+      return;
+    }
+    if (autoWokenThreadKeyRef.current === activeThreadKey) return;
+    if (document.visibilityState !== "visible") return;
+    autoWokenThreadKeyRef.current = activeThreadKey;
+    void handleWakeActiveEnvironment(false);
+  }, [
+    activeEnvironmentUnavailable,
+    activeEnvironmentWakeable,
+    activeThreadKey,
+    handleWakeActiveEnvironment,
+  ]);
   const systemComposerBannerItems = useMemo<ComposerBannerStackItem[]>(() => {
     const items: ComposerBannerStackItem[] = [];
     const updateRunning = serverUpdateState.status === "running";
@@ -3050,6 +3098,17 @@ export default function ChatView(props: ChatViewProps) {
                 }
               >
                 Reconnect
+              </Button>
+            ) : null}
+            {activeEnvironmentWakeable ? (
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={wakingEnvironmentId !== null}
+                title="Send a Wake-on-LAN signal through another connected machine"
+                onClick={() => void handleWakeActiveEnvironment(true)}
+              >
+                Wake
               </Button>
             ) : null}
             {disconnectAction}
@@ -3144,6 +3203,9 @@ export default function ChatView(props: ChatViewProps) {
     autoBalanceUpdateBanner,
     activeEnvironmentUnavailableState,
     handleReconnectActiveEnvironment,
+    activeEnvironmentWakeable,
+    wakingEnvironmentId,
+    handleWakeActiveEnvironment,
     canDisconnectActiveEnvironment,
     disconnectingEnvironment,
     handleDisconnectActiveEnvironment,

@@ -9,6 +9,7 @@ import { createEnvironmentCatalogAtoms } from "@cz/client-runtime/state/connecti
 import { createDecisionEnvironmentAtoms } from "@cz/client-runtime/state/decisions";
 import { createOrchestrationEnvironmentAtoms } from "@cz/client-runtime/state/orchestration";
 import { createQueueEnvironmentAtoms } from "@cz/client-runtime/state/queue";
+import { createHostWakeEnvironmentAtoms } from "@cz/client-runtime/state/hostWake";
 import { createVcsEnvironmentAtoms } from "@cz/client-runtime/state/vcs";
 import { createAtomCommandScheduler, createRuntimeCommand } from "@cz/client-runtime/state/runtime";
 import { createServerEnvironmentAtoms } from "@cz/client-runtime/state/server";
@@ -48,6 +49,7 @@ export function makeTuiAtoms({ runtime }: TuiRuntime) {
   const threadDetails = createEnvironmentThreadDetailAtoms(threads.stateAtom);
   const decisions = createDecisionEnvironmentAtoms(runtime);
   const queue = createQueueEnvironmentAtoms(runtime);
+  const hostWake = createHostWakeEnvironmentAtoms(runtime);
   const orchestration = createOrchestrationEnvironmentAtoms(runtime);
   const vcs = createVcsEnvironmentAtoms(runtime);
   const pairing = createRuntimeCommand(runtime, {
@@ -75,6 +77,7 @@ export function makeTuiAtoms({ runtime }: TuiRuntime) {
     threadDetails,
     decisions,
     queue,
+    hostWake,
     orchestration,
     vcs,
     pairing,

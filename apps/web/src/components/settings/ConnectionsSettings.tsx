@@ -171,6 +171,8 @@ import {
   usePrimaryEnvironment,
   useRelayEnvironmentDiscovery,
 } from "~/state/environments";
+import { useWakeEnvironment } from "~/state/hostWake";
+import { wakeHostFromUrl } from "@cz/client-runtime/state/hostWake";
 import { APP_VERSION } from "~/branding";
 import { requestConfirmDialog } from "~/confirmDialog";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -1492,6 +1494,8 @@ function SavedBackendListRow({
 }: SavedBackendListRowProps) {
   const [routesOpen, setRoutesOpen] = useState(false);
   const environmentId = environment.environmentId;
+  const wakeEnvironment = useWakeEnvironment();
+  const [waking, setWaking] = useState(false);
   const unsupported = environment.connection.phase === "unsupported";
   const enabled = environment.entry.enabled && !unsupported;
   const isConnected = environment.connection.phase === "connected";
@@ -1667,6 +1671,36 @@ function SavedBackendListRow({
           label={serverUpdateState.status === "failed" ? "Retry update" : "Update"}
           appearance="icon"
         />
+      ) : null}
+      {enabled && !isConnected && wakeHostFromUrl(environment.displayUrl) !== null ? (
+        <Button
+          size="xs"
+          variant="ghost"
+          disabled={waking}
+          title="Send a Wake-on-LAN signal through another connected machine"
+          onClick={async () => {
+            setWaking(true);
+            const result = await wakeEnvironment(environment);
+            setWaking(false);
+            toastManager.add(
+              stackedThreadToast(
+                result === "sent"
+                  ? {
+                      type: "success",
+                      title: `Waking ${environment.label}`,
+                      description: "It reconnects by itself, usually within 30 seconds.",
+                    }
+                  : {
+                      type: "error",
+                      title: `Couldn't wake ${environment.label}`,
+                      description: "No connected machine on its network knows how to wake it.",
+                    },
+              ),
+            );
+          }}
+        >
+          Wake
+        </Button>
       ) : null}
       <Tooltip>
         <TooltipTrigger

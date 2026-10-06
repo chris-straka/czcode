@@ -11,8 +11,9 @@ import type { TuiAtoms } from "../state/atoms.ts";
 import { useCommand } from "./command.ts";
 import { TextInput } from "./TextInput.ts";
 import { useKeys } from "./input.ts";
+import { useWakeHost } from "./useWakeHost.ts";
 
-/** Paired machines with their state; `p` pairs a new one from a `cz pair` link. */
+/** Paired machines with their state; `p` pairs a new one from a `cz pair` link, `w` wakes a sleeping one. */
 export function HostsScreen({
   atoms,
   active,
@@ -29,6 +30,7 @@ export function HostsScreen({
   const retry = useCommand(atoms.catalog.retryNow);
   const setEnabled = useCommand(atoms.catalog.setEnabled);
   const selected = entries[Math.min(cursor, entries.length - 1)];
+  const wakeHost = useWakeHost(atoms);
 
   useKeys(
     (input, key) => {
@@ -36,7 +38,10 @@ export function HostsScreen({
       if (key.downArrow || input === "j") setCursor(Math.min(entries.length - 1, cursor + 1));
       else if (key.upArrow || input === "k") setCursor(Math.max(0, cursor - 1));
       else if (input === "r" && selected) void retry(selected[0]);
-      else if (input === "e" && selected) {
+      else if (input === "w" && selected) {
+        setNote(`Waking ${selected[1].target.label}…`);
+        void wakeHost(selected[0]).then((message) => setNote(message ?? "Nothing to wake there."));
+      } else if (input === "e" && selected) {
         void setEnabled({ environmentId: selected[0], enabled: !selected[1].enabled });
       }
     },
@@ -65,7 +70,7 @@ export function HostsScreen({
           }),
         ),
     pairing === null
-      ? h(Text, { dimColor: true }, note || "p pair · r retry · e enable/disable")
+      ? h(Text, { dimColor: true }, note || "p pair · r retry · w wake · e enable/disable")
       : h(
           Box,
           { flexDirection: "column", marginTop: 1 },

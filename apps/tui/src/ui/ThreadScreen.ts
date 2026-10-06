@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
   CommandId,
   DEFAULT_PROVIDER_INTERACTION_MODE,
@@ -8,8 +8,9 @@ import {
   type ThreadId,
 } from "@cz/contracts";
 import * as Option from "effect/Option";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { Box, Text } from "ink";
-import { createElement as h, useContext, useMemo, useState } from "react";
+import { createElement as h, useContext, useEffect, useMemo, useState } from "react";
 import { randomUUID } from "node:crypto";
 
 import { hasActiveRun, type LineTone, transcriptLines } from "../model/transcript.ts";
@@ -26,6 +27,7 @@ import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
 import { TextInput } from "./TextInput.ts";
 import { useKeys } from "./input.ts";
+import { useWakeHost } from "./useWakeHost.ts";
 
 const TONE: Record<
   LineTone,
@@ -71,6 +73,17 @@ export function ThreadScreen(props: {
 
   const projection = thread?.projection ?? null;
   const setStatus = useContext(StatusContext);
+  const registry = useContext(RegistryContext);
+  const wakeHost = useWakeHost(atoms);
+  // Opening a thread on a host that stays unreachable wakes it, once per visit.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const state = AsyncResult.value(registry.get(atoms.catalog.stateAtom(props.environmentId)));
+      if (Option.isSome(state) && state.value.phase === "connected") return;
+      void wakeHost(props.environmentId).then((message) => message && setStatus(message));
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [atoms, props.environmentId, registry, setStatus, wakeHost]);
   const catalogEntry = useAtomValue(atoms.catalog.catalogValueAtom).entries.get(
     props.environmentId,
   );

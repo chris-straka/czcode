@@ -2,6 +2,7 @@ import { Connection } from "@cz/client-runtime/connection";
 import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
 import * as MobileReleaseHttp from "@cz/client-runtime/state/mobileRelease";
 import { QueueHttp } from "@cz/client-runtime/state/queue";
+import * as HostWakeHttp from "@cz/client-runtime/state/hostWake";
 import { ShellSnapshotLoader } from "@cz/client-runtime/state/shell";
 import {
   boundedThreadSnapshotLoaderLayer,
@@ -32,6 +33,7 @@ const snapshotLoaderLayer = Layer.mergeAll(
   ThreadHistoryController.layer,
   DecisionsHttp.layer,
   QueueHttp.layer,
+  HostWakeHttp.layer,
   MobileReleaseHttp.layer,
 );
 

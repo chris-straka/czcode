@@ -6,6 +6,7 @@ import {
 } from "@cz/client-runtime/state/threads";
 import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
 import { QueueHttp } from "@cz/client-runtime/state/queue";
+import * as HostWakeHttp from "@cz/client-runtime/state/hostWake";
 import { PullRequestDiffLoader } from "@cz/client-runtime/state/pull-requests";
 import * as Layer from "effect/Layer";
 import { Atom } from "effect/unstable/reactivity";
@@ -28,6 +29,7 @@ const snapshotLoaderLayer = Layer.mergeAll(
   PullRequestDiffLoader.layer,
   DecisionsHttp.layer,
   QueueHttp.layer,
+  HostWakeHttp.layer,
 );
 
 type ConnectionLayerSource =
