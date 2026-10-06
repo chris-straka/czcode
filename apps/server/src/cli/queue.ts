@@ -101,6 +101,10 @@ const addCommand = Command.make("add", {
     Flag.withDescription("Provider instance and model, like claude/claude-opus-5-5."),
   ),
   title: Flag.String("title").pipe(Flag.optional),
+  option: Flag.String("option").pipe(
+    Flag.withDescription("A model option as id=value, like variant=max; repeat for more."),
+    Flag.atLeast(0),
+  ),
   at: Flag.String("at").pipe(
     Flag.withDescription("Start at this time instead of the provider's next reset."),
     Flag.optional,
@@ -115,6 +119,21 @@ const addCommand = Command.make("add", {
         const slash = flags.model.indexOf("/");
         if (slash <= 0)
           return yield* fail("--model is instance/model, like claude/claude-opus-5-5.");
+        const options = flags.option.map((entry) => {
+          const equals = entry.indexOf("=");
+          const value = entry.slice(equals + 1).trim();
+          return {
+            id: entry.slice(0, equals).trim(),
+            value: value === "true" ? true : value === "false" ? false : value,
+          };
+        });
+        const badOption = flags.option.find((entry, index) => {
+          const parsed = options[index]!;
+          return entry.indexOf("=") <= 0 || parsed.value === "";
+        });
+        if (badOption !== undefined) {
+          return yield* fail(`--option is id=value, like variant=max (got ${badOption}).`);
+        }
         const dueAt = Option.map(flags.at, Date.parse);
         if (Option.isSome(dueAt) && !Number.isFinite(dueAt.value)) {
           return yield* fail(`Can't read --at ${Option.getOrElse(flags.at, () => "")} as a time.`);
@@ -136,6 +155,7 @@ const addCommand = Command.make("add", {
             modelSelection: {
               instanceId: ProviderInstanceId.make(flags.model.slice(0, slash)),
               model: flags.model.slice(slash + 1),
+              ...(options.length > 0 ? { options } : {}),
             },
             source: "cli",
             ...(Option.isSome(dueAt) ? { dueAt: dueAt.value } : {}),

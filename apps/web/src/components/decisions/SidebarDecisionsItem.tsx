@@ -24,10 +24,12 @@ export function SidebarDecisionsItem() {
                 void navigate({ to: "/decisions" });
               }}
             >
-              <span className="relative">
-                <InboxIcon />
+              {/* The button truncates (clips) its last span, so this wrapper fills
+                  the whole button and the count sits inside it. */}
+              <span className="relative grid size-8 place-items-center">
+                <InboxIcon className="size-4" />
                 {count > 0 ? (
-                  <span className="absolute -top-1.5 -right-2 min-w-3.5 rounded-full bg-primary px-1 text-center text-3xs leading-3.5 font-medium text-primary-foreground">
+                  <span className="absolute top-0.5 right-0 min-w-3.5 rounded-full bg-primary px-1 text-center text-3xs leading-3.5 font-medium text-primary-foreground">
                     {count}
                   </span>
                 ) : null}
