@@ -63,3 +63,4 @@ export * from "./worktreeSetup.ts";
 export * from "./decisions.ts";
 export * from "./resetQueue.ts";
 export * from "./mobileRelease.ts";
+export * from "./hostWake.ts";

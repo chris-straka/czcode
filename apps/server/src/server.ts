@@ -80,8 +80,11 @@ import * as DecisionFollowUps from "./decisions/DecisionFollowUps.ts";
 import * as DecisionService from "./decisions/DecisionService.ts";
 import * as ForkDatabase from "./forkDatabase/ForkDatabase.ts";
 import * as ResetQueueService from "./resetQueue/ResetQueueService.ts";
+import * as HostSleepService from "./hostSleep/HostSleepService.ts";
 import { queueHttpApiLayer } from "./resetQueue/http.ts";
 import { mobileReleaseApkRouteLayer, mobileReleaseHttpApiLayer } from "./mobileRelease/http.ts";
+import * as HostWakeService from "./hostWake/HostWakeService.ts";
+import { hostWakeHttpApiLayer, hostWakeInfoRouteLayer } from "./hostWake/http.ts";
 import * as MobileReleaseService from "./mobileRelease/MobileReleaseService.ts";
 import { decisionMediaRouteLayer, decisionsHttpApiLayer } from "./decisions/http.ts";
 import { hasCloudPublicConfig } from "./cloud/publicConfig.ts";
@@ -629,6 +632,7 @@ const RuntimeServicesLive = RuntimeCoreDependenciesLive.pipe(
   Layer.provideMerge(AnalyticsService.layer),
   Layer.provideMerge(DecisionService.layer),
   Layer.provideMerge(MobileReleaseService.layer),
+  Layer.provideMerge(HostWakeService.layer),
   Layer.provideMerge(ForkDatabase.layer),
   Layer.provideMerge(ExternalLauncher.layer),
   Layer.provideMerge(RemoteOpenTargets.layer),
@@ -639,6 +643,8 @@ const RuntimeServicesLive = RuntimeCoreDependenciesLive.pipe(
 
 // The reset queue starts threads, so it sits above everything it launches with.
 const RuntimeDependenciesLive = DecisionFollowUps.layer.pipe(
+  // Sleeps a spare host when idle; reads the queue to wake for its next run.
+  Layer.provideMerge(HostSleepService.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provideMerge(ResetQueueService.layer),
   Layer.provideMerge(RuntimeServicesLive),
 );
@@ -662,6 +668,7 @@ const makeRoutesLayer = Layer.mergeAll(
       Layer.provide(decisionsHttpApiLayer),
       Layer.provide(queueHttpApiLayer),
       Layer.provide(mobileReleaseHttpApiLayer),
+      Layer.provide(hostWakeHttpApiLayer),
       Layer.provide(serverEnvironmentHttpApiLayer),
       Layer.provide(environmentAuthenticatedAuthLayer),
     ),
@@ -670,6 +677,7 @@ const makeRoutesLayer = Layer.mergeAll(
     attachmentUploadRouteLayer,
     decisionMediaRouteLayer,
     mobileReleaseApkRouteLayer,
+    hostWakeInfoRouteLayer,
     deviceHubProxyRouteLayer,
     staticAndDevRouteLayer,
     websocketRpcRouteLayer,

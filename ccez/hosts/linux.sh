@@ -97,6 +97,18 @@ exec /usr/bin/node "$CHECKOUT/apps/server/dist/bin.mjs" "\$@"
 SHIM
 chmod +x "$HOME/.local/bin/cz"
 
+# A Linux PC on Ethernet sleeps when idle and wakes over the network: the
+# Mac (or any cz server on the LAN) sends the Wake-on-LAN packet when needed.
+sleep_minutes=0
+wired=""
+if ! $in_wsl; then
+  wired=$(nmcli -t -f DEVICE,TYPE,STATE device 2> /dev/null |
+    awk -F: '$2 == "ethernet" && $3 == "connected" {print $1; exit}')
+  if [ -n "$wired" ] && sudo ethtool "$wired" 2> /dev/null | grep -q 'Supports Wake-on:.*g'; then
+    sleep_minutes=${CZ_SLEEP_WHEN_IDLE_MINUTES:-30}
+  fi
+fi
+
 step "cz as a background service on the tailnet"
 mkdir -p "$HOME/.config/systemd/user"
 cat > "$HOME/.config/systemd/user/$UNIT" << UNITFILE
@@ -106,6 +118,7 @@ After=network-online.target
 
 [Service]
 Environment=CZ_TAILSCALE_SERVE=1
+Environment=CZ_SLEEP_WHEN_IDLE_MINUTES=$sleep_minutes
 # systemd's default PATH lacks the agents installed in your home.
 Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=%h
@@ -139,6 +152,50 @@ if $in_wsl; then
     (cd /mnt/c && /mnt/c/Windows/System32/powercfg.exe /change "$setting" 0)
   done
   echo "Sleep and hibernate are off on AC power."
+elif [ "$sleep_minutes" -gt 0 ]; then
+  step "Sleep when idle, wake over the network"
+  connection=$(nmcli -t -f NAME,DEVICE connection show --active |
+    awk -F: -v device="$wired" '$2 == device {print $1; exit}')
+  sudo nmcli connection modify "$connection" 802-3-ethernet.wake-on-lan magic
+  sudo ethtool -s "$wired" wol g
+  # cz decides when to sleep. A held sleep lock stops GNOME and the login
+  # screen from suspending on their own; cz's helper overrides it.
+  sudo systemctl unmask sleep.target suspend.target > /dev/null 2>&1
+  sudo systemctl mask hibernate.target hybrid-sleep.target > /dev/null 2>&1
+  sudo tee /etc/systemd/system/cz-host-sleep-lock.service > /dev/null << 'LOCK'
+[Unit]
+Description=Only cz puts this agent host to sleep (ccez/hosts/linux.sh)
+
+[Service]
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --mode=block --who=cz-host --why="cz sleeps this host when idle" /bin/sleep infinity
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+LOCK
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now cz-host-sleep-lock.service > /dev/null 2>&1
+  sudo tee /usr/local/sbin/cz-host-sleep > /dev/null << 'HELPER'
+#!/bin/sh
+# Installed by ccez/hosts/linux.sh. cz's idle sleep runs this through sudo:
+#   cz-host-sleep <wake-at-epoch-seconds, or 0 for no alarm>
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+wake_at=${1:-0}
+case "$wake_at" in '' | *[!0-9]*) echo "usage: cz-host-sleep <epoch-seconds|0>" >&2 && exit 2 ;; esac
+if [ "$wake_at" -gt 0 ]; then
+  rtcwake -m no -t "$wake_at" > /dev/null
+else
+  rtcwake -m disable > /dev/null 2>&1 || true
+fi
+exec systemctl suspend --check-inhibitors=no
+HELPER
+  sudo chmod 755 /usr/local/sbin/cz-host-sleep
+  echo "$USER ALL=(root) NOPASSWD: /usr/local/sbin/cz-host-sleep" |
+    sudo tee /etc/sudoers.d/cz-host-sleep > /dev/null
+  sudo chmod 440 /etc/sudoers.d/cz-host-sleep
+  sudo visudo -cf /etc/sudoers.d/cz-host-sleep > /dev/null
+  echo "Sleeps after $sleep_minutes idle minutes; the Mac wakes it over Ethernet when needed."
 else
   step "Never sleep"
   # Ubuntu Desktop suspends when idle, which drops agents mid-turn. The screen can still turn off.

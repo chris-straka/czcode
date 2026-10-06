@@ -66,6 +66,7 @@ import {
   QueuedRunNotFoundError,
 } from "./resetQueue.ts";
 import { AndroidReleaseResult } from "./mobileRelease.ts";
+import { WakeHostInput, WakeHostResult } from "./hostWake.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import {
   PullRequestDiffInput,
@@ -812,6 +813,16 @@ class EnvironmentMobileReleaseHttpApi extends HttpApiGroup.make("mobileRelease")
   }).middleware(EnvironmentAuthenticatedAuth),
 ) {}
 
+/** Asks this server to wake a sleeping host on its LAN (fork). */
+class EnvironmentHostWakeHttpApi extends HttpApiGroup.make("hostWake").add(
+  HttpApiEndpoint.post("wake", "/api/hosts/wake", {
+    headers: OptionalBearerHeaders,
+    payload: WakeHostInput,
+    success: WakeHostResult,
+    error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
+  }).middleware(EnvironmentAuthenticatedAuth),
+) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
@@ -821,4 +832,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentConnectHttpApi)
   .add(EnvironmentDecisionsHttpApi)
   .add(EnvironmentQueueHttpApi)
-  .add(EnvironmentMobileReleaseHttpApi) {}
+  .add(EnvironmentMobileReleaseHttpApi)
+  .add(EnvironmentHostWakeHttpApi) {}
