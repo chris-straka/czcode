@@ -92,6 +92,38 @@ To roll back, quit czcode and open T3 Code. `~/.t3` is left untouched.
 | ------------------------------------ | ------------------------------- |
 | ![](img/p6-s24-1-install-update.png) | ![](img/p6-s24-2-installer.png) |
 
+## Mac agent host (2026-10-06)
+
+`ccez/hosts/mac.sh` and `build-tools-mac.sh` set up a dedicated account on a
+shared Mac (target: a family member's Mac Studio). They're new files next to
+the Linux scripts, which stay unchanged. Everything goes in the agent account's
+home folder except Homebrew and Tailscale, which the whole Mac shares.
+
+- Tailscale is the open-source `tailscaled` from Homebrew, installed as a
+  system daemon. It stays on the tailnet while the account is switched away
+  from, and it supports Tailscale SSH (the App Store and standalone apps
+  don't). The script refuses to run if the Tailscale app is already
+  installed, or if Homebrew belongs to another account.
+- cz runs as the launchd agent `uk.ccez.cz-host` (KeepAlive, 10240 open
+  files), wrapped in `caffeinate -s -i`. That keeps the Mac awake on power
+  while cz runs, with no `pmset` change. There's no Wake-on-LAN.
+- Blender goes to `~/Applications`, .NET to `~/.dotnet`, Docker is Colima,
+  and the JDK isn't linked into `/Library`.
+
+Checked on Linux (`basement`). The scripts never ran for real there:
+
+- `bash -n` and shellcheck 0.11.0 are clean on both files.
+- With `CZ_HOST_DRY_RUN=1`, `mac.sh` prints 22 steps and 134 commands,
+  including the build tools. `build-tools-mac.sh` alone prints 9 steps and
+  97 commands. Exit code 0.
+- Both dry runs were run with 27 tools stubbed to log and fail (`brew`,
+  `sudo`, `curl`, `git`, `npm`, `launchctl`, `tailscale`, `jq`...). There
+  were 0 calls, and no files were written.
+- The LaunchAgent plist from the dry run parses with Python's `plistlib`.
+- All 60 Homebrew formulae it installs exist (formulae.brew.sh API, 60/60
+  HTTP 200). The Blender 5.2.1 arm64 DMG URL returns 200.
+
 ## Not done
 
 - The owner using only cz for three days.
+- The first real `mac.sh` run, on the Mac Studio.
