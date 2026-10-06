@@ -25,6 +25,16 @@ enabled, so it starts at boot and keeps running after you log out.
 | Stop until next boot | `systemctl --user stop cz-host`    |
 | Update cz            | Run the host setup script again    |
 
+A Linux host on Ethernet sleeps after 30 idle minutes: no agent turn running
+or waiting to start, no queued run or scheduled task coming up, nobody logged
+in, and low CPU load (so a training run left going keeps it up). Another
+machine running czcode on the same network wakes it when you open one of its
+threads or start one there, or when you press **Wake** (on the offline notice,
+in **Settings → Connections**, or `w` in the terminal app's Hosts tab). It
+wakes itself for its next queued run. Waking takes about 30 seconds. Set
+`CZ_SLEEP_WHEN_IDLE_MINUTES` in the service to change the wait, or `0` to keep
+it on. The log of when it slept is `host-sleep.jsonl` in its cz home.
+
 On Windows, the script also keeps WSL running after you log in to Windows and
 turns off sleep while plugged in. WSL starts only after a Windows login, so a
 PC that restarts (for example after Windows Update) needs someone to log in, or
