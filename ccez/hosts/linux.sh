@@ -255,10 +255,10 @@ step "Sign in: Codex (optional)"
 if codex login status > /dev/null 2>&1; then
   echo "Already signed in."
 else
-  # Threads default to Claude Opus; Codex is only for when you want it.
-  read -r -p "Sign in to Codex on this machine? [y/N] " answer < /dev/tty
+  # Threads default to Claude Opus; Codex stays signed in for when a newer model is better.
+  read -r -p "Sign in to Codex on this machine? [Y/n] " answer < /dev/tty
   case "$answer" in
-    [yY]*)
+    "" | [yY]*)
       echo "Open the link on any device and enter the code. If OpenAI says device codes"
       echo "are off, turn on \"Enable device code sign-in for Codex\" in ChatGPT's settings."
       codex login --device-auth
