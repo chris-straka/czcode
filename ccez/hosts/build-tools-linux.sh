@@ -5,6 +5,10 @@
 #
 #   bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh
 #
+# From another machine, quote the path so `~` expands on the host:
+#   ssh -t b@basement 'bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh'
+# SKIP_APT=1 runs only the steps that need no sudo; APT_ONLY=1 only the sudo one.
+#
 # Safe to re-run: installed pieces are skipped. Not covered (Mac-only or not
 # needed on agent hosts): Xcode/iOS, gcloud, MEGAcmd, resend, notify-me,
 # llama.cpp, databases (use Docker).
@@ -20,7 +24,9 @@ have() { command -v "$1" > /dev/null 2>&1; }
 [ "$(id -u)" -ne 0 ] || { echo "Run as your normal user, not root." >&2; exit 1; }
 mkdir -p "$HOME/.local/bin" "$HOME/.local/opt"
 export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}"   # agents share this host
 
+if [ "${SKIP_APT:-0}" != 1 ]; then
 step "System packages (asks for your password once)"
 sudo apt-get update -q
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq \
@@ -34,9 +40,11 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq \
   ripgrep fd-find jq tree tmux neovim aria2 wget curl rsync unzip zip \
   xz-utils sqlite3 git-lfs git-filter-repo shellcheck cifs-utils \
   python3-venv
+fi
+[ "${APT_ONLY:-0}" != 1 ] || { echo "APT_ONLY: done."; exit 0; }
 # Ubuntu names fd "fdfind".
-have fd || ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
-git lfs install --skip-repo > /dev/null
+have fd || ! have fdfind || ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+! have git-lfs || git lfs install --skip-repo > /dev/null
 
 step "Rust targets and components"
 rustup target add wasm32-unknown-unknown wasm32-wasip2 x86_64-pc-windows-gnu \
@@ -56,8 +64,9 @@ done
 step "Faster Rust builds: sccache + mold"
 cfg="$HOME/.cargo/config.toml"
 touch "$cfg"
-grep -q 'rustc-wrapper' "$cfg" || printf '[build]\nrustc-wrapper = "sccache"\n' >> "$cfg"
-grep -q 'x86_64-unknown-linux-gnu' "$cfg" || printf '\n[target.x86_64-unknown-linux-gnu]\nlinker = "clang"\nrustflags = ["-C", "link-arg=-fuse-ld=mold"]\n' >> "$cfg"
+# Only point cargo at tools that exist, or every build on this host fails.
+! have sccache || grep -q 'rustc-wrapper' "$cfg" || printf '[build]\nrustc-wrapper = "sccache"\n' >> "$cfg"
+! { have mold && have clang; } || grep -q 'x86_64-unknown-linux-gnu' "$cfg" || printf '\n[target.x86_64-unknown-linux-gnu]\nlinker = "clang"\nrustflags = ["-C", "link-arg=-fuse-ld=mold"]\n' >> "$cfg"
 
 step "Python tools (uv, yt-dlp)"
 have uv || curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -91,7 +100,9 @@ else
 fi
 
 step "Factory CLIs from this machine's checkouts"
-[ -d "$HOME/SWE/games/tools/gk" ] && { have gk || cargo install --locked --path "$HOME/SWE/games/tools/gk"; }
+if [ -d "$HOME/SWE/games/tools/gk" ] && ! have gk; then
+  cargo install --locked --path "$HOME/SWE/games/tools/gk" || echo "gk did not build (system packages missing?); re-run after them."
+fi
 
 step "Check"
 for t in cargo sccache mold clang ffmpeg magick blender cargo-ndk uv yt-dlp bun wrangler gltf-transform gltfpack rg fd jq shellcheck typst; do
