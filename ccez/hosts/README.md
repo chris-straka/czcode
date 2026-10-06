@@ -22,12 +22,20 @@ update cz.
   settings.
 - **OpenCode:** skip it. The Mac copies its login here over Tailscale.
 
-## Build tools (optional, for game and tool builds)
+## Build tools
 
-For a host that builds the factory's projects (Bevy games, Android APKs,
-Blender jobs, media tools), run this afterwards. It asks for your password
-once and is safe to re-run:
+The script also installs everything the factory's projects build with: Rust,
+Go, Java and Kotlin, the Android SDK and NDK, C/C++ toolchains, Python, Node
+and bun, .NET, Docker, Kubernetes tools, Blender, ffmpeg and the libraries
+Bevy games need. Set `CZ_HOST_TOOLS=0` before the command to skip them.
+
+To add or update the tools on a host that's already set up, run:
 
 ```sh
 bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh
 ```
+
+From another machine, quote the path so `~` expands on the host:
+`ssh -t b@basement 'bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh'`.
+To leave groups out, set `CZ_TOOLS_SKIP`, for example
+`CZ_TOOLS_SKIP="android blender"`.
