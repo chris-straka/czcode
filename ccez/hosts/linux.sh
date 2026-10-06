@@ -228,10 +228,14 @@ else
 fi
 
 step "Sign in: OpenCode"
-opencode auth list || true
-echo "Skip this to have the Mac copy its OpenCode login (your Muse key) here over Tailscale."
-read -r -p "Add an OpenCode login by hand now? [y/N] " answer < /dev/tty
-case "$answer" in [yY]*) opencode auth login ;; *) ;; esac
+if [ -s "$HOME/.local/share/opencode/auth.json" ]; then
+  echo "Already signed in."
+else
+  echo "No OpenCode login here yet. Usually the Mac copies its login (your Muse key)"
+  echo "over Tailscale after this script finishes, so you can answer N."
+  read -r -p "Sign in to OpenCode by hand instead? [y/N] " answer < /dev/tty
+  case "$answer" in [yY]*) opencode auth login ;; *) ;; esac
+fi
 
 step "GitHub (so agents here can push)"
 git config --global user.name > /dev/null || git config --global user.name "Chris Straka"
