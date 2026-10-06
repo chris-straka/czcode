@@ -107,7 +107,7 @@ After=network-online.target
 [Service]
 Environment=CZ_TAILSCALE_SERVE=1
 # systemd's default PATH lacks the agents installed in your home.
-Environment=PATH=$HOME/.local/bin:$HOME/.opencode/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=%h
 ExecStart=$HOME/.local/bin/cz serve --no-browser
 Restart=on-failure
@@ -150,8 +150,8 @@ step "Coding agents"
 npm_global() { have "$1" || npm install -g "$2"; }
 npm_global claude @anthropic-ai/claude-code
 npm_global codex @openai/codex
-have opencode || curl -fsSL https://opencode.ai/install | bash
-export PATH="$HOME/.opencode/bin:$PATH"
+# OpenCode 2 is the npm package; opencode.ai/install still gives 1.x.
+opencode --version 2> /dev/null | grep -q '^v\?2\.' || npm install -g @opencode/cli > /dev/null
 
 step "Sign in: Claude"
 if [ -s "$HOME/.claude/.credentials.json" ]; then
@@ -165,6 +165,8 @@ step "Sign in: Codex"
 if codex login status > /dev/null 2>&1; then
   echo "Already signed in."
 else
+  echo "If OpenAI says device codes are off: in ChatGPT's settings, turn on"
+  echo "\"Enable device code sign-in for Codex\", then run this script again."
   codex login --device-auth
 fi
 

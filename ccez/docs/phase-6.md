@@ -70,13 +70,28 @@ To roll back, quit czcode and open T3 Code. `~/.t3` is left untouched.
   so the copy is consistent. That was the switch-over. T3's apps, data, and
   caches then went to the Trash (`t3-removed-2026-10-05`).
 
+- **First real host** (2026-10-05): the owner's spare PC, wiped to Ubuntu
+  26.04.1 Desktop, ran `linux.sh` as `basement` (6 cores, 15 GB, GTX 770,
+  too old for current CUDA). cz-host came up on the tailnet at
+  `https://basement.tailfe37c2.ts.net`; the Mac's desktop app and the S24
+  paired with it. Fixed from that run:
+  - OpenCode's own installer still gives 1.x; the script now installs the
+    `@opencode/cli` npm package (2.x, matching the Mac).
+  - Codex device sign-in fails until "Enable device code sign-in for Codex"
+    is on in ChatGPT's settings; the script says so first.
+  - Ubuntu Desktop suspends when idle; the script masks the sleep targets.
+  - A fresh Ubuntu Desktop has no `curl`, so the copy command uses `wget`.
+  - Tailscale SSH needs a tailnet policy rule; the default is "check",
+    which asks for a browser sign-in every 12 hours.
+- **The S24 off home Wi-Fi:** pairing on the LAN plus a Tailscale route
+  (`https://z.tailfe37c2.ts.net`, Serve, tailnet only) worked; the phone's
+  browser reached it over Tailscale. Failover to that route away from home
+  is untested: the phone has no mobile data.
+
 | Install update                       | System installer                |
 | ------------------------------------ | ------------------------------- |
 | ![](img/p6-s24-1-install-update.png) | ![](img/p6-s24-2-installer.png) |
 
 ## Not done
 
-- `linux.sh` hasn't run on a real Windows PC or Ubuntu
-  machine yet. Shellcheck passes, but nothing was available here to run
-  them on.
 - The owner using only cz for three days.
