@@ -300,6 +300,16 @@ if [ ! -e "$HOME/.config/opencode/opencode.jsonc" ] && [ ! -e "$HOME/.config/ope
 EOF
 fi
 
+step "Point the agents at ~/SWE/AGENTS.md (the owner's shared rules)"
+for f in "$HOME/.claude/CLAUDE.md" "$HOME/.codex/AGENTS.md" "$HOME/.config/opencode/AGENTS.md"; do
+  [ -e "$f" ] && continue
+  mkdir -p "$(dirname "$f")"
+  cat > "$f" << 'RULES'
+Never use writing blocks. Put prose, drafts, emails, and messages directly in normal chat text.
+Read ~/SWE/AGENTS.md for the owner's shared working rules before starting work. Follow the project's own instructions where they are narrower.
+RULES
+done
+
 step "GitHub (so agents here can push)"
 git config --global user.name > /dev/null || git config --global user.name "Chris Straka"
 git config --global user.email > /dev/null || git config --global user.email "c@z.local"
