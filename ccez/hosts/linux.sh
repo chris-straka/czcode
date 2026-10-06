@@ -303,8 +303,14 @@ fi
 step "GitHub (so agents here can push)"
 git config --global user.name > /dev/null || git config --global user.name "Chris Straka"
 git config --global user.email > /dev/null || git config --global user.email "c@z.local"
+# Keep the token in gh's own file (mode 600), not the desktop keyring: the
+# keyring stays locked after a reboot until someone logs in at the screen, so
+# agents on a rebooted host would lose GitHub.
+if gh auth status 2> /dev/null | grep -q '(keyring)'; then
+  gh auth token | gh auth login --hostname github.com --with-token --insecure-storage
+fi
 if ! gh auth status > /dev/null 2>&1; then
-  gh auth login --hostname github.com --git-protocol https --web
+  gh auth login --hostname github.com --git-protocol https --web --insecure-storage
 fi
 gh auth setup-git
 
