@@ -235,5 +235,7 @@ done
 for p in alsa libudev wayland-client xkbcommon vulkan; do
   if pkg-config --exists "$p"; then printf '  ok  %s (dev)\n' "$p"; else printf '  --  %s (dev)\n' "$p"; fi
 done
-! have nvidia-smi || nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
+# A freshly installed driver only answers after a restart; that's not an error.
+! have nvidia-smi || nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2> /dev/null ||
+  echo "NVIDIA driver installed; restart this PC to load it."
 echo "Done. Open a new shell (or log out and in, for Docker) to pick up the new PATH."
