@@ -237,6 +237,29 @@ else
   read -r -p "Sign in to OpenCode by hand instead? [y/N] " answer < /dev/tty
   case "$answer" in [yY]*) opencode auth login ;; *) ;; esac
 fi
+# czcode offers the reasoning variants OpenCode's config defines; Muse Spark's
+# "max" exists only through this, as on the Mac.
+if [ ! -e "$HOME/.config/opencode/opencode.jsonc" ] && [ ! -e "$HOME/.config/opencode/opencode.json" ]; then
+  mkdir -p "$HOME/.config/opencode"
+  cat > "$HOME/.config/opencode/opencode.jsonc" << 'EOF'
+// Global OpenCode config for this agent host (from ccez/hosts/linux.sh).
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "meta": {
+      "models": {
+        "muse-spark-1.3-contributor": { "variants": { "max": { "reasoningEffort": "max" } } }
+      }
+    },
+    "opencode": {
+      "models": {
+        "muse-spark-1.3-contributor-free": { "variants": { "max": { "reasoningEffort": "max" } } }
+      }
+    }
+  }
+}
+EOF
+fi
 
 step "GitHub (so agents here can push)"
 git config --global user.name > /dev/null || git config --global user.name "Chris Straka"
