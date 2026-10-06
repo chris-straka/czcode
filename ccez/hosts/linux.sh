@@ -8,9 +8,8 @@
 # wget -qO /tmp/cz-host.sh https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/hosts/linux.sh && bash /tmp/cz-host.sh
 #
 # Sets up this machine as a cz agent host: tools, Tailscale, cz built from this
-# repo and kept running as a background service on the tailnet, the build
-# tools in build-tools-linux.sh (Rust, Go, Java, Android, Blender, Docker...),
-# and the Claude, Codex, and OpenCode logins (each prints a link or code to open on any
+# repo and kept running as a background service on the tailnet, and the Claude,
+# Codex, and OpenCode logins (each prints a link or code to open on any
 # device). Safe to re-run: finished steps are skipped, and re-running updates cz.
 #
 # On WSL it also turns on systemd, keeps WSL running after you log in to
@@ -98,11 +97,6 @@ exec /usr/bin/node "$CHECKOUT/apps/server/dist/bin.mjs" "\$@"
 SHIM
 chmod +x "$HOME/.local/bin/cz"
 
-if [ "${CZ_HOST_TOOLS:-1}" = 1 ]; then
-  step "Build tools: Rust, Go, Java, Android, Blender, Docker and more (CZ_HOST_TOOLS=0 skips)"
-  bash "$CHECKOUT/ccez/hosts/build-tools-linux.sh"
-fi
-
 # A Linux PC on Ethernet sleeps when idle and wakes over the network: the
 # Mac (or any cz server on the LAN) sends the Wake-on-LAN packet when needed.
 sleep_minutes=0
@@ -133,9 +127,6 @@ OOMPolicy=continue
 # systemd's default PATH lacks the agents and toolchains installed in your
 # home (rustup, a Go tarball in ~/.local/go, go install).
 Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.local/go/bin:$HOME/go/bin:/usr/local/bin:/usr/bin:/bin
-# Written by build-tools-linux.sh: PATH, JAVA_HOME, ANDROID_HOME and friends.
-# Overrides the PATH above when present.
-EnvironmentFile=-%h/.config/cz-host/environment
 WorkingDirectory=%h
 ExecStart=$HOME/.local/bin/cz serve --no-browser
 Restart=on-failure
