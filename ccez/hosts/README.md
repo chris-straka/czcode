@@ -21,3 +21,13 @@ update cz.
   Codex, first turn on "Enable device code sign-in for Codex" in ChatGPT's
   settings.
 - **OpenCode:** skip it. The Mac copies its login here over Tailscale.
+
+## Build tools (optional, for game and tool builds)
+
+For a host that builds the factory's projects (Bevy games, Android APKs,
+Blender jobs, media tools), run this afterwards. It asks for your password
+once and is safe to re-run:
+
+```sh
+bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh
+```
