@@ -29,6 +29,11 @@ Go, Java and Kotlin, the Android SDK and NDK, C/C++ toolchains, Python, Node
 and bun, .NET, Docker, Kubernetes tools, Blender, ffmpeg and the libraries
 Bevy games need. Set `CZ_HOST_TOOLS=0` before the command to skip them.
 
+It also tunes the machine (`tune-host-linux.sh`): compressed swap in RAM
+(zram), a disk swap file up to 16 GB, higher file-watcher limits, and caps on
+log sizes. czcode starts with Codex using this machine's own sign-in and with
+Claude Opus as the default model for new threads.
+
 To add or update the tools on a host that's already set up, run:
 
 ```sh

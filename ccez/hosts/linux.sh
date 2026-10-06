@@ -103,6 +103,9 @@ if [ "${CZ_HOST_TOOLS:-1}" = 1 ]; then
   bash "$CHECKOUT/ccez/hosts/build-tools-linux.sh"
 fi
 
+step "Tune the host: zram, swap file, file-watcher limits, log caps"
+sudo bash "$CHECKOUT/ccez/hosts/tune-host-linux.sh"
+
 # A Linux PC on Ethernet sleeps when idle and wakes over the network: the
 # Mac (or any cz server on the LAN) sends the Wake-on-LAN packet when needed.
 sleep_minutes=0
@@ -130,6 +133,8 @@ Environment=CZ_SLEEP_WHEN_IDLE_MINUTES=$sleep_minutes
 Environment=CZ_AGENT_SCOPES=1
 # A process the kernel kills for memory doesn't stop the server with it.
 OOMPolicy=continue
+# Agents and builds open many files; systemd's default soft limit is 1024.
+LimitNOFILE=1048576
 # systemd's default PATH lacks the agents and toolchains installed in your
 # home (rustup, a Go tarball in ~/.local/go, go install).
 Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.local/go/bin:$HOME/go/bin:/usr/local/bin:/usr/bin:/bin
@@ -148,6 +153,19 @@ UNITFILE
 sudo loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable "$UNIT" > /dev/null
+# Settings are edited only while cz is stopped, so it can't write over them.
+# Codex uses this machine's own `codex login` ("existing"); the welcome wizard
+# can otherwise pick "managed", which needs a second sign-in. New threads
+# default to Claude Opus.
+systemctl --user stop "$UNIT" 2> /dev/null || true
+settings="${CZ_HOME:-$HOME/.cz}/userdata/settings.json"
+mkdir -p "$(dirname "$settings")"
+[ -s "$settings" ] || echo '{}' > "$settings"
+jq '
+  .providerInstances.codex //= {driver: "codex", enabled: true, config: {binaryPath: "codex", homePath: "", shadowHomePath: "", launchArgs: "", customModels: []}}
+  | .providerInstances.codex.config.setupMode = "existing"
+  | .defaultModelSelection //= {instanceId: "claudeAgent", model: "claude-opus-5-5", options: [{id: "effort", value: "high"}]}
+' "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
 systemctl --user restart "$UNIT"
 
 if $in_wsl; then
