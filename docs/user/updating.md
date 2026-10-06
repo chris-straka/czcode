@@ -64,5 +64,5 @@ and restart continuation preferences are in **Settings → Maintenance**.
 
 On Android, a paired machine can offer its own newer build: **Settings → App →
 Install update** appears when one has an APK newer than yours. Tapping it
-downloads the APK in your browser; open the download to install it over the
-current app. Android asks once to allow installs from your browser.
+downloads the update in the app and opens Android's installer; tap **Update**.
+The first time, Android asks you to allow czcode to install apps.

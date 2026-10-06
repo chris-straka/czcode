@@ -4,11 +4,12 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
-import { Linking, Pressable, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 import { AppText as Text } from "../../components/AppText";
 import { MaterialButton } from "../../components/MaterialButton";
+import { downloadAndInstallApk } from "../../lib/installApk";
 import { usePreparedConnection } from "../../state/session";
 
 /** The media's signed URL, resolved against the host it lives on. */
@@ -140,7 +141,18 @@ export function DecisionMedia({
         <MaterialButton
           tone="primary"
           label={`Install ${media.name}`}
-          onPress={() => void Linking.openURL(uri)}
+          onPress={() => {
+            if (Platform.OS !== "android") return void Linking.openURL(uri);
+            void downloadAndInstallApk(
+              uri,
+              media.name.endsWith(".apk") ? media.name : `${media.name}.apk`,
+            ).catch((error: unknown) =>
+              Alert.alert(
+                "Couldn't install",
+                error instanceof Error ? error.message : String(error),
+              ),
+            );
+          }}
         />
       );
     default:

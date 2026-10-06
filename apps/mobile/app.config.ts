@@ -313,6 +313,8 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: true,
     // expo-sensors declares this for its pedometer, which the app does not use.
     blockedPermissions: ["android.permission.ACTIVITY_RECOGNITION"],
+    // Installs app updates (and playtest builds) from a paired machine without the browser.
+    permissions: ["android.permission.REQUEST_INSTALL_PACKAGES"],
   },
   web: {
     favicon: variant.assets.appIcon,
