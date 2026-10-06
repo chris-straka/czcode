@@ -340,7 +340,15 @@ function DecisionCard({
           ) : null}
           <span className="ml-auto">{age}</span>
         </div>
-        <h2 className="mt-1 font-medium text-foreground">{item.question}</h2>
+        {/* Agents often reuse one question across a batch; the title tells them apart. */}
+        {item.title && item.title !== item.question ? (
+          <>
+            <h2 className="mt-1 font-medium text-foreground">{item.title}</h2>
+            <p className="text-sm text-muted-foreground">{item.question}</p>
+          </>
+        ) : (
+          <h2 className="mt-1 font-medium text-foreground">{item.question}</h2>
+        )}
         {item.cost_note ? (
           <p className="text-xs text-warning-foreground">{item.cost_note}</p>
         ) : null}

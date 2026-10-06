@@ -74,7 +74,17 @@ export function DecisionsRouteScreen() {
                     {item.kind} · {item.project}
                     {item.blocking ? " · agent waiting" : ""}
                   </Text>
-                  <Text className="font-cz-medium text-base text-foreground">{item.question}</Text>
+                  {/* Agents often reuse one question across a batch; the title tells them apart. */}
+                  {item.title && item.title !== item.question ? (
+                    <>
+                      <Text className="font-cz-medium text-base text-foreground">{item.title}</Text>
+                      <Text className="text-sm text-foreground-muted">{item.question}</Text>
+                    </>
+                  ) : (
+                    <Text className="font-cz-medium text-base text-foreground">
+                      {item.question}
+                    </Text>
+                  )}
                   {item.cost_note ? (
                     <Text className="text-xs text-warning">{item.cost_note}</Text>
                   ) : null}

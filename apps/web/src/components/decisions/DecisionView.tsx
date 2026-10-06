@@ -110,6 +110,9 @@ export function DecisionView({
               </span>
             ) : null}
           </div>
+          {item.title && item.title !== item.question ? (
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{item.title}</p>
+          ) : null}
           <h1 className="mt-1 text-lg font-semibold text-foreground">{item.question}</h1>
           {item.cost_note ? (
             <p className="mt-1 text-sm text-warning-foreground">{item.cost_note}</p>

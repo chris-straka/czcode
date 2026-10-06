@@ -186,6 +186,9 @@ function DecisionAnswerForm({
   return (
     <View className="flex-1">
       <ScrollView className="flex-1" contentContainerClassName="gap-4 p-4">
+        {item.title && item.title !== item.question ? (
+          <Text className="text-sm font-cz-medium text-foreground-muted">{item.title}</Text>
+        ) : null}
         <Text className="text-xl font-cz-bold text-foreground">{item.question}</Text>
         {item.blocking ? (
           <Text className="text-sm text-warning">An agent is waiting on this.</Text>
