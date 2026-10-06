@@ -119,8 +119,9 @@ After=network-online.target
 [Service]
 Environment=CZ_TAILSCALE_SERVE=1
 Environment=CZ_SLEEP_WHEN_IDLE_MINUTES=$sleep_minutes
-# systemd's default PATH lacks the agents installed in your home.
-Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
+# systemd's default PATH lacks the agents and toolchains installed in your
+# home (rustup, a Go tarball in ~/.local/go, go install).
+Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.local/go/bin:$HOME/go/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=%h
 ExecStart=$HOME/.local/bin/cz serve --no-browser
 Restart=on-failure
