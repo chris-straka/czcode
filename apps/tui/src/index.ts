@@ -45,5 +45,10 @@ export const runTui: TuiModule["runTui"] = async (options: RunTuiOptions) => {
   } finally {
     process.off("SIGHUP", onHangup);
     tuiRuntime.registry.dispose();
+    // Unmounting queued atom removals that run a tick later and re-arm the
+    // registry's idle timers, which would keep the process (and the shell's
+    // prompt) waiting for minutes. Dispose again once they have run.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    tuiRuntime.registry.dispose();
   }
 };
