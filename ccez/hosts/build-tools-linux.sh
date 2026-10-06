@@ -60,6 +60,8 @@ if [ "${SKIP_APT:-0}" != 1 ]; then
     ripgrep fd-find jq tree tmux htop btop neovim aria2 rsync unzip zip
     p7zip-full xz-utils zstd git-lfs git-filter-repo shellcheck cifs-utils
     nfs-common ethtool
+    # Disk health (SMART) and hardware virtualization (Android emulator, VMs)
+    smartmontools nvme-cli cpu-checker qemu-system-x86
   )
   want docker && pkgs+=(docker.io docker-compose-v2 docker-buildx)
   want dotnet && pkgs+=(dotnet-sdk-10.0)
@@ -70,6 +72,8 @@ if [ "${SKIP_APT:-0}" != 1 ]; then
     id -nG "$USER" | grep -qw docker || sudo usermod -aG docker "$USER"
     $in_wsl || sudo systemctl enable --now docker > /dev/null 2>&1 || true
   fi
+  # /dev/kvm for the Android emulator and VMs (takes effect at the next login).
+  if [ -e /dev/kvm ] && ! id -nG "$USER" | grep -qw kvm; then sudo usermod -aG kvm "$USER"; fi
   if want gpu && ! $in_wsl && lspci 2> /dev/null | grep -qi 'vga.*nvidia\|3d.*nvidia'; then
     # Only drivers that still get CUDA updates; older cards (GTX 7xx) stay on nouveau.
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq ubuntu-drivers-common > /dev/null
