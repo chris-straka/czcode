@@ -38,6 +38,7 @@ export type CzMcpToolSummaryAction =
   | "question-list"
   | "question-read"
   | "question-respond"
+  | "secret-request"
   | "worktree-handoff"
   | "worktree-list"
   | "worktree-status"
@@ -58,7 +59,9 @@ export type CzMcpToolSummaryAction =
   | "watch-pr"
   | "unwatch-pr"
   | "browser"
-  | "device";
+  | "device"
+  | "html-preview"
+  | "html-render";
 
 export interface CzMcpToolDefinition {
   readonly displayName: string;
@@ -128,6 +131,7 @@ const CZ_MCP_TOOLS: Readonly<Record<string, CzMcpToolDefinition>> = {
     ["Delete", "Deleting", "Requested deletion of", "a scheduled task"],
     "schedule-delete",
   ),
+  request_secret: tool(["Ask for", "Asking for", "Asked for", "a secret"], "secret-request"),
   create_threads: tool(["Create", "Creating", "Created", "cz threads"], "thread-create"),
   cz_thread_start: tool(["Start", "Starting", "Started", "a cz thread"], "thread-create"),
   cz_thread_list: tool(["List", "Listing", "Listed", "cz threads"], "thread-list"),
@@ -284,6 +288,8 @@ const CZ_MCP_TOOLS: Readonly<Record<string, CzMcpToolDefinition>> = {
     "attachment-discard",
   ),
   cz_thread_send_attachments: tool(["Send", "Sending", "Sent", "attachments"], "attachment-send"),
+  html_preview: tool(["Preview", "Previewing", "Previewed", "an HTML page"], "html-preview"),
+  html_render: tool(["Render", "Rendering", "Rendered", "an HTML page"], "html-render"),
 };
 
 /**
@@ -324,7 +330,22 @@ function resolveCzMcpToolName(value: string): string | null {
 
   const prefixed = /^(?:mcp[-_]{1,2})?cz[-_ ]?code(?:__|[-_.:/ ])(?<tool>.+)$/i.exec(label);
   const candidate = prefixed?.groups?.tool ?? label;
-  return Object.hasOwn(CZ_MCP_TOOLS, candidate) ? candidate : null;
+  if (Object.hasOwn(CZ_MCP_TOOLS, candidate)) return candidate;
+  // OpenCode 2 registers one server per thread, `czcode-<thread>`, and joins
+  // it to the tool with `_`. Thread ids can hold `_` too, so take the longest
+  // known tool name that ends the label.
+  if (!/^czcode-/i.test(label)) return null;
+  let longest: string | null = null;
+  for (const tool of Object.keys(CZ_MCP_TOOLS)) {
+    if (label.endsWith(`_${tool}`) && tool.length > (longest?.length ?? 0)) longest = tool;
+  }
+  return longest;
+}
+
+/** The bare cz tool name (`html_render`) for any provider's spelling of it. */
+export function resolveCzMcpToolId(toolName: string | null | undefined): string | null {
+  const name = toolName == null ? null : resolveCzMcpToolName(toolName);
+  return name !== null && Object.hasOwn(CZ_MCP_TOOLS, name) ? name : null;
 }
 
 export function resolveCzMcpToolDefinition(

@@ -4,7 +4,7 @@ import type { ServerConfig } from "@cz/contracts";
 import { EnvironmentId } from "@cz/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as Option from "effect/Option";
-import { Atom, AtomRegistry } from "effect/unstable/reactivity";
+import { Atom, AtomRegistry } from "effect/reactivity";
 
 import { createRemoteEnvironmentProjectionAtoms } from "./remote-environment-projections";
 

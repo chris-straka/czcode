@@ -6,7 +6,7 @@ import {
   type AtomCommandResult,
 } from "@cz/client-runtime/state/runtime";
 import { scopeProjectRef, scopeThreadRef } from "@cz/client-runtime/environment";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { type EnvironmentId, type ProjectIconOverride } from "@cz/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import * as Cause from "effect/Cause";

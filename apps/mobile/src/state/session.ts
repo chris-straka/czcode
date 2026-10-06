@@ -2,7 +2,7 @@ import { useAtomValue } from "@effect/atom-react";
 import { createEnvironmentSessionAtoms } from "@cz/client-runtime/state/session";
 import type { EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { connectionAtomRuntime } from "../connection/runtime";
 

@@ -8,7 +8,7 @@ import type { EnvironmentCatalogState } from "@cz/client-runtime/state/connectio
 import type { EnvironmentShellSummary } from "@cz/client-runtime/state/shell";
 import { EnvironmentId, type ServerConfig } from "@cz/contracts";
 import * as Option from "effect/Option";
-import { Atom, AtomRegistry } from "effect/unstable/reactivity";
+import { Atom, AtomRegistry } from "effect/reactivity";
 
 import { createWorkspaceConnectionAtoms } from "./workspace-connection-atoms";
 import { projectWorkspaceEnvironment, projectWorkspaceState } from "./workspaceModel";

@@ -8,7 +8,7 @@ import type {
   EnvironmentThreadShell,
 } from "@cz/client-runtime/state/shell";
 import type { EnvironmentId, ScopedProjectRef, ScopedThreadRef, ServerConfig } from "@cz/contracts";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { environmentProjects } from "./projects";
 import { environmentServerConfigsAtom, serverEnvironment } from "./server";

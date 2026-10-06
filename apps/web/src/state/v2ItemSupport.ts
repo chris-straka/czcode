@@ -7,7 +7,7 @@ import {
 } from "@cz/client-runtime/state/item-support";
 import type { EnvironmentId, ThreadId, TurnItemId } from "@cz/contracts";
 import { scopeThreadRef } from "@cz/client-runtime/environment";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 
 import { environmentThreadDetails } from "./threads";
 

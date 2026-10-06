@@ -3,7 +3,7 @@ import type { VcsRef } from "@cz/client-runtime/state/vcs";
 import { type AtomCommandResult, mapAtomCommandResult } from "@cz/client-runtime/state/runtime";
 import type { VcsSwitchRefInput, VcsSwitchRefResult } from "@cz/contracts";
 import * as Cause from "effect/Cause";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 
 import { shouldCheckoutNewTaskBranch } from "./new-task-context-presentation";
 

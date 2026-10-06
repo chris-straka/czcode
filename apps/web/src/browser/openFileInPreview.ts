@@ -10,7 +10,7 @@ import { mediaFileReference } from "@cz/client-runtime/media-reference";
 import { type AtomCommandResult, mapAtomCommandResult } from "@cz/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
 import * as Data from "effect/Data";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 
 import { resolveAssetUrl } from "~/assets/assetUrls";
 import {

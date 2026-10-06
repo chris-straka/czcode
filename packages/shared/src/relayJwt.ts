@@ -11,6 +11,9 @@ export const RELAY_MINT_RESPONSE_TYP = "cz-env-mint+jwt";
 export const RELAY_HEALTH_RESPONSE_TYP = "cz-env-health+jwt";
 export const RELAY_ACTIVITY_PUBLISH_TYP = "cz-env-activity+jwt";
 export const RELAY_MANAGED_TUNNEL_RECOVERY_TYP = "cz-env-managed-tunnel-recovery+jwt";
+export const RELAY_HOOK_DELIVERY_TYP = "cz-relay-hook-delivery+jwt";
+/** Header carrying the signed proof that a webhook request came from the relay. */
+export const RELAY_HOOK_DELIVERY_HEADER = "x-cz-relay-delivery";
 
 export class RelayJwtError extends Schema.TaggedError<RelayJwtError>()("RelayJwtError", {
   operation: Schema.Literals(["sign", "verify"]),

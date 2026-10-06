@@ -170,6 +170,7 @@ export default defineConfig({
       "czcode/no-test-in-loop": "error",
       "czcode/no-unscoped-has": "error",
       "czcode/namespace-node-imports": "error",
+      "czcode/require-suppression-reason": "error",
     },
     overrides: [
       {

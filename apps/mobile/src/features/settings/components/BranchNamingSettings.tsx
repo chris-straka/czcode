@@ -48,7 +48,7 @@ export function BranchNamingSettings(props: {
       {props.mode === "static" ? (
         <View className="gap-2 px-4 py-3">
           <Text className="text-sm text-foreground-muted">
-            Use czcode or czcode/ for czcode/add-search. Leave empty for no prefix.
+            Use cz or cz/ for cz/add-search. Leave empty for no prefix.
           </Text>
           <AppTextInput
             key={props.prefix}

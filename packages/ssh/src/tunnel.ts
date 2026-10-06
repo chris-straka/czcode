@@ -4,6 +4,7 @@ import {
   waitForHttpReady as waitForHttpReadyShared,
 } from "@cz/shared/httpReadiness";
 import { cliReleaseDownloadBaseUrl } from "@cz/shared/cliRelease";
+import * as KeyedLock from "@cz/shared/KeyedLock";
 import * as NetService from "@cz/shared/Net";
 import { extractJsonObject, fromLenientJson } from "@cz/shared/schemaJson";
 import { satisfiesSemverRange } from "@cz/shared/semver";
@@ -15,10 +16,9 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
-import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
-import { HttpClient } from "effect/unstable/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { HttpClient } from "effect/http";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import * as SshAuth from "./auth.ts";
 import {
@@ -90,7 +90,7 @@ interface SshTunnelEntry {
   readonly httpBaseUrl: string;
   readonly wsBaseUrl: string;
   readonly process: ChildProcessSpawner.ChildProcessHandle;
-  readonly scope: Scope.Scope;
+  readonly scope: Scope.Closeable;
 }
 
 type SshEnvironmentEffectContext =
@@ -1101,6 +1101,7 @@ const startSshTunnel = Effect.fn("ssh/tunnel.startSshTunnel")(function* (input: 
   readonly wsBaseUrl: string;
   readonly authOptions: SshAuth.SshAuthOptions;
   readonly remoteServerKind: "external" | "managed" | null;
+  readonly scope: Scope.Closeable;
 }): Effect.fn.Return<
   SshTunnelEntry,
   SshCommandError | SshInvalidTargetError | SshReadinessError,
@@ -1109,7 +1110,6 @@ const startSshTunnel = Effect.fn("ssh/tunnel.startSshTunnel")(function* (input: 
   | Path.Path
   | HttpClient.HttpClient
   | NetService.NetService
-  | Scope.Scope
 > {
   const hostSpec = yield* buildSshHostSpecEffect(input.resolvedTarget);
   const childEnvironment = yield* SshAuth.buildSshChildEnvironment({
@@ -1156,7 +1156,7 @@ const startSshTunnel = Effect.fn("ssh/tunnel.startSshTunnel")(function* (input: 
   const sshCommand = yield* resolveSshCommand;
   const tunnelCommand = [sshCommand, ...args];
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const scope = yield* Scope.Scope;
+  const { scope } = input;
   yield* Effect.logDebug("ssh.tunnel.spawn.start", {
     ...sshTargetLogFields(input.resolvedTarget),
     command: tunnelCommand,
@@ -1177,6 +1177,7 @@ const startSshTunnel = Effect.fn("ssh/tunnel.startSshTunnel")(function* (input: 
       }),
     )
     .pipe(
+      Effect.provideService(Scope.Scope, scope),
       Effect.mapError(
         (cause) =>
           new SshCommandError({
@@ -1325,7 +1326,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
 ): Effect.fn.Return<SshEnvironmentManagerShape, never, Scope.Scope> {
   const managerScope = yield* Scope.Scope;
   const tunnels = new Map<string, SshTunnelEntry>();
-  const targetLocks = new Map<string, Semaphore.Semaphore>();
+  const targetLocks = yield* KeyedLock.make<string>();
   const authSecrets = new Map<string, string>();
 
   // Keep one lock per target so reconnect cannot reuse a server while stop is pending.
@@ -1333,12 +1334,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
     key: string,
     effect: Effect.Effect<A, E, R>,
   ): Effect.fn.Return<A, E, R> {
-    let lock = targetLocks.get(key);
-    if (lock === undefined) {
-      lock = Semaphore.makeUnsafe(1);
-      targetLocks.set(key, lock);
-    }
-    return yield* lock.withPermits(1)(effect);
+    return yield* targetLocks.withLock(key, effect);
   });
 
   const closeTunnelEntry = Effect.fn("ssh/tunnel.closeTunnelEntry")(function* (
@@ -1530,7 +1526,8 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
           wsBaseUrl,
           authOptions,
           remoteServerKind: remoteLaunch.remoteServerKind,
-        }).pipe(Effect.provideService(Scope.Scope, entryScope)),
+          scope: entryScope,
+        }),
     }).pipe(
       Effect.onExit((exit) =>
         Exit.isSuccess(exit) ? Effect.void : Scope.close(entryScope, Exit.void).pipe(Effect.ignore),

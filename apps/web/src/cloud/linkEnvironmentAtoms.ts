@@ -38,6 +38,9 @@ export const updatePrimaryEnvironmentPreferences = createRuntimeCommand(connecti
   label: "web:cloud:update-primary-environment-preferences",
   scheduler: cloudLinkScheduler,
   concurrency: cloudLinkConcurrency,
-  execute: (input: { readonly target: CloudLinkTarget; readonly publishAgentActivity: boolean }) =>
-    updatePrimaryCloudPreferences(input),
+  execute: (input: {
+    readonly target: CloudLinkTarget;
+    readonly publishAgentActivity: boolean;
+    readonly holdWebhooksWhileOffline?: boolean;
+  }) => updatePrimaryCloudPreferences(input),
 });

@@ -76,7 +76,7 @@ export function BranchNamingSettings() {
           serverScoped
           settingKeys={["branchNamePrefix"]}
           title="Branch prefix"
-          description="For example, czcode or czcode/ produces czcode/add-search. Leave empty for no prefix."
+          description="For example, cz or cz/ produces cz/add-search. Leave empty for no prefix."
           resetAction={
             prefixMixed ||
             settings.branchNamePrefix !== DEFAULT_SERVER_SETTINGS.branchNamePrefix ? (

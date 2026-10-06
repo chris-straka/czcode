@@ -8,7 +8,7 @@ import * as Path from "effect/Path";
 
 import * as CzProjectFileLoader from "./CzProjectFileLoader.ts";
 
-const TestLayer = Layer.empty.pipe(
+const layerTest = Layer.empty.pipe(
   Layer.provideMerge(CzProjectFileLoader.layer),
   Layer.provideMerge(NodeServices.layer),
 );
@@ -26,7 +26,7 @@ const writeProjectFile = Effect.fn("writeProjectFile")(function* (cwd: string, c
   yield* fileSystem.writeFileString(path.join(cwd, "cz.json"), contents).pipe(Effect.orDie);
 });
 
-it.layer(TestLayer)("CzProjectFileLoader", (it) => {
+it.layer(layerTest)("CzProjectFileLoader", (it) => {
   describe("load", () => {
     it.effect("loads and decodes a valid cz.json", () =>
       Effect.gen(function* () {
