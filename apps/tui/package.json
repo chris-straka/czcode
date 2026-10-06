@@ -10,6 +10,10 @@
     "./api": {
       "types": "./src/api.ts",
       "default": "./src/api.ts"
+    },
+    "./hosts": {
+      "types": "./src/hostsEntry.d.ts",
+      "default": "./src/hosts.ts"
     }
   },
   "scripts": {

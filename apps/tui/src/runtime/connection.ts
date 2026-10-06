@@ -54,7 +54,8 @@ const relaySignerLayer = Layer.succeed(
   }),
 );
 
-export function makeTuiRuntime(options: TuiRuntimeOptions) {
+/** Everything the TUI's atoms run on: the shared connection stack on Node. */
+export function makeTuiConnectionLayer(options: TuiRuntimeOptions) {
   const httpClientLayer = layerRemoteHttpClient(fetch);
   const baseLayer = Layer.mergeAll(
     httpClientLayer,
@@ -82,14 +83,17 @@ export function makeTuiRuntime(options: TuiRuntimeOptions) {
     QueueHttp.layer,
     HostWakeHttp.layer,
   );
-  const connectionLayer = loaders.pipe(
+  return loaders.pipe(
     Layer.provideMerge(
       Connection.layerWithOptions({ usageLimitSources: true, usageLimitsCommand: true }),
     ),
     Layer.provideMerge(platformLayer),
   );
+}
+
+export function makeTuiRuntime(options: TuiRuntimeOptions) {
   const registry = AtomRegistry.make();
-  const runtime = Atom.runtime(connectionLayer);
+  const runtime = Atom.runtime(makeTuiConnectionLayer(options));
   return { registry, runtime };
 }
 

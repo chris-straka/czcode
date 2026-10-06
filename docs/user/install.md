@@ -41,6 +41,12 @@ through each provider sign-in, and prints a pairing link.
 | Pair a device over Tailscale          | `cz pair --tailscale` |
 | Ask the owner, read answers           | `cz inbox`            |
 | Run a task at the next quota reset    | `cz queue`            |
+| List threads, stop a run              | `cz thread`           |
+| Pair this terminal with a machine     | `cz host add <link>`  |
+
+`cz queue` and `cz thread` act on another machine with `--host <name>`, once
+`cz host add` (or the terminal app's Hosts tab) has paired with it. They share
+the terminal app's paired machines.
 
 Run `cz help` or `cz --help` for the full reference. To start in a new working
 directory, use an explicit path such as `cz ./my-project`. A bare directory name

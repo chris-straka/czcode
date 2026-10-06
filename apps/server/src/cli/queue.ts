@@ -5,28 +5,18 @@
  *
  * @module QueueCli
  */
-import {
-  AuthAdministrativeScopes,
-  EnvironmentHttpApi,
-  ProviderInstanceId,
-  type QueuedRun,
-} from "@cz/contracts";
+import { ProviderInstanceId, type QueuedRun } from "@cz/contracts";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
-import { Argument, Command, Flag, GlobalFlag } from "effect/cli";
-import { FetchHttpClient } from "effect/http";
-import * as HttpApiClient from "effect/http-api/HttpApiClient";
+import { Argument, Command, Flag } from "effect/cli";
 
-import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
-import * as ServerConfig from "../config.ts";
-import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
-import { baseDirFlag, resolveCliAuthConfig } from "./config.ts";
+import { baseDirFlag } from "./config.ts";
+import { hostFlag, withServer } from "./serverClient.ts";
 
 export class QueueCliError extends Schema.TaggedError<QueueCliError>()("QueueCliError", {
   message: Schema.String,
@@ -37,48 +27,10 @@ const encodeJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown
 const jsonFlag = Flag.Boolean("json").pipe(Flag.withDefault(false));
 const idArgument = Argument.String("id");
 
-type ServerClient = HttpApiClient.ForApi<typeof EnvironmentHttpApi>;
-
-/** Runs `run` against the running server with a short-lived admin session. */
-const withServer = <A, E, R>(
-  baseDir: Option.Option<string>,
-  run: (api: {
-    readonly queue: ServerClient["queue"];
-    readonly projects: ServerClient["projects"];
-    readonly headers: { readonly authorization: string };
-  }) => Effect.Effect<A, E, R>,
-) =>
-  Effect.gen(function* () {
-    const logLevel = yield* GlobalFlag.LogLevel;
-    const config = yield* resolveCliAuthConfig({ baseDir }, logLevel);
-    return yield* Effect.gen(function* () {
-      const runtimeState = yield* readPersistedServerRuntimeState(config.serverRuntimeStatePath);
-      if (Option.isNone(runtimeState)) {
-        return yield* fail("cz isn't running. Start it (cz or the desktop app), then try again.");
-      }
-      const auth = yield* EnvironmentAuth.EnvironmentAuth;
-      const client = yield* HttpApiClient.make(EnvironmentHttpApi, {
-        baseUrl: runtimeState.value.origin,
-      });
-      return yield* Effect.acquireUseRelease(
-        auth.issueSession({ scopes: AuthAdministrativeScopes, label: "cz queue cli" }),
-        (issued) =>
-          run({
-            queue: client.queue,
-            projects: client.projects,
-            headers: { authorization: `Bearer ${issued.token}` },
-          }),
-        (issued) => auth.revokeSession(issued.sessionId).pipe(Effect.ignore({ log: true })),
-      );
-    }).pipe(
-      Effect.provide(
-        EnvironmentAuth.layerRuntime.pipe(
-          Layer.provideMerge(FetchHttpClient.layer),
-          Layer.provide(ServerConfig.layer(config)),
-        ),
-      ),
-    );
-  });
+const sessionInput = (flags: {
+  readonly baseDir: Option.Option<string>;
+  readonly host: Option.Option<string>;
+}) => ({ baseDir: flags.baseDir, host: flags.host, sessionLabel: "cz queue cli" });
 
 const describeRun = (run: QueuedRun, now: number) => {
   const when =
@@ -92,9 +44,12 @@ const describeRun = (run: QueuedRun, now: number) => {
 
 const addCommand = Command.make("add", {
   baseDir: baseDirFlag,
+  host: hostFlag,
   json: jsonFlag,
   project: Flag.String("project").pipe(
-    Flag.withDescription("Project path or id (default: the current directory)."),
+    Flag.withDescription(
+      "Project path, id, or name (default: the current directory). With --host, a path on that machine.",
+    ),
     Flag.optional,
   ),
   model: Flag.String("model").pipe(
@@ -113,7 +68,7 @@ const addCommand = Command.make("add", {
 }).pipe(
   Command.withDescription("Queue a task to start as a thread when the model's quota resets."),
   Command.withHandler((flags) =>
-    withServer(flags.baseDir, ({ queue, projects, headers }) =>
+    withServer(sessionInput(flags), ({ client, headers }) =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
         const slash = flags.model.indexOf("/");
@@ -139,14 +94,18 @@ const addCommand = Command.make("add", {
           return yield* fail(`Can't read --at ${Option.getOrElse(flags.at, () => "")} as a time.`);
         }
         const wanted = Option.getOrElse(flags.project, () => process.cwd());
-        const snapshot = yield* projects.snapshot({ headers });
+        const snapshot = yield* client.projects.snapshot({ headers });
         const live = snapshot.projects.filter((project) => project.deletedAt === null);
         const project =
           live.find((candidate) => candidate.id === wanted) ??
-          live.find((candidate) => candidate.workspaceRoot === path.resolve(wanted));
+          live.find((candidate) => candidate.workspaceRoot === wanted) ??
+          (Option.isNone(flags.host)
+            ? live.find((candidate) => candidate.workspaceRoot === path.resolve(wanted))
+            : undefined) ??
+          live.find((candidate) => candidate.title === wanted);
         if (!project) return yield* fail(`No cz project at ${wanted}. Add it with cz project add.`);
         const firstLine = flags.prompt.trim().split("\n")[0] ?? "";
-        const run = yield* queue.enqueue({
+        const run = yield* client.queue.enqueue({
           headers,
           payload: {
             title: Option.getOrElse(flags.title, () => firstLine.slice(0, 80)),
@@ -169,12 +128,16 @@ const addCommand = Command.make("add", {
   ),
 );
 
-const listCommand = Command.make("list", { baseDir: baseDirFlag, json: jsonFlag }).pipe(
+const listCommand = Command.make("list", {
+  baseDir: baseDirFlag,
+  host: hostFlag,
+  json: jsonFlag,
+}).pipe(
   Command.withDescription("Queued runs by start time, then recent ones."),
   Command.withHandler((flags) =>
-    withServer(flags.baseDir, ({ queue, headers }) =>
+    withServer(sessionInput(flags), ({ client, headers }) =>
       Effect.gen(function* () {
-        const { runs } = yield* queue.list({ headers });
+        const { runs } = yield* client.queue.list({ headers });
         if (flags.json) return yield* Console.log(encodeJson(runs));
         const now = yield* Clock.currentTimeMillis;
         yield* Console.log(
@@ -188,13 +151,15 @@ const listCommand = Command.make("list", { baseDir: baseDirFlag, json: jsonFlag 
 );
 
 const mutationCommand = (name: "cancel" | "run-now", description: string) =>
-  Command.make(name, { baseDir: baseDirFlag, id: idArgument }).pipe(
+  Command.make(name, { baseDir: baseDirFlag, host: hostFlag, id: idArgument }).pipe(
     Command.withDescription(description),
     Command.withHandler((flags) =>
-      withServer(flags.baseDir, ({ queue, headers }) =>
+      withServer(sessionInput(flags), ({ client, headers }) =>
         Effect.gen(function* () {
           const request = { headers, params: { id: flags.id } };
-          const run = yield* name === "cancel" ? queue.cancel(request) : queue.runNow(request);
+          const run = yield* name === "cancel"
+            ? client.queue.cancel(request)
+            : client.queue.runNow(request);
           yield* Console.log(describeRun(run, yield* Clock.currentTimeMillis));
         }),
       ),

@@ -10,7 +10,6 @@ import type { LocalServer, TuiModule } from "@cz/tui/api";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { Command, GlobalFlag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
@@ -21,17 +20,11 @@ import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { baseDirFlag, resolveCliAuthConfig } from "./config.ts";
+import { tuiConfigDir } from "./serverClient.ts";
 
 export class TuiCliError extends Schema.TaggedError<TuiCliError>()("TuiCliError", {
   message: Schema.String,
 }) {}
-
-/** `$XDG_CONFIG_HOME/czcode/tui`, else `~/.config/czcode/tui`: saved connections. */
-const tuiConfigDir = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const base = process.env.XDG_CONFIG_HOME?.trim() || path.join(NodeOS.homedir(), ".config");
-  return path.join(base, "czcode", "tui");
-});
 
 // Loaded lazily so `cz serve` never pays for Ink and React. The package's
 // "types" entry declares only runTui, keeping its DOM-typed client code out

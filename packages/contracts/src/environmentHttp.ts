@@ -67,6 +67,12 @@ import {
 } from "./resetQueue.ts";
 import { AndroidReleaseResult } from "./mobileRelease.ts";
 import { WakeHostInput, WakeHostResult } from "./hostWake.ts";
+import {
+  ThreadControlListResult,
+  ThreadControlNotFoundError,
+  ThreadStopInput,
+  ThreadStopResult,
+} from "./threadControl.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import {
   PullRequestDiffInput,
@@ -845,6 +851,24 @@ const webhookEndpoint = {
 } as const;
 const WEBHOOK_PATH = "/api/hooks/:hookId/:token";
 
+/** Lists threads and stops their runs, for `cz thread` (fork). */
+class EnvironmentThreadsHttpApi extends HttpApiGroup.make("threads")
+  .add(
+    HttpApiEndpoint.get("list", "/api/threads", {
+      headers: OptionalBearerHeaders,
+      success: ThreadControlListResult,
+      error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("stop", "/api/threads/stop", {
+      headers: OptionalBearerHeaders,
+      payload: ThreadStopInput,
+      success: ThreadStopResult,
+      error: [ThreadControlNotFoundError, EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 class EnvironmentWebhooksHttpApi extends HttpApiGroup.make("webhooks")
   .add(HttpApiEndpoint.post("webhookPost", WEBHOOK_PATH, webhookEndpoint))
   .add(HttpApiEndpoint.put("webhookPut", WEBHOOK_PATH, webhookEndpoint))
@@ -862,4 +886,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentQueueHttpApi)
   .add(EnvironmentMobileReleaseHttpApi)
   .add(EnvironmentHostWakeHttpApi)
+  .add(EnvironmentThreadsHttpApi)
   .add(EnvironmentWebhooksHttpApi) {}

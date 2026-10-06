@@ -18,7 +18,9 @@ import { authCommand } from "./cli/auth.ts";
 import { appCommand } from "./cli/app.ts";
 import { inboxCommand } from "./cli/inbox.ts";
 import { pairCommand } from "./cli/pair.ts";
+import { hostCommand } from "./cli/host.ts";
 import { queueCommand } from "./cli/queue.ts";
+import { threadCommand } from "./cli/thread.ts";
 import { sharedServerCommandFlags } from "./cli/config.ts";
 import { projectCommand } from "./cli/project.ts";
 import { runDefaultServerCommand, serveCommand, startCommand } from "./cli/server.ts";
@@ -55,6 +57,8 @@ export const makeCli = () =>
       pairCommand,
       inboxCommand,
       queueCommand,
+      threadCommand,
+      hostCommand,
       tuiCommand,
       authCommand,
       projectCommand,
