@@ -324,6 +324,26 @@ if ! gh auth status > /dev/null 2>&1; then
 fi
 gh auth setup-git
 
+if ! $in_wsl && [ -n "$wired" ] &&
+  [ "$(basename "$(readlink -f "/sys/class/net/$wired/device/driver")")" = alx ]; then
+  step "Wake-on-LAN driver for the Killer network chip"
+  # Linux's alx driver dropped Wake-on-LAN in 2013; chris-straka/alx-wol puts
+  # it back and rebuilds with each kernel (DKMS).
+  if dkms status alx-wol 2> /dev/null | grep -q installed; then
+    echo "Already installed."
+  else
+    tmp=$(mktemp -d)
+    git clone -q https://github.com/chris-straka/alx-wol "$tmp/alx-wol"
+    ver=$(sed -n 's/^PACKAGE_VERSION="\(.*\)"/\1/p' "$tmp/alx-wol/dkms.conf")
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq dkms > /dev/null
+    sudo rm -rf "/usr/src/alx-wol-$ver"
+    sudo cp -r "$tmp/alx-wol" "/usr/src/alx-wol-$ver"
+    sudo rm -rf "/usr/src/alx-wol-$ver/.git" "$tmp"
+    sudo dkms install "alx-wol/$ver"
+    echo "Installed. Restart this PC, then run this script again to turn on sleep-when-idle."
+  fi
+fi
+
 step "Pair your phone and desktop"
 systemctl --user --no-pager --lines=0 status "$UNIT" | head -3
 cz pair --tailscale || echo "Pairing failed; check: journalctl --user -u $UNIT"

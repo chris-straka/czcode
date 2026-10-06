@@ -34,7 +34,10 @@ Bevy games need. Set `CZ_HOST_TOOLS=0` before the command to skip them.
 
 It also tunes the machine (`tune-host-linux.sh`): compressed swap in RAM
 (zram), a disk swap file up to 16 GB, higher file-watcher limits, and caps on
-log sizes. czcode starts with Codex using this machine's own sign-in and with
+log sizes. On PCs with a Killer (Atheros `alx`) network chip it installs
+[alx-wol](https://github.com/chris-straka/alx-wol), so they can sleep and be
+woken over the network too; restart and run the script again afterwards.
+czcode starts with Codex using this machine's own sign-in and with
 Claude Opus as the default model for new threads.
 
 To add or update the tools on a host that's already set up, run:
