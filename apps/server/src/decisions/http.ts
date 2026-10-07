@@ -30,6 +30,7 @@ import {
 } from "../auth/http.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { signPayload, timingSafeEqualBase64Url } from "../auth/utils.ts";
+import { assetFileResponse } from "../http.ts";
 import * as DecisionService from "./DecisionService.ts";
 
 export const DECISION_MEDIA_ROUTE_PREFIX = "/api/decision-media";
@@ -165,9 +166,11 @@ export const decisionMediaRouteLayer = HttpRouter.add(
     const decisions = yield* DecisionService.DecisionService;
     const path = yield* decisions.mediaPath(key);
     if (Option.isNone(path)) return notFound;
-    return yield* HttpServerResponse.file(path.value, {
-      contentType: mime,
-      headers: { "cache-control": "private, max-age=3600", "x-content-type-options": "nosniff" },
-    }).pipe(Effect.orElseSucceed(() => notFound));
+    // Range-aware, so the app's video and audio players can seek.
+    return yield* assetFileResponse(
+      { path: path.value, mimeType: mime },
+      request.headers.range,
+      request.headers["if-range"],
+    ).pipe(Effect.orElseSucceed(() => notFound));
   }),
 );
