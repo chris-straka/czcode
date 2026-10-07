@@ -22,6 +22,17 @@ export function useDecisionMediaUrl(
   return resolveAssetUrl(connection.value.httpBaseUrl, media.url);
 }
 
+/** Resolves any of a host's decision media to a loadable URL. */
+export function useDecisionMediaResolver(
+  environmentId: EnvironmentId,
+): (media: DecisionMediaRef | null | undefined) => string | null {
+  const connection = usePreparedConnection(environmentId);
+  return (media) =>
+    media?.url && connection._tag === "Some"
+      ? resolveAssetUrl(connection.value.httpBaseUrl, media.url)
+      : null;
+}
+
 /** Plays one sound; tap to play or pause, the loop toggle repeats it. */
 export function DecisionAudio({ uri, label }: { uri: string; label?: string }) {
   const player = useAudioPlayer({ uri }, { updateInterval: 250 });
@@ -106,19 +117,43 @@ document.getElementById("clay").onclick=()=>{clay=!clay;m.model.materials.forEac
   );
 }
 
-/** One attachment, sized for a card (`compact`) or the full view. */
+/**
+ * The one frame every option's media shares, so options of different shapes
+ * line up: fixed aspect, contained, on a neutral letterbox.
+ */
+export const OPTION_FRAME_STYLE = { width: "100%", aspectRatio: 4 / 3, borderRadius: 10 } as const;
+
+/** One attachment, sized for a card (`compact`), an option tile (`framed`), or the full view. */
 export function DecisionMedia({
   environmentId,
   media,
   compact = false,
+  framed = false,
 }: {
   environmentId: EnvironmentId;
   media: DecisionMediaRef;
   compact?: boolean;
+  framed?: boolean;
 }) {
   const uri = useDecisionMediaUrl(environmentId, media);
   if (!uri)
-    return <View className={compact ? "h-20 rounded-lg bg-subtle" : "h-48 rounded-lg bg-subtle"} />;
+    return framed ? (
+      <View className="bg-subtle" style={OPTION_FRAME_STYLE} />
+    ) : (
+      <View className={compact ? "h-20 rounded-lg bg-subtle" : "h-48 rounded-lg bg-subtle"} />
+    );
+  if (framed && media.type === "image") {
+    return (
+      <View className="overflow-hidden bg-subtle" style={OPTION_FRAME_STYLE}>
+        <Image
+          source={{ uri }}
+          accessibilityLabel={media.caption ?? media.name}
+          contentFit="contain"
+          style={{ width: "100%", height: "100%" }}
+        />
+      </View>
+    );
+  }
   switch (media.type) {
     case "image":
       return (

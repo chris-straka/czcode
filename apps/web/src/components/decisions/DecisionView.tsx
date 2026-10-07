@@ -26,6 +26,7 @@ import {
   type ReactNode,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -113,6 +114,13 @@ export function DecisionView({
     readonly optionIds?: ReadonlyArray<string>;
   } | null>(null);
   const title = item.title || item.question;
+  const fullScreenImages = useMemo<FullScreenImages>(
+    () => ({
+      open: (images, index, optionIds) =>
+        setFullScreen({ images, index, ...(optionIds ? { optionIds } : {}) }),
+    }),
+    [],
+  );
 
   const pickOption = (id: string) => {
     if (item.kind !== "pick") return;
@@ -127,7 +135,7 @@ export function DecisionView({
   // Keys: j/k scroll, 1-9 pick, Enter sends, n/p (J/K) step through Review
   // all, Esc closes. A text field keeps its keys; Esc there leaves it first.
   const keyHandler = useRef<(event: KeyboardEvent) => void>(() => {});
-  keyHandler.current = (event) => {
+  const onKey = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
     if (fullScreen !== null) return;
     if (isTypingTarget(event.target)) {
@@ -177,6 +185,9 @@ export function DecisionView({
     })();
     if (handled) event.preventDefault();
   };
+  useEffect(() => {
+    keyHandler.current = onKey;
+  });
   useEffect(() => {
     const listener = (event: KeyboardEvent) => keyHandler.current(event);
     window.addEventListener("keydown", listener);
@@ -265,12 +276,7 @@ export function DecisionView({
             <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
           ) : null}
           <UploadContext value={onUpload}>
-            <FullScreenContext
-              value={{
-                open: (images, index, optionIds) =>
-                  setFullScreen({ images, index, ...(optionIds ? { optionIds } : {}) }),
-              }}
-            >
+            <FullScreenContext value={fullScreenImages}>
               <DecisionBody entry={entry} draft={draft} update={update} />
             </FullScreenContext>
           </UploadContext>

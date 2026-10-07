@@ -3,12 +3,13 @@ import { View } from "react-native";
 
 import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { AppText as Text } from "../../components/AppText";
-import { useOpenDecisions } from "../../state/decisions";
+import { useFilteredOpenDecisions } from "../../state/decisions";
 
 /** Header button to the Decisions feed, badged with the open count. */
 export function DecisionsHeaderButton() {
   const navigation = useNavigation();
-  const count = useOpenDecisions().entries.length;
+  // Counts what the feed shows under its filters, so the two agree.
+  const count = useFilteredOpenDecisions().entries.length;
   return (
     <View>
       <AndroidHeaderIconButton
