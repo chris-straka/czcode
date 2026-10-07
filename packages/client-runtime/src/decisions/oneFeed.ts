@@ -61,10 +61,6 @@ export function machineMatches(filter: MachineFilter, environmentId: Environment
 
 const threadKey = (environmentId: string, threadId: string) => `${environmentId}\u0000${threadId}`;
 
-function newestFirst(a: string, b: string): number {
-  return Date.parse(b) - Date.parse(a);
-}
-
 /**
  * Builds the feed: needs-you cards first (decision order, then threads
  * waiting on approvals or input, newest first), then the rest newest first.
@@ -147,14 +143,12 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
   }
 
   const updatedAt = (card: OneFeedCard<T, D>) =>
-    card.kind === "thread"
-      ? card.thread.updatedAt
-      : new Date(card.decision.item.created_at).toISOString();
+    card.kind === "thread" ? Date.parse(card.thread.updatedAt) : card.decision.item.created_at;
   return [
     ...needsYou
-      .toSorted((a, b) => a.rank - b.rank || newestFirst(updatedAt(a.card), updatedAt(b.card)))
+      .toSorted((a, b) => a.rank - b.rank || updatedAt(b.card) - updatedAt(a.card))
       .map(({ card }) => card),
-    ...rest.toSorted((a, b) => newestFirst(a.thread.updatedAt, b.thread.updatedAt)),
+    ...rest.toSorted((a, b) => updatedAt(b) - updatedAt(a)),
   ];
 }
 
