@@ -12,7 +12,7 @@ This folder (`ccez/`) holds everything fork-specific that isn't product code:
 this plan, phase logs (`ccez/docs/phase-N.md`), brand sources, the rename
 and the rename script.
 
-## What exists today
+## What existed at the start (2026-10-04)
 
 - **T3 Code** (this repo, `chris-straka/czcode` at `~/SWE/czcode`, renamed from
   `t3code` on 2026-10-04; fork of `pingdotgg/t3code`, MIT, TypeScript):
@@ -63,18 +63,20 @@ and the rename script.
   Connect's relay and Clerk sign-in are removed. **No push notifications**
   (the owner checks in on their own time; push dropped from the plan
   2026-10-05). No analytics leave the owner's machines.
-- **Home machines:** the M4 Mac mini stays awake as the main desktop; two
-  Windows PCs are additional agent hosts when needed. Each host has Tailscale,
+- **Home machines:** the M4 Mac mini stays awake as the main desktop; Ubuntu
+  PCs (`basement`, `f-ms-7917`, `art-ms-7917`, set up by `ccez/hosts/linux.sh`)
+  are additional agent hosts, and `ccez/hosts/mac.sh` sets up an account on a
+  shared Mac. Each host has Tailscale,
   czcode, its own projects, and the providers it will run installed and
   authenticated locally. Each client pairs once with each host it will use.
   Reuse upstream's optional web/desktop load balancing for new threads in
   projects grouped across connected machines, based on available CPU, memory,
   and machine preferences. Existing threads stay on their original host;
   mobile selects the host manually. Connect is not needed for balancing.
-  Windows PCs can sleep when unused and must be awake with czcode running
-  before receiving work. Wake-on-LAN from the Mac is optional setup requiring
-  validation on both PCs; automatic wake/sleep and mobile load balancing are
-  separate work, not assumed upstream capabilities.
+  Linux hosts on Ethernet sleep after 30 idle minutes and any cz server on
+  the LAN wakes them when a client needs them (Mac hosts stay awake with
+  `caffeinate`; Windows/WSL hosts never sleep on AC power). Mobile load
+  balancing is separate work.
 - **Desktop: T3's Electron app, rebranded to cz** (owner's call,
   2026-10-04, after weighing Tauri). It keeps Chromium rendering, the
   built-in Node that runs the server, the web-preview browser and cookie
