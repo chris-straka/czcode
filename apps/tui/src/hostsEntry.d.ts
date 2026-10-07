@@ -6,3 +6,4 @@ import type { HostsModule } from "./api.ts";
 export type { PairedHost } from "./api.ts";
 export declare const listHosts: HostsModule["listHosts"];
 export declare const pairHost: HostsModule["pairHost"];
+export declare const removeHost: HostsModule["removeHost"];

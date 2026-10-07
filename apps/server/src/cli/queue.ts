@@ -64,6 +64,10 @@ const addCommand = Command.make("add", {
     Flag.withDescription("Start at this time instead of the provider's next reset."),
     Flag.optional,
   ),
+  now: Flag.Boolean("now").pipe(
+    Flag.withDescription("Start now if the model has quota left, instead of at its next reset."),
+    Flag.withDefault(false),
+  ),
   prompt: Argument.String("prompt"),
 }).pipe(
   Command.withDescription("Queue a task to start as a thread when the model's quota resets."),
@@ -118,6 +122,7 @@ const addCommand = Command.make("add", {
             },
             source: "cli",
             ...(Option.isSome(dueAt) ? { dueAt: dueAt.value } : {}),
+            ...(flags.now ? { start: "when-available" as const } : {}),
           },
         });
         yield* Console.log(

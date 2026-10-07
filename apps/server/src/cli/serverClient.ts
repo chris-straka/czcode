@@ -20,6 +20,7 @@ import { czConfigDir } from "@cz/shared/configDir";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
+import { findMachine } from "../machines/machines.ts";
 import { resolveCliAuthConfig } from "./config.ts";
 
 export class ServerClientError extends Schema.TaggedError<ServerClientError>()(
@@ -51,16 +52,7 @@ export const machineListDir = Effect.sync(() => czConfigDir());
 export const loadHosts = (): Promise<HostsModule> => import("@cz/tui/hosts");
 
 /** A paired host by its label, environment id, or address. */
-export function findHost(hosts: ReadonlyArray<PairedHost>, wanted: string): PairedHost | undefined {
-  const needle = wanted.trim().toLowerCase();
-  return hosts.find(
-    (host) =>
-      host.label.toLowerCase() === needle ||
-      host.environmentId === wanted ||
-      new URL(host.httpBaseUrl).hostname.toLowerCase().split(".")[0] === needle ||
-      new URL(host.httpBaseUrl).hostname.toLowerCase() === needle,
-  );
-}
+export const findHost = findMachine<PairedHost>;
 
 const remoteAccess = (wanted: string) =>
   Effect.gen(function* () {
@@ -74,7 +66,7 @@ const remoteAccess = (wanted: string) =>
     if (!host) {
       const known = hosts.map((entry) => entry.label).join(", ") || "none yet";
       return yield* new ServerClientError({
-        message: `No paired machine called ${wanted} (paired: ${known}). Pair one with cz host add <link>.`,
+        message: `No paired machine called ${wanted} (paired: ${known}). Sign in to one with cz host add <name or link>.`,
       });
     }
     const client = yield* HttpApiClient.make(EnvironmentHttpApi, { baseUrl: host.httpBaseUrl });

@@ -6,6 +6,8 @@
  * @module hosts
  */
 import { BearerConnectionProfile, ConnectionOnboarding } from "@cz/client-runtime/connection";
+import { removeConnectionFromCatalog } from "@cz/client-runtime/platform";
+import type { EnvironmentId } from "@cz/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -67,3 +69,19 @@ export const pairHost: HostsModule["pairHost"] = async ({ configDir, pairingUrl,
     await runtime.dispose();
   }
 };
+
+export const removeHost: HostsModule["removeHost"] = (configDir, environmentId) =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const catalog = yield* CatalogFile.openInConfigDir(configDir);
+      const saved = (yield* catalog.read).targets.some(
+        (target) => target.environmentId === environmentId,
+      );
+      if (saved) {
+        yield* catalog.update((document) =>
+          removeConnectionFromCatalog(document, environmentId as EnvironmentId),
+        );
+      }
+      return saved;
+    }).pipe(Effect.provide(NodeServices.layer)),
+  );

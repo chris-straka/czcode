@@ -83,6 +83,8 @@ import { queueHttpApiLayer } from "./resetQueue/http.ts";
 import { threadsHttpApiLayer } from "./threadControl/http.ts";
 import { mobileReleaseApkRouteLayer, mobileReleaseHttpApiLayer } from "./mobileRelease/http.ts";
 import * as HostWakeService from "./hostWake/HostWakeService.ts";
+import * as MachineDirectory from "./machines/MachineDirectory.ts";
+import { machinesHttpApiLayer } from "./machines/http.ts";
 import { hostWakeHttpApiLayer, hostWakeInfoRouteLayer } from "./hostWake/http.ts";
 import * as MobileReleaseService from "./mobileRelease/MobileReleaseService.ts";
 import { decisionMediaRouteLayer, decisionsHttpApiLayer } from "./decisions/http.ts";
@@ -666,6 +668,8 @@ const layerRuntimeDependencies = DecisionFollowUps.layer.pipe(
   // Sleeps a spare host when idle; reads the queue to wake for its next run.
   Layer.provideMerge(HostSleepService.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provideMerge(AgentScopesService.layer),
+  // Queues work on other machines, so it sits above the queue.
+  Layer.provideMerge(MachineDirectory.layer),
   Layer.provideMerge(ResetQueueService.layer),
   Layer.provideMerge(layerRuntimeServices),
 );
@@ -691,6 +695,7 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(queueHttpApiLayer),
       Layer.provide(mobileReleaseHttpApiLayer),
       Layer.provide(hostWakeHttpApiLayer),
+      Layer.provide(machinesHttpApiLayer),
       Layer.provide(threadsHttpApiLayer.pipe(Layer.provide(ProjectionStoreV2.layer))),
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
       Layer.provide(WebhookRoute.layer.pipe(Layer.provide(RelayDeliveryProof.layer))),

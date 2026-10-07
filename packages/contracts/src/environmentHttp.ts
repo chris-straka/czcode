@@ -78,6 +78,14 @@ import {
   QueuedRunListResult,
   QueuedRunNotFoundError,
 } from "./resetQueue.ts";
+import {
+  MachineError,
+  MachineListResult,
+  MachinePairInput,
+  MachinePairResult,
+  MachinePairingLinkInput,
+  MachinePairingLinkResult,
+} from "./machines.ts";
 import { AndroidReleaseResult } from "./mobileRelease.ts";
 import { WakeHostInput, WakeHostResult } from "./hostWake.ts";
 import {
@@ -889,6 +897,32 @@ class EnvironmentMobileReleaseHttpApi extends HttpApiGroup.make("mobileRelease")
   }).middleware(EnvironmentAuthenticatedAuth),
 ) {}
 
+/** The machines on the tailnet, and signing devices in to them (fork). */
+class EnvironmentMachinesHttpApi extends HttpApiGroup.make("machines")
+  .add(
+    HttpApiEndpoint.get("list", "/api/machines", {
+      headers: OptionalBearerHeaders,
+      success: MachineListResult,
+      error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("pairingLink", "/api/machines/pairing-link", {
+      headers: OptionalBearerHeaders,
+      payload: MachinePairingLinkInput,
+      success: MachinePairingLinkResult,
+      error: [MachineError, EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("pair", "/api/machines/pair", {
+      headers: OptionalBearerHeaders,
+      payload: MachinePairInput,
+      success: MachinePairResult,
+      error: [MachineError, EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 /** Asks this server to wake a sleeping host on its LAN (fork). */
 class EnvironmentHostWakeHttpApi extends HttpApiGroup.make("hostWake").add(
   HttpApiEndpoint.post("wake", "/api/hosts/wake", {
@@ -952,5 +986,6 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentQueueHttpApi)
   .add(EnvironmentMobileReleaseHttpApi)
   .add(EnvironmentHostWakeHttpApi)
+  .add(EnvironmentMachinesHttpApi)
   .add(EnvironmentThreadsHttpApi)
   .add(EnvironmentWebhooksHttpApi) {}

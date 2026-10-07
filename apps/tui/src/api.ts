@@ -42,4 +42,6 @@ export interface HostsModule {
     readonly pairingUrl: string;
     readonly appVersion: string;
   }) => Promise<{ readonly environmentId: string; readonly label: string }>;
+  /** Forgets a machine on this computer (every app here); false when it wasn't saved. */
+  readonly removeHost: (configDir: string, environmentId: string) => Promise<boolean>;
 }

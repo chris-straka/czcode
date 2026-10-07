@@ -49,6 +49,8 @@ import { WorktreeToolkit } from "./toolkits/worktree/tools.ts";
 import * as WorktreeMcpService from "./WorktreeMcpService.ts";
 import { DecisionsToolkitHandlersLive } from "./toolkits/decisions/handlers.ts";
 import { DecisionsToolkit } from "./toolkits/decisions/tools.ts";
+import { MachinesToolkitHandlersLive } from "./toolkits/machines/handlers.ts";
+import { MachinesToolkit } from "./toolkits/machines/tools.ts";
 import * as PullRequestsHandlers from "./toolkits/pullRequests/handlers.ts";
 import { PullRequestsToolkit } from "./toolkits/pullRequests/tools.ts";
 import * as DeviceHandlers from "./toolkits/device/handlers.ts";
@@ -834,6 +836,8 @@ const layerDeviceStandardToolkitRegistration = toolkitRegistration(
 
 const layerDecisionsToolkit = toolkitRegistration(DecisionsToolkit, DecisionsToolkitHandlersLive);
 
+const layerMachinesToolkit = toolkitRegistration(MachinesToolkit, MachinesToolkitHandlersLive);
+
 const layerDeviceScreenshotRegistration = imageToolRegistration(
   registerDeviceScreenshot(),
   DeviceHandlers.layerScreenshot,
@@ -862,6 +866,7 @@ export const layer = Layer.mergeAll(
   layerWorktreeToolkitRegistration,
   layerPullRequestsToolkit,
   layerDecisionsToolkit,
+  layerMachinesToolkit,
   layerDeviceToolkit,
   layerHtmlToolkit,
 ).pipe(Layer.provideMerge(layerMcpTransport));
