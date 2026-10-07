@@ -8,6 +8,7 @@ import { StatusContext } from "./command.ts";
 import { FleetScreen } from "./FleetScreen.ts";
 import { HostsScreen } from "./HostsScreen.ts";
 import { NewThreadScreen } from "./NewThreadScreen.ts";
+import { decisionFeed } from "../model/decisionFeed.ts";
 import { projectScope } from "../model/scope.ts";
 import { DecisionsScreen, openDecisionsAtom } from "./DecisionsScreen.ts";
 import { DiffScreen } from "./DiffScreen.ts";
@@ -47,16 +48,18 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
   const [allProjects, setAllProjects] = useState(false);
   const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
   const shells = useAtomValue(shellsAtom);
-  // Every machine's open decisions, as the desktop sidebar badge counts them.
+  // Open decisions on every machine, counted the way the Decisions tab filters
+  // them (this project, or all with `a`), as the desktop badge does.
   const decisionsAtom = useMemo(() => openDecisionsAtom(atoms), [atoms]);
-  const openDecisionCount = useAtomValue(decisionsAtom).hosts.reduce(
-    (sum, host) => sum + host.items.length,
-    0,
-  );
+  const decisionHosts = useAtomValue(decisionsAtom).hosts;
   const tabLabel = (name: Tab, index: number) =>
     `${index + 1} ${name}${name === "Decisions" && openDecisionCount > 0 ? ` ${openDecisionCount}` : ""}`;
   const scope = useMemo(() => projectScope(shells, cwd), [shells, cwd]);
   const scopeKeys = allProjects || scope === null ? null : scope.keys;
+  const openDecisionCount = useMemo(
+    () => decisionFeed(decisionHosts, allProjects || scope === null ? null : scope.names).length,
+    [decisionHosts, allProjects, scope],
+  );
   const [status, setStatusText] = useState("");
   const setStatus = useCallback((message: string) => setStatusText(message), []);
   useEffect(() => {
@@ -133,6 +136,10 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       active: true,
       scopeNames: allProjects || scope === null ? null : scope.names,
       onOpenChange: setDecisionOpen,
+      onOpenThread: (environmentId: EnvironmentId, threadId: ThreadId) => {
+        setDecisionOpen(false);
+        openThread(environmentId, threadId);
+      },
     });
   } else if (tab === "Queue") {
     body = h(QueueScreen, { atoms, active: true });

@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { DecisionItemWithAnswer, EnvironmentId } from "@cz/contracts";
+import { type DecisionItemWithAnswer, type EnvironmentId, ThreadId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { Box, type DOMElement, Text } from "ink";
@@ -50,14 +50,15 @@ export function DecisionsScreen(props: {
   readonly scopeNames: ReadonlySet<string> | null;
   /** Lets the app hide its tab bar while a decision is open. */
   readonly onOpenChange: (open: boolean) => void;
+  readonly onOpenThread: (environmentId: EnvironmentId, threadId: ThreadId) => void;
 }) {
   const feedAtom = useMemo(() => openDecisionsAtom(props.atoms), [props.atoms]);
   const { hosts, results } = useAtomValue(feedAtom);
   const loads = useHostLoads(props.atoms, results);
-  const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
+  const [answeredIds, setAnswered] = useState<ReadonlySet<string>>(new Set());
   const entries = useMemo(
-    () => decisionFeed(hosts, props.scopeNames).filter((entry) => !answered.has(entry.item.id)),
-    [hosts, props.scopeNames, answered],
+    () => decisionFeed(hosts, props.scopeNames).filter((entry) => !answeredIds.has(entry.item.id)),
+    [hosts, props.scopeNames, answeredIds],
   );
   const [cursor, setCursor] = useState(0);
   const [open, setOpen] = useState<DecisionEntry | null>(null);
@@ -100,28 +101,50 @@ export function DecisionsScreen(props: {
   );
 
   if (open) {
+    const index = entries.findIndex((entry) => entry.item.id === open.item.id);
+    const close = () => {
+      setOpen(null);
+      props.onOpenChange(false);
+    };
     return h(DecisionScreen, {
       key: open.item.id,
       atoms: props.atoms,
       entry: open,
       active: props.active,
-      onDone: () => {
-        // The list re-reads on its interval; hide an answered item until then.
-        if (open.item.status === "open") setAnswered(new Set([...answered, open.item.id]));
-        setOpen(null);
-        props.onOpenChange(false);
+      position: index >= 0 ? `${index + 1}/${entries.length}` : "",
+      onStep: (direction) => {
+        const next = entries[index + direction];
+        if (next) setOpen(next);
+      },
+      onOpenThread: (threadId) => {
+        close();
+        props.onOpenThread(open.environmentId, ThreadId.make(threadId));
+      },
+      onDone: (answered) => {
+        if (!answered) return close();
+        // The list re-reads on its interval; hide the answered item until then,
+        // and carry on to the next one, as Review all does.
+        setAnswered(new Set([...answeredIds, open.item.id]));
+        const next = entries[index + 1] ?? entries[index - 1];
+        if (next && next.item.id !== open.item.id) setOpen(next);
+        else close();
       },
     });
   }
   const total = hosts.reduce((sum, host) => sum + host.items.length, 0);
-  const machines = hosts.filter((host) => host.items.length > 0).length;
+  const machines = new Set(entries.map((entry) => entry.environmentId)).size;
+  const elsewhere = Math.max(0, total - entries.length - answeredIds.size);
   const summary = h(
     Text,
     { dimColor: true, wrap: "truncate" },
-    h(Text, total > 0 ? { color: "yellow", bold: true } : { bold: true }, `${total} open`),
-    total > 0 ? ` on ${machines} machine${machines === 1 ? "" : "s"}` : "",
-    props.scopeNames !== null && entries.length !== total
-      ? ` · ${entries.length} in this project · a all`
+    h(
+      Text,
+      entries.length > 0 ? { color: "yellow", bold: true } : { bold: true },
+      `${entries.length} open`,
+    ),
+    entries.length > 0 ? ` on ${machines} machine${machines === 1 ? "" : "s"}` : "",
+    props.scopeNames !== null && elsewhere > 0
+      ? ` · ${elsewhere} more in other projects · a all`
       : "",
   );
   if (entries.length === 0) {

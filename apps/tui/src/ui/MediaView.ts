@@ -1,10 +1,10 @@
 import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
-import { Text } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useEffect, useState } from "react";
 
 import { pngFor, turntableFrame } from "../model/media.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
-import { InlineImage } from "./InlineImage.ts";
+import { InlineImage, LETTERBOX } from "./InlineImage.ts";
 import { useMediaFile } from "./useMedia.ts";
 
 const SIZE = (bytes: number) =>
@@ -27,6 +27,8 @@ export function MediaView(props: {
   readonly clay: boolean;
   readonly playing: boolean;
   readonly onPath?: (path: string | null) => void;
+  /** Fill a fixed maxColumns × maxRows frame (option tiles line up). */
+  readonly framed?: boolean;
 }) {
   const { path, error } = useMediaFile(props.atoms, props.environmentId, props.media);
   const [png, setPng] = useState<Uint8Array | null>(null);
@@ -52,8 +54,24 @@ export function MediaView(props: {
   }, [path, kind, props.frame, props.clay]);
 
   const caption = props.media.caption ? ` — ${props.media.caption}` : "";
-  if (error) return h(Text, { color: "red" }, `${props.media.name}: ${error}`);
-  if (renderError) return h(Text, { color: "red" }, `${props.media.name}: ${renderError}`);
+  // Anything that isn't drawn as an image still fills the frame in a tile.
+  const tile = (text: string, style: Record<string, unknown> = {}) =>
+    props.framed
+      ? h(
+          Box,
+          {
+            width: props.maxColumns,
+            height: props.maxRows,
+            flexShrink: 0,
+            backgroundColor: LETTERBOX,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+          h(Text, { wrap: "truncate", ...style }, text),
+        )
+      : h(Text, style, text);
+  if (error) return tile(`${props.media.name}: ${error}`, { color: "red" });
+  if (renderError) return tile(`${props.media.name}: ${renderError}`, { color: "red" });
   switch (kind) {
     case "image":
     case "glb":
@@ -62,19 +80,21 @@ export function MediaView(props: {
         label: `${props.media.name}${kind === "glb" ? ` ${props.frame * 30}°${props.clay ? " clay" : ""}` : ""}`,
         maxColumns: props.maxColumns,
         maxRows: props.maxRows,
+        ...(props.framed ? { framed: true } : {}),
       });
     case "audio":
     case "voice":
-      return h(
-        Text,
+      return tile(
+        `${props.playing ? "▶" : "♪"} ${props.media.name}${props.framed ? "" : caption}`,
         props.playing ? { color: "green" } : {},
-        `${props.playing ? "▶" : "♪"} ${props.media.name}${caption}`,
       );
     case "video":
-      return h(Text, null, `🎞 ${props.media.name}${caption}`);
+      return tile(`🎞 ${props.media.name}${props.framed ? "" : caption}`);
     case "apk":
-      return h(Text, null, `⬇ ${props.media.name} · ${SIZE(props.media.size)}`);
+      return tile(`⬇ ${props.media.name} · ${SIZE(props.media.size)}`);
     default:
-      return h(Text, null, `▤ ${props.media.name} · ${SIZE(props.media.size)}${caption}`);
+      return tile(
+        `▤ ${props.media.name} · ${SIZE(props.media.size)}${props.framed ? "" : caption}`,
+      );
   }
 }

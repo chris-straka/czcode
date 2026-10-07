@@ -9,7 +9,7 @@ import {
 import type { DecisionMediaRef } from "@cz/contracts";
 import { Box, Text } from "ink";
 import { createElement as h, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { ChildProcess } from "node:child_process";
+import type * as NodeChildProcess from "node:child_process";
 
 import { type DecisionEntry, KIND_TAG } from "../model/decisionFeed.ts";
 import {
@@ -20,10 +20,12 @@ import {
   togglePick,
 } from "../model/decisionDraft.ts";
 import { adbInstall, openInF3d, openWithSystem, play, TURNTABLE_FRAMES } from "../model/media.ts";
+import { tileGrid } from "../model/decisionTiles.ts";
 import { wrapText } from "../model/wrap.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
+import { LETTERBOX } from "./InlineImage.ts";
 import { MediaView } from "./MediaView.ts";
 import { TextInput } from "./TextInput.ts";
 import { useKeys, useVimMotion } from "./input.ts";
@@ -36,18 +38,26 @@ type Typing =
 const PLAYTEST_LABEL = { good: "What felt good", bad: "What felt bad", bugs: "Bugs" } as const;
 
 /**
- * One decision, answered from the keyboard. Every kind shares: ↑↓/jk move,
- * c comment, Enter send, N "none of these, try again", Esc back. Kinds add:
- * pick space · rank J/K · listen space play, y keep, x kill, f favourite,
- * l loop, m more · verdicts 1-3 · look ←→ turn, C clay, o free orbit ·
- * read p comment on a paragraph · playtest i install, g/b/u fields ·
- * timeline a approve, r redo from here.
+ * One decision, answered from the keyboard. Every kind shares: j/k scroll,
+ * 1-9 pick an option (or a verdict), ]/[ move between options, Enter send,
+ * c note, N "none of these, try again", n/p (or J/K) next/previous decision,
+ * o open the focused media full screen, t open the thread, Esc or q back.
+ * Kinds add: pick 1-9 toggles · rank </> move · listen space play, y keep,
+ * x kill, f favourite, l loop, m more · look ←→ turn, C clay · read p comment
+ * on a paragraph · playtest i install, g/b/u fields · timeline a approve,
+ * r redo from here.
  */
 export function DecisionScreen(props: {
   readonly atoms: TuiAtoms;
   readonly entry: DecisionEntry;
   readonly active: boolean;
-  readonly onDone: () => void;
+  /** Back to the feed; `answered` when the answer was sent. */
+  readonly onDone: (answered: boolean) => void;
+  /** Moves to the next (+1) or previous (-1) decision in the feed. */
+  readonly onStep: (direction: 1 | -1) => void;
+  readonly onOpenThread: (threadId: string) => void;
+  /** "3/7" while reviewing the feed in order. */
+  readonly position: string;
 }) {
   const { atoms, entry } = props;
   const item = entry.item;
@@ -64,7 +74,7 @@ export function DecisionScreen(props: {
   const [text, setText] = useState("");
   const [mediaPath, setMediaPath] = useState<string | null>(null);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
-  const player = useRef<ChildProcess | null>(null);
+  const player = useRef<NodeChildProcess.ChildProcess | null>(null);
 
   const stop = () => {
     player.current?.kill();
@@ -106,6 +116,9 @@ export function DecisionScreen(props: {
   // An option or step with its own media shows that; otherwise the item's media cycles with Tab.
   const shownMediaIndex = selected?.media ?? mediaIndex;
   const media: DecisionMediaRef | null = item.media[shownMediaIndex] ?? null;
+  const contextMedia: DecisionMediaRef | null = item.media[mediaIndex] ?? null;
+  const [scroll, setScroll] = useState(0);
+  const [fullScreen, setFullScreen] = useState<DecisionMediaRef | null>(null);
 
   const send = (retry = false) => {
     const problem = retry
@@ -128,7 +141,7 @@ export function DecisionScreen(props: {
               ? `Sent: ${value.comment}`
               : "Sent.",
         );
-        props.onDone();
+        props.onDone(true);
       },
     );
   };
@@ -146,61 +159,90 @@ export function DecisionScreen(props: {
 
   const openMedia = () => {
     if (!media) return;
+    if (media.type === "image" || media.type === "glb") return setFullScreen(media);
     if (mediaPath === null) return setStatus("Still downloading…");
-    if (media.type === "glb") openInF3d(mediaPath);
-    else if (media.type === "video") toggleSound(media.key, mediaPath, true);
+    if (media.type === "video") toggleSound(media.key, mediaPath, true);
     else openWithSystem(mediaPath);
   };
 
+  const verdicts = VERDICT_BUTTONS[item.kind];
+  const width = Math.max(20, columns - 2);
+  const optionMedia = rows.map((row) =>
+    row.media === null ? null : (item.media[row.media] ?? null),
+  );
+  // Tiles once any option has media; plain numbered rows otherwise.
+  const tiled = item.kind !== "read" && optionMedia.some((entry) => entry !== null);
+  const grid = tileGrid(width, rows.length);
+
   const vim = useVimMotion();
+  const blocksRef = useRef(0);
+  const back = () => {
+    stop();
+    props.onDone(false);
+  };
   useKeys(
     (input, key) => {
-      if (key.escape) {
-        stop();
-        return props.onDone();
+      if (fullScreen) {
+        if (key.escape || input === "q" || input === "h" || input === "o") setFullScreen(null);
+        if (media?.type === "glb" && (key.leftArrow || input === "<"))
+          setFrame((frame + TURNTABLE_FRAMES - 1) % TURNTABLE_FRAMES);
+        if (media?.type === "glb" && (key.rightArrow || input === ">"))
+          setFrame((frame + 1) % TURNTABLE_FRAMES);
+        return;
       }
+      if (key.escape) return back();
       if (key.return) return send();
       if (input === "N") return send(true);
+      if (input === "n" || input === "J") return props.onStep(1);
+      if (input === "p" && item.kind !== "read") return props.onStep(-1);
+      if (input === "K") return props.onStep(-1);
+      if (input === "t" && item.thread) return props.onOpenThread(item.thread);
       if (input === "c") {
         setText(draft.comment);
         return setTyping({ field: "comment" });
       }
+      if (input === "]") return setCursor(Math.min(rows.length - 1, cursor + 1));
+      if (input === "[") return setCursor(Math.max(0, cursor - 1));
       // Playtest keeps a lone g for its "good" note, so gg isn't a motion there.
       if (
         !(item.kind === "playtest" && input === "g") &&
         vim(input, key, {
-          cursor,
-          count: rows.length,
-          page: 10,
-          onMove: setCursor,
-          onBack: () => {
-            stop();
-            props.onDone();
-          },
+          cursor: scroll,
+          count: blocksRef.current,
+          page: 6,
+          onMove: setScroll,
+          onBack: back,
         })
       )
         return;
       if (key.tab && item.media.length > 1)
         return setMediaIndex((mediaIndex + 1) % item.media.length);
       if (input === "o") return openMedia();
-      if (media?.type === "glb") {
+      if (media?.type === "glb" && item.kind !== "rank") {
         if (key.leftArrow || input === "<")
           return setFrame((frame + TURNTABLE_FRAMES - 1) % TURNTABLE_FRAMES);
         if (key.rightArrow || input === ">") return setFrame((frame + 1) % TURNTABLE_FRAMES);
         if (input === "C") return setClay(!clay);
       }
-      const verdicts = VERDICT_BUTTONS[item.kind];
       const digit = Number(input);
-      if (verdicts && digit >= 1 && digit <= verdicts.length) {
-        return setDraft({ ...draft, choice: verdicts[digit - 1]!.value });
+      if (input >= "1" && input <= "9") {
+        if (verdicts) {
+          if (digit <= verdicts.length) setDraft({ ...draft, choice: verdicts[digit - 1]!.value });
+          return;
+        }
+        const row = rows[digit - 1];
+        if (!row) return;
+        setCursor(digit - 1);
+        if (item.kind === "pick") setDraft(togglePick(item, draft, row.id));
+        return;
       }
       switch (item.kind) {
         case "pick":
           if (selected && input === " ") setDraft(togglePick(item, draft, selected.id));
           return;
         case "rank":
-          if (input === "J" || input === "K") {
-            const moved = moveRank(draft, cursor, input === "J" ? 1 : -1);
+          if (input === "<" || input === ">") {
+            const moved = moveRank(draft, cursor, input === ">" ? 1 : -1);
             setDraft(moved.draft);
             setCursor(moved.index);
           }
@@ -212,7 +254,7 @@ export function DecisionScreen(props: {
           if (input === "x") return setDraft(react(draft, selected.id, "kill"));
           if (input === "f") return setDraft(react(draft, selected.id, "favourite"));
           if (input === "m") return setDraft({ ...draft, moreLikeThese: !draft.moreLikeThese });
-          if (input === "L") return setLoop(!loop);
+          if (input === "l") return setLoop(!loop);
           return;
         case "read":
           if (input === "p") {
@@ -249,6 +291,7 @@ export function DecisionScreen(props: {
     },
     { isActive: props.active && typing === null },
   );
+  // While typing a note, only Esc is ours: it leaves the note, not the decision.
   useKeys(
     (_input, key) => {
       if (key.escape) setTyping(null);
@@ -265,7 +308,6 @@ export function DecisionScreen(props: {
     setTyping(null);
   };
 
-  const width = Math.max(20, columns - 2);
   const mark = (id: string): string => {
     switch (item.kind) {
       case "pick":
@@ -293,61 +335,150 @@ export function DecisionScreen(props: {
     }
   };
 
-  const header = `${KIND_TAG[item.kind]} · ${item.project}${entry.environmentLabel ? ` · ${entry.environmentLabel}` : ""}${item.blocking ? " · blocking" : ""}`;
-  const question = wrapText(item.question, width);
-  const bodyLines = item.kind === "read" ? [] : wrapText(item.body_md, width).slice(0, 6);
-  const listRows = Math.max(3, Math.min(rows.length, Math.floor((height - 10) / 3)));
-  const top = Math.max(0, Math.min(cursor - Math.floor(listRows / 2), rows.length - listRows));
-  const mediaRows = Math.max(4, height - question.length - bodyLines.length - listRows - 9);
-  const verdicts = VERDICT_BUTTONS[item.kind];
-
-  const children: Array<ReactNode> = [
-    h(Text, { key: "h", dimColor: true, wrap: "truncate" }, header),
-    ...question.map((line, index) => h(Text, { key: `q${index}`, bold: true }, line)),
-    ...bodyLines.map((line, index) => h(Text, { key: `b${index}` }, line || " ")),
-  ];
-  if (media) {
-    children.push(
+  if (fullScreen) {
+    return h(
+      Box,
+      { flexDirection: "column" },
       h(MediaView, {
-        key: `m:${media.key}`,
+        key: `full:${fullScreen.key}`,
         atoms,
         environmentId: entry.environmentId,
-        media,
+        media: fullScreen,
         maxColumns: width,
-        maxRows: mediaRows,
+        maxRows: Math.max(4, height - 2),
         frame,
         clay,
-        playing: playingKey === media.key || playingKey === selected?.id,
+        playing: false,
+        framed: true,
+      }),
+      h(Text, { dimColor: true, wrap: "truncate" }, `${fullScreen.name} · esc close`),
+    );
+  }
+
+  // Blocks scroll as units (j/k move one), so images never cut in half.
+  const blocks: Array<{ readonly key: string; readonly height: number; readonly node: ReactNode }> =
+    [];
+  const line = (key: string, node: ReactNode) => blocks.push({ key, height: 1, node });
+  const title = (item.title || item.question).trim();
+  for (const [index, text] of wrapText(title, width).entries())
+    line(`title${index}`, h(Text, { bold: true }, text));
+  if (item.title && item.question.trim() !== item.title.trim()) {
+    for (const [index, text] of wrapText(item.question, width).entries())
+      line(`q${index}`, h(Text, null, text));
+  }
+  if (item.kind !== "read") {
+    for (const [index, text] of wrapText(item.body_md, width).entries())
+      line(`b${index}`, h(Text, { dimColor: true }, text || " "));
+  }
+  if (contextMedia && !tiled) {
+    const rowsForMedia = Math.max(4, Math.min(height - 12, 18));
+    blocks.push({
+      key: `m:${media?.key ?? contextMedia.key}`,
+      height: rowsForMedia,
+      node: h(MediaView, {
+        atoms,
+        environmentId: entry.environmentId,
+        media: media ?? contextMedia,
+        maxColumns: width,
+        maxRows: rowsForMedia,
+        frame,
+        clay,
+        playing: playingKey === (media ?? contextMedia).key || playingKey === selected?.id,
         onPath: setMediaPath,
       }),
-    );
+    });
   }
-  if (rows.length > 0) {
-    children.push(
-      ...rows.slice(top, top + listRows).map((row, offset) => {
-        const index = top + offset;
-        const focused = index === cursor;
-        const label = item.kind === "rank" ? `${index + 1}. ${row.label}` : row.label;
-        return h(
+  const optionLabel = (row: (typeof rows)[number], index: number) => {
+    const recommended = item.options.find((option) => option.id === row.id)?.recommended;
+    const prefix = index < 9 ? `${index + 1}` : " ";
+    const label = item.kind === "rank" ? `${index + 1}. ${row.label}` : row.label;
+    return `${prefix} ${mark(row.id)} ${label}${recommended ? " ★" : ""}`.replace(/ {2,}/g, " ");
+  };
+  if (tiled) {
+    for (let start = 0; start < rows.length; start += grid.perRow) {
+      const slice = rows.slice(start, start + grid.perRow);
+      blocks.push({
+        key: `tiles${start}`,
+        height: grid.tileRows,
+        node: h(
+          Box,
+          { gap: 1 },
+          ...slice.map((row, offset) => {
+            const index = start + offset;
+            const focused = index === cursor;
+            const mediaRef = optionMedia[index] ?? null;
+            return h(
+              Box,
+              {
+                key: row.id,
+                flexDirection: "column",
+                width: grid.tileColumns,
+                borderStyle: "round",
+                borderColor: focused ? "cyan" : "gray",
+              },
+              mediaRef
+                ? h(MediaView, {
+                    atoms,
+                    environmentId: entry.environmentId,
+                    media: mediaRef,
+                    maxColumns: grid.frameColumns,
+                    maxRows: grid.frameRows,
+                    frame,
+                    clay,
+                    playing: playingKey === row.id,
+                    framed: true,
+                    ...(focused ? { onPath: setMediaPath } : {}),
+                  })
+                : h(
+                    Box,
+                    {
+                      width: grid.frameColumns,
+                      height: grid.frameRows,
+                      backgroundColor: LETTERBOX,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingX: 1,
+                    },
+                    h(Text, { wrap: "wrap" }, row.label),
+                  ),
+              h(
+                Text,
+                { wrap: "truncate", ...(focused ? { color: "cyan", bold: true } : {}) },
+                optionLabel(row, index),
+              ),
+            );
+          }),
+        ),
+      });
+    }
+  } else {
+    for (const [index, row] of rows.entries()) {
+      const focused = index === cursor;
+      line(
+        `r${row.id}`,
+        h(
           Text,
-          { key: `r${row.id}`, wrap: "truncate", ...(focused ? { color: "cyan" } : {}) },
-          `${focused ? "› " : "  "}${mark(row.id)} ${label}${item.options.find((option) => option.id === row.id)?.recommended ? " ★" : ""}`,
-        );
-      }),
-    );
+          { wrap: "truncate", ...(focused ? { color: "cyan" } : {}) },
+          `${focused ? "›" : " "} ${optionLabel(row, index)}`,
+        ),
+      );
+    }
   }
   if (verdicts) {
-    children.push(
+    line(
+      "v",
       h(
-        Text,
-        { key: "v" },
-        verdicts
-          .map((verdict, index) =>
+        Box,
+        { gap: 1 },
+        ...verdicts.map((verdict, index) =>
+          h(
+            Text,
             draft.choice === verdict.value
-              ? `[${index + 1} ${verdict.label}]`
-              : ` ${index + 1} ${verdict.label} `,
-          )
-          .join(" "),
+              ? { key: verdict.value, inverse: true, bold: true }
+              : { key: verdict.value },
+            ` ${index + 1} ${verdict.label} `,
+          ),
+        ),
       ),
     );
   }
@@ -362,63 +493,151 @@ export function DecisionScreen(props: {
     item.kind === "listen" && draft.moreLikeThese ? "more like these" : "",
     item.kind === "timeline" && draft.choice === "approve" ? "approve the run" : "",
   ].filter(Boolean);
-  if (notes.length > 0)
-    children.push(h(Text, { key: "n", dimColor: true, wrap: "truncate" }, notes.join(" · ")));
-  children.push(
-    typing
-      ? h(
-          Box,
-          { key: "t", flexDirection: "column" },
-          h(
-            Text,
-            { dimColor: true },
-            typing.field === "comment"
-              ? "Comment:"
-              : typing.field === "passage"
-                ? "Comment on this paragraph:"
-                : `${PLAYTEST_LABEL[typing.field]}:`,
-          ),
-          h(TextInput, {
-            value: text,
-            active: props.active,
-            multiline: true,
-            onChange: setText,
-            onSubmit: commit,
-          }),
-        )
-      : h(
+  if (notes.length > 0) line("n", h(Text, { dimColor: true, wrap: "truncate" }, notes.join(" · ")));
+  blocksRef.current = blocks.length;
+
+  const meta = [
+    KIND_TAG[item.kind],
+    item.project,
+    entry.environmentLabel,
+    item.blocking ? "blocking" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const footer = typing
+    ? h(
+        Box,
+        { flexDirection: "column" },
+        h(
           Text,
-          { key: "k", dimColor: true, wrap: "wrap" },
-          keyHelp(item.kind, media?.type ?? null, item.media.length > 1),
+          { dimColor: true },
+          `${
+            typing.field === "comment"
+              ? "Note"
+              : typing.field === "passage"
+                ? "Comment on this paragraph"
+                : PLAYTEST_LABEL[typing.field]
+          } (enter keeps it, esc leaves the note):`,
         ),
+        h(TextInput, {
+          value: text,
+          active: props.active,
+          multiline: true,
+          onChange: setText,
+          onSubmit: commit,
+        }),
+      )
+    : h(KeyHints, {
+        hints: keyHints(
+          item.kind,
+          media?.type ?? null,
+          item.media.length > 1 && !tiled,
+          !!item.thread,
+        ),
+      });
+  const available = Math.max(4, height - (typing ? 4 : 2) - 2);
+  const first = Math.min(scroll, Math.max(0, blocks.length - 1));
+  const visibleBlocks: Array<(typeof blocks)[number]> = [];
+  let used = 0;
+  for (const block of blocks.slice(first)) {
+    if (used + block.height > available && visibleBlocks.length > 0) break;
+    visibleBlocks.push(block);
+    used += block.height;
+  }
+  const hiddenBelow = first + visibleBlocks.length < blocks.length;
+  return h(
+    Box,
+    { flexDirection: "column" },
+    h(
+      Box,
+      { justifyContent: "space-between" },
+      h(
+        Text,
+        { dimColor: true, wrap: "truncate" },
+        `${meta}${props.position ? ` · ${props.position}` : ""}`,
+      ),
+      item.thread ? h(Text, { color: "cyan" }, "t open thread") : null,
+    ),
+    h(
+      Box,
+      { flexDirection: "column", height: available },
+      ...visibleBlocks.map((block) => h(Box, { key: block.key, flexShrink: 0 }, block.node)),
+    ),
+    h(
+      Text,
+      { dimColor: true },
+      first > 0 || hiddenBelow ? `${first > 0 ? "↑ k " : ""}${hiddenBelow ? "↓ j more" : ""}` : " ",
+    ),
+    footer,
   );
-  return h(Box, { flexDirection: "column" }, ...children);
 }
 
-function keyHelp(
+/** A row of small key chips: the key, then what it does. */
+function KeyHints({ hints }: { readonly hints: ReadonlyArray<readonly [string, string]> }) {
+  return h(
+    Box,
+    { flexWrap: "wrap", columnGap: 1 },
+    ...hints.map(([key, label]) =>
+      h(
+        Box,
+        { key: `${key}:${label}`, flexShrink: 0 },
+        h(Text, { inverse: true }, ` ${key} `),
+        h(Text, { dimColor: true }, ` ${label}`),
+      ),
+    ),
+  );
+}
+
+function keyHints(
   kind: DecisionEntry["item"]["kind"],
   media: DecisionMediaRef["type"] | null,
   manyMedia: boolean,
-): string {
-  const byKind: Record<DecisionEntry["item"]["kind"], string> = {
-    pick: "space choose",
-    rank: "J/K move",
-    listen: "space play · y keep · x kill · f fav · L loop · m more",
-    look: "1-3 verdict",
-    review: "1-3 verdict",
-    read: "p comment paragraph · 1-2 verdict",
-    pitch: "1-3 verdict",
-    request: "c write it",
-    playtest: "i install · g good · b bad · u bugs",
-    timeline: "a approve · r redo from here",
+  hasThread: boolean,
+): ReadonlyArray<readonly [string, string]> {
+  const byKind: Record<DecisionEntry["item"]["kind"], ReadonlyArray<readonly [string, string]>> = {
+    pick: [["1-9", "pick"]],
+    rank: [
+      ["1-9", "select"],
+      ["</>", "move"],
+    ],
+    listen: [
+      ["1-9", "select"],
+      ["space", "play"],
+      ["y/x/f", "keep/kill/fav"],
+      ["l", "loop"],
+    ],
+    look: [["1-3", "verdict"]],
+    review: [["1-3", "verdict"]],
+    read: [
+      ["1-2", "verdict"],
+      ["]/[", "paragraph"],
+      ["p", "comment"],
+    ],
+    pitch: [["1-3", "verdict"]],
+    request: [["c", "write it"]],
+    playtest: [
+      ["i", "install"],
+      ["g/b/u", "notes"],
+    ],
+    timeline: [
+      ["1-9", "step"],
+      ["a", "approve"],
+      ["r", "redo here"],
+    ],
   };
-  const mediaKeys =
-    media === "glb"
-      ? " · ←→ turn · C clay · o orbit"
-      : media === "video"
-        ? " · o play"
-        : media === "file" || media === "text"
-          ? " · o open"
-          : "";
-  return `${byKind[kind]}${mediaKeys}${manyMedia ? " · tab media" : ""} · c note · enter send · N none · q back`;
+  return [
+    ...byKind[kind],
+    ...(media === "image" || media === "glb" ? ([["o", "full screen"]] as const) : []),
+    ...(media === "glb" ? ([["←→", "turn"]] as const) : []),
+    ...(media === "video" || media === "file" || media === "text"
+      ? ([["o", "open"]] as const)
+      : []),
+    ...(manyMedia ? ([["tab", "media"]] as const) : []),
+    ["enter", "send"],
+    ["c", "note"],
+    ["n/p", "next/prev"],
+    ["j/k", "scroll"],
+    ...(hasThread ? ([["t", "thread"]] as const) : []),
+    ["esc", "back"],
+  ];
 }
