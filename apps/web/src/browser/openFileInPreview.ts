@@ -13,11 +13,8 @@ import * as Data from "effect/Data";
 import { AsyncResult } from "effect/reactivity";
 
 import { resolveAssetUrl } from "~/assets/assetUrls";
-import {
-  applyPreviewServerSnapshot,
-  isPreviewSupportedInRuntime,
-  rememberPreviewUrl,
-} from "~/previewStateStore";
+import { isPreviewAvailableFor, previewRuntimeFor } from "~/browser/previewRuntime";
+import { applyPreviewServerSnapshot, rememberPreviewUrl } from "~/previewStateStore";
 import { useRightPanelStore } from "~/rightPanelStore";
 
 import {
@@ -59,6 +56,7 @@ export async function openUrlInPreview<E>(input: {
   if (defaults instanceof BrowserSettingsReadError) {
     return AsyncResult.failure(Cause.fail(defaults));
   }
+  const runtime = previewRuntimeFor(input.threadRef.environmentId);
   const result = await input.openPreview({
     environmentId: input.threadRef.environmentId,
     input: {
@@ -69,6 +67,7 @@ export async function openUrlInPreview<E>(input: {
       // applied explicitly or file/link opens would ignore them.
       viewport: browserDefaultOpenViewport(defaults),
       profileId: browserDefaultOpenProfileId(defaults),
+      ...(runtime === undefined ? {} : { runtime }),
     },
   });
   return mapAtomCommandResult(result, (snapshot) => {
@@ -98,7 +97,7 @@ export async function openFileInPreview<AssetError, PreviewError>(input: {
     AssetError | PreviewError | BrowserPreviewUnavailableError | BrowserSettingsReadError
   >
 > {
-  if (!isPreviewSupportedInRuntime()) {
+  if (!isPreviewAvailableFor(input.threadRef.environmentId)) {
     return AsyncResult.failure(
       Cause.fail(
         new BrowserPreviewUnavailableError({

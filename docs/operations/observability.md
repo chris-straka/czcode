@@ -377,7 +377,7 @@ Traces are best for one request. Metrics are best for trends.
 Good metric families to watch:
 
 - `cz_rpc_request_duration`
-- `cz_provider_turn_duration`
+- `cz_provider_turn_duration` (how long the provider adapter takes to start a turn, not the turn's run time)
 - `cz_git_command_duration`
 
 Counters tell you volume and failure rate:
@@ -635,8 +635,8 @@ wins for its signal. `otlp` is the default, and any other exporter name, such as
 
 Current high-value span and metric boundaries include:
 
-- Effect RPC websocket request spans from `effect/rpc`
-- RPC request metrics in `apps/server/src/observability/RpcInstrumentation.ts`
+- WebSocket RPC request spans (`ws.rpc.<method>`) and metrics in
+  `apps/server/src/observability/RpcInstrumentation.ts`
 - startup phases
 - orchestration command processing
 - provider session and turn operations

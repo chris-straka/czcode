@@ -9,15 +9,21 @@ import {
   DecisionNotFoundError,
   DecisionStorageError,
   DecisionSubmitInput,
+  OrchestratorMcpFailure,
 } from "@cz/contracts";
 import * as Schema from "effect/Schema";
 import * as Tool from "effect/ai/Tool";
 import * as Toolkit from "effect/ai/Toolkit";
 
 import * as DecisionService from "../../../decisions/DecisionService.ts";
+import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
-const dependencies = [McpInvocationContext.McpInvocationContext, DecisionService.DecisionService];
+const dependencies = [
+  McpInvocationContext.McpInvocationContext,
+  ThreadManagementService.ThreadManagementService,
+  DecisionService.DecisionService,
+];
 
 /** ccez/DECISIONS.md, "When agents should ask", in the words agents read before asking. */
 const WHEN_TO_ASK = `Ask the owner only for: a taste call (art, animation, sound, music, story, names, game feel, UI look); anything that spends money or is outward-facing (publishing, deploying, deleting); materially different directions where a wrong guess wastes real work; a finished batch that needs judging; input only the owner has. Don't ask when a sensible default exists for a technical choice (decide and log it in the repo's docs/decisions.md), for status updates (say them in the thread), or when a check could answer it (tests, screenshots). Batch: one listen with 8 sounds, not 8 decisions; keep at most about 5 open decisions per project. Don't block if anything else can be done: submit with blocking=false and a resume plan, then continue or end the thread. Mark your recommended option and give the reason in one line. Read decision_history first to learn the owner's past taste.`;
@@ -37,6 +43,7 @@ export const DecisionToolError = Schema.Union([
   DecisionClosedError,
   DecisionStorageError,
   DecisionMediaReadError,
+  OrchestratorMcpFailure,
 ]);
 
 const DecisionId = Schema.Struct({
