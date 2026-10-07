@@ -1860,6 +1860,8 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
    * the start of the work it continues; request time while preparing.
    */
   activityRunStartedAt: Schema.optional(Schema.NullOr(Schema.DateTimeUtc)),
+  /** What the active run is doing right now ("$ vp test run"), for fleet views. */
+  currentActivity: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(100)))),
   activityRunStatus: Schema.optional(
     Schema.NullOr(Schema.Literals(["preparing", "starting", "running", "waiting"])),
   ),
