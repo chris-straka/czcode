@@ -9,7 +9,7 @@ import {
   resolvePendingUserInputAnswer,
   setPendingUserInputCustomAnswer,
   togglePendingUserInputOptionSelection,
-} from "./pendingUserInput";
+} from "./pendingUserInput.ts";
 
 const singleSelectQuestion = {
   id: "scope",

@@ -31,6 +31,10 @@
       "types": "./src/projectFaviconCache.ts",
       "default": "./src/projectFaviconCache.ts"
     },
+    "./pending-user-input": {
+      "types": "./src/pendingUserInput.ts",
+      "default": "./src/pendingUserInput.ts"
+    },
     "./user-message": {
       "types": "./src/userMessage.ts",
       "default": "./src/userMessage.ts"
