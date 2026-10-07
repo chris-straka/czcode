@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseProcStat, planScopes, processKey, scopeUnitName, type ProcessEntry } from "./plan.ts";
+import {
+  agentScopesCgroupProblem,
+  parseProcStat,
+  planScopes,
+  processKey,
+  scopeUnitName,
+  type ProcessEntry,
+} from "./plan.ts";
 
 const SERVER = 100;
 const proc = (pid: number, ppid: number, comm = "node"): ProcessEntry => ({
@@ -11,6 +18,19 @@ const proc = (pid: number, ppid: number, comm = "node"): ProcessEntry => ({
 });
 
 describe("agent scopes", () => {
+  it("stay on only for the service itself, never for a server an agent started", () => {
+    const app = "/user.slice/user-1000.slice/user@1000.service/app.slice";
+    expect(agentScopesCgroupProblem(`${app}/cz-host.service`)).toBe(null);
+    // A dev server, test, or `cz serve` launched by an agent on the host.
+    expect(agentScopesCgroupProblem(`${app}/cz-agent-4242-claude.scope`)).toContain(
+      "cz-agent-4242-claude.scope",
+    );
+    // A terminal session.
+    expect(agentScopesCgroupProblem(`${app}/app-ghostty-1234.scope`)).not.toBe(null);
+    expect(agentScopesCgroupProblem("/system.slice/ssh.service")).not.toBe(null);
+    expect(agentScopesCgroupProblem(undefined)).not.toBe(null);
+  });
+
   it("reads pid, parent, start time, and a name with spaces from /proc stat", () => {
     const stat =
       "4242 (opencode serve) S 100 4242 4242 0 -1 4194560 1 0 0 0 5 3 0 0 20 0 12 0 987654 1000 200";

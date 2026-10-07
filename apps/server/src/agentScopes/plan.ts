@@ -13,6 +13,23 @@ export interface ProcessEntry {
   readonly comm: string;
 }
 
+/**
+ * Why agent scopes must stay off for a server in this cgroup, or null when it
+ * may manage them. Only the systemd service itself (cz-host.service) may:
+ * agents inherit CZ_AGENT_SCOPES, so a server an agent starts (a dev server,
+ * a test, `cz serve`) runs inside that agent's scope, and its startup cleanup
+ * of `cz-agent-*.scope` would stop every agent on the host, itself included.
+ */
+export function agentScopesCgroupProblem(cgroupPath: string | undefined): string | null {
+  if (!cgroupPath || !cgroupPath.includes("user@"))
+    return "not running under a systemd user manager";
+  const unit = cgroupPath.split("/").findLast((segment) => segment !== "") ?? "";
+  if (!unit.endsWith(".service")) {
+    return `running in ${unit || "an unnamed cgroup"}, not as its own service (started from a terminal or by an agent)`;
+  }
+  return null;
+}
+
 export const processKey = (entry: Pick<ProcessEntry, "pid" | "startTime">) =>
   `${entry.pid}:${entry.startTime}`;
 
