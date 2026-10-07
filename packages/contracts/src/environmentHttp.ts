@@ -84,6 +84,8 @@ import {
   ThreadControlListResult,
   ThreadControlNotFoundError,
   ThreadStopInput,
+  ThreadDigestInput,
+  ThreadDigestResult,
   ThreadStopResult,
 } from "./threadControl.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
@@ -922,6 +924,14 @@ class EnvironmentThreadsHttpApi extends HttpApiGroup.make("threads")
     HttpApiEndpoint.get("list", "/api/threads", {
       headers: OptionalBearerHeaders,
       success: ThreadControlListResult,
+      error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("digests", "/api/threads/digests", {
+      headers: OptionalBearerHeaders,
+      payload: ThreadDigestInput,
+      success: ThreadDigestResult,
       error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
     }).middleware(EnvironmentAuthenticatedAuth),
   )
