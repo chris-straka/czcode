@@ -40,6 +40,8 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
   const [listCursor, setListCursor] = useState(0);
   const [decisionOpen, setDecisionOpen] = useState(false);
+  // The thread list is taking text (search, rename) or showing a menu.
+  const [listCapturing, setListCapturing] = useState(false);
   // Opens on the project containing the cwd (one Ghostty tab per project); `a` shows all.
   const [allProjects, setAllProjects] = useState(false);
   const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
@@ -81,7 +83,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
         setListCursor(0);
       }
     },
-    { isActive: atTop },
+    { isActive: atTop && !listCapturing },
   );
 
   const back = () => setOverlay({ kind: "none" });
@@ -134,6 +136,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       cursor: listCursor,
       onCursor: setListCursor,
       scope: scopeKeys,
+      onCaptureChange: setListCapturing,
     });
   }
 
