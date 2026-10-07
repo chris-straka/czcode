@@ -25,10 +25,12 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from "react";
 
+import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
 import type { DecisionEntry } from "~/state/decisions";
 import ChatMarkdown from "../ChatMarkdown";
@@ -36,7 +38,15 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { DecisionMedia, useDecisionMediaUrl } from "./DecisionMedia";
+import { ExpandedImageDialog } from "../chat/ExpandedImageDialog";
+import type { ExpandedImageItem } from "../chat/ExpandedImagePreview";
+import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import {
+  DECISION_OPTION_FRAME_CLASS,
+  DecisionMedia,
+  useDecisionMediaResolver,
+  useDecisionMediaUrl,
+} from "./DecisionMedia";
 import {
   type DecisionDraft,
   draftProblem,
@@ -57,6 +67,25 @@ interface DecisionViewProps {
   readonly onUpload: UploadDecisionMedia;
   readonly onClose: () => void;
   readonly onSkip?: () => void;
+  readonly onPrevious?: () => void;
+}
+
+/** Opens images full screen; option images can be picked from there. */
+interface FullScreenImages {
+  readonly open: (
+    images: ReadonlyArray<ExpandedImageItem>,
+    index: number,
+    optionIds?: ReadonlyArray<string>,
+  ) => void;
+}
+const FullScreenContext = createContext<FullScreenImages>({ open: () => {} });
+
+/** True when keys belong to a text field (the note box, a rename input). */
+function isTypingTarget(target: EventTarget | null): target is HTMLElement {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+  );
 }
 
 /** One decision, full screen, with its answer panel pinned to the bottom. */
@@ -67,6 +96,7 @@ export function DecisionView({
   onUpload,
   onClose,
   onSkip,
+  onPrevious,
 }: DecisionViewProps) {
   const { item, environmentId } = entry;
   const [draft, setDraft] = useState<DecisionDraft>(() => emptyDraft(item));
@@ -76,135 +106,280 @@ export function DecisionView({
   const verdicts = VERDICT_BUTTONS[item.kind];
   const submit = (patch: Partial<DecisionDraft> = {}, retry = false) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, retry));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [fullScreen, setFullScreen] = useState<{
+    readonly images: ReadonlyArray<ExpandedImageItem>;
+    readonly index: number;
+    readonly optionIds?: ReadonlyArray<string>;
+  } | null>(null);
+  const title = item.title || item.question;
+
+  const pickOption = (id: string) => {
+    if (item.kind !== "pick") return;
+    if (item.max_choices === 1) return update({ optionIds: [id] });
+    update({
+      optionIds: draft.optionIds.includes(id)
+        ? draft.optionIds.filter((value) => value !== id)
+        : [...draft.optionIds, id],
+    });
+  };
+
+  // Keys: j/k scroll, 1-9 pick, Enter sends, n/p (J/K) step through Review
+  // all, Esc closes. A text field keeps its keys; Esc there leaves it first.
+  const keyHandler = useRef<(event: KeyboardEvent) => void>(() => {});
+  keyHandler.current = (event) => {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (fullScreen !== null) return;
+    if (isTypingTarget(event.target)) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.target.blur();
+      }
+      return;
+    }
+    const scroller = scrollRef.current;
+    const handled = (() => {
+      switch (event.key) {
+        case "j":
+          scroller?.scrollBy({ top: 120 });
+          return true;
+        case "k":
+          scroller?.scrollBy({ top: -120 });
+          return true;
+        case "n":
+        case "J":
+          onSkip?.();
+          return onSkip !== undefined;
+        case "p":
+        case "K":
+          onPrevious?.();
+          return onPrevious !== undefined;
+        case "Escape":
+          onClose();
+          return true;
+        case "Enter":
+          if (verdicts || item.kind === "timeline" || problem !== null) return false;
+          submit();
+          return true;
+        default: {
+          const digit = Number(event.key);
+          if (!Number.isInteger(digit) || digit < 1 || digit > 9) return false;
+          if (item.kind === "pick") {
+            const option = item.options[digit - 1];
+            if (option) pickOption(option.id);
+            return option !== undefined;
+          }
+          const verdict = verdicts?.[digit - 1];
+          if (verdict) submit({ choice: verdict.value });
+          return verdict !== undefined;
+        }
+      }
+    })();
+    if (handled) event.preventDefault();
+  };
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => keyHandler.current(event);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, []);
+
+  const keyHints = [
+    "j/k scroll",
+    item.kind === "pick" || verdicts
+      ? `1-${Math.min(9, item.kind === "pick" ? item.options.length : (verdicts?.length ?? 1))} choose`
+      : null,
+    !verdicts && item.kind !== "timeline" ? "Enter send" : null,
+    onSkip ? "n/p next/previous" : null,
+    "Esc close",
+  ].filter((hint) => hint !== null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-decision-kind={item.kind}>
-      <header className="flex items-start gap-3 border-b border-border px-4 py-3">
-        <Button size="icon-sm" variant="ghost" aria-label="Close" onClick={onClose}>
-          <XIcon />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            <Badge variant="secondary" size="sm">
-              {item.kind}
+      <WorkspacePageHeader electron={isElectron} className="border-b border-border">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
+          <Badge variant="secondary" size="sm">
+            {item.kind}
+          </Badge>
+          <span className="truncate">
+            {item.project} · {entry.environmentLabel}
+          </span>
+          {item.blocking ? (
+            <Badge variant="warning" size="sm">
+              Agent waiting
             </Badge>
-            <span>{item.project}</span>
-            <span>· {entry.environmentLabel}</span>
-            {item.thread ? (
-              <Link
-                to="/$environmentId/$threadId"
-                params={{ environmentId: entry.environmentId, threadId: item.thread }}
-                className="underline-offset-2 hover:text-foreground hover:underline"
-              >
-                · Open thread
-              </Link>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {position ? (
+            <span className="px-1 text-xs text-muted-foreground tabular-nums">
+              {position.index + 1} of {position.total}
+            </span>
+          ) : null}
+          {item.thread ? (
+            <Button
+              size="xs"
+              variant="outline"
+              render={
+                <Link
+                  to="/$environmentId/$threadId"
+                  params={{ environmentId: entry.environmentId, threadId: item.thread }}
+                />
+              }
+            >
+              Open thread
+            </Button>
+          ) : null}
+          {onPrevious ? (
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Previous decision"
+              onClick={onPrevious}
+            >
+              <ChevronLeftIcon />
+            </Button>
+          ) : null}
+          {onSkip ? (
+            <Button size="icon-xs" variant="ghost" aria-label="Next decision" onClick={onSkip}>
+              <ChevronRightIcon />
+            </Button>
+          ) : null}
+          <Button size="icon-xs" variant="ghost" aria-label="Close" onClick={onClose}>
+            <XIcon />
+          </Button>
+        </div>
+      </WorkspacePageHeader>
+
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6">
+          <div className="space-y-1">
+            <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+            {item.title && item.question !== item.title ? (
+              <p className="text-sm text-foreground/80">{item.question}</p>
             ) : null}
-            {item.blocking ? (
-              <Badge variant="warning" size="sm">
-                Agent waiting
-              </Badge>
-            ) : null}
-            {position ? (
-              <span className="ml-auto">
-                {position.index + 1} of {position.total}
-              </span>
+            {item.cost_note ? (
+              <p className="text-sm text-warning-foreground">{item.cost_note}</p>
             ) : null}
           </div>
-          {item.title && item.title !== item.question ? (
-            <p className="mt-1 text-sm font-medium text-muted-foreground">{item.title}</p>
+          {item.kind !== "read" && item.body_md ? (
+            <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
           ) : null}
-          <h1 className="mt-1 text-lg font-semibold text-foreground">{item.question}</h1>
-          {item.cost_note ? (
-            <p className="mt-1 text-sm text-warning-foreground">{item.cost_note}</p>
-          ) : null}
+          <UploadContext value={onUpload}>
+            <FullScreenContext
+              value={{
+                open: (images, index, optionIds) =>
+                  setFullScreen({ images, index, ...(optionIds ? { optionIds } : {}) }),
+              }}
+            >
+              <DecisionBody entry={entry} draft={draft} update={update} />
+            </FullScreenContext>
+          </UploadContext>
         </div>
-        {onSkip ? (
-          <Button size="sm" variant="ghost" onClick={onSkip}>
-            Skip
-            <ChevronRightIcon />
-          </Button>
-        ) : null}
-      </header>
-
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {item.kind !== "read" && item.body_md ? (
-          <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
-        ) : null}
-        <UploadContext value={onUpload}>
-          <DecisionBody entry={entry} draft={draft} update={update} />
-        </UploadContext>
       </div>
+      {fullScreen ? (
+        <ExpandedImageDialog
+          preview={{ images: [...fullScreen.images], index: fullScreen.index }}
+          onClose={() => setFullScreen(null)}
+          {...(fullScreen.optionIds
+            ? {
+                renderAction: (index: number) => {
+                  const id = fullScreen.optionIds?.[index];
+                  if (id === undefined) return null;
+                  const picked = draft.optionIds.includes(id);
+                  return (
+                    <Button
+                      size="xs"
+                      variant={picked ? "secondary" : "default"}
+                      className="ms-2"
+                      onClick={() => {
+                        pickOption(id);
+                        if (item.max_choices === 1) setFullScreen(null);
+                      }}
+                    >
+                      {picked ? "Picked" : "Pick this"}
+                    </Button>
+                  );
+                },
+              }
+            : {})}
+        />
+      ) : null}
 
-      <footer className="sticky bottom-0 space-y-2 border-t border-border bg-background px-4 py-3">
-        <div className="flex items-start gap-2">
-          <Textarea
-            aria-label="Note"
-            placeholder={
-              item.kind === "request"
-                ? "Write it here, or attach or record it"
-                : "Add a note (optional)"
-            }
-            value={draft.comment}
-            onChange={(event) => update({ comment: event.target.value })}
-            className="min-h-10 flex-1"
-          />
-          <VoiceNoteButton
-            recorded={draft.voiceKey !== null}
-            onRecorded={async (bytes, mime) => {
-              const ref = await onUpload({ name: "voice-note.webm", mime, type: "voice" }, bytes);
-              if (ref) update({ voiceKey: ref.key });
-            }}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {verdicts ? (
-            verdicts.map((verdict) => (
+      <footer className="sticky bottom-0 border-t border-border bg-background">
+        <div className="mx-auto w-full max-w-4xl space-y-2 px-4 py-3 sm:px-6">
+          <div className="flex items-start gap-2">
+            <Textarea
+              aria-label="Note"
+              placeholder={
+                item.kind === "request"
+                  ? "Write it here, or attach or record it"
+                  : "Add a note (optional)"
+              }
+              value={draft.comment}
+              onChange={(event) => update({ comment: event.target.value })}
+              className="min-h-10 flex-1"
+            />
+            <VoiceNoteButton
+              recorded={draft.voiceKey !== null}
+              onRecorded={async (bytes, mime) => {
+                const ref = await onUpload({ name: "voice-note.webm", mime, type: "voice" }, bytes);
+                if (ref) update({ voiceKey: ref.key });
+              }}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {verdicts ? (
+              verdicts.map((verdict) => (
+                <Button
+                  key={verdict.value}
+                  variant={
+                    verdict.value === "reject" || verdict.value === "never" ? "outline" : "default"
+                  }
+                  onClick={() => submit({ choice: verdict.value })}
+                >
+                  {verdict.label}
+                </Button>
+              ))
+            ) : item.kind === "timeline" ? (
+              <>
+                <Button onClick={() => submit({ choice: "approve", redoFrom: null })}>
+                  Approve run
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={draft.redoFrom === null}
+                  onClick={() => submit({ choice: "redo" })}
+                >
+                  Redo from {stepLabel(entry, draft.redoFrom) ?? "a step"}
+                </Button>
+              </>
+            ) : (
               <Button
-                key={verdict.value}
-                variant={
-                  verdict.value === "reject" || verdict.value === "never" ? "outline" : "default"
-                }
-                onClick={() => submit({ choice: verdict.value })}
+                disabled={problem !== null}
+                title={problem ?? undefined}
+                onClick={() => submit()}
               >
-                {verdict.label}
+                Send
               </Button>
-            ))
-          ) : item.kind === "timeline" ? (
-            <>
-              <Button onClick={() => submit({ choice: "approve", redoFrom: null })}>
-                Approve run
-              </Button>
+            )}
+            {item.options.length > 0 && item.kind !== "rank" ? (
               <Button
-                variant="outline"
-                disabled={draft.redoFrom === null}
-                onClick={() => submit({ choice: "redo" })}
+                variant="ghost"
+                disabled={!draft.comment.trim() && draft.voiceKey === null}
+                title="Needs a note saying what to try instead"
+                onClick={() => submit({}, true)}
               >
-                Redo from {stepLabel(entry, draft.redoFrom) ?? "a step"}
+                <RepeatIcon />
+                None of these, try again
               </Button>
-            </>
-          ) : (
-            <Button
-              disabled={problem !== null}
-              title={problem ?? undefined}
-              onClick={() => submit()}
-            >
-              Send
-            </Button>
-          )}
-          {item.options.length > 0 && item.kind !== "rank" ? (
-            <Button
-              variant="ghost"
-              disabled={!draft.comment.trim() && draft.voiceKey === null}
-              title="Needs a note saying what to try instead"
-              onClick={() => submit({}, true)}
-            >
-              <RepeatIcon />
-              None of these, try again
-            </Button>
-          ) : null}
-          {problem && !verdicts && item.kind !== "timeline" ? (
-            <span className="text-xs text-muted-foreground">{problem}</span>
-          ) : null}
+            ) : null}
+            {problem && !verdicts && item.kind !== "timeline" ? (
+              <span className="text-xs text-muted-foreground">{problem}</span>
+            ) : null}
+            <span className="ms-auto hidden text-2xs text-muted-foreground sm:inline">
+              {keyHints.join(" · ")}
+            </span>
+          </div>
         </div>
       </footer>
     </div>
@@ -246,14 +421,48 @@ function DecisionBody(props: BodyProps) {
 }
 
 function MediaList({ entry }: { entry: DecisionEntry }) {
-  const glbs = entry.item.media.filter((media) => media.type === "glb");
+  return <AttachedMedia entry={entry} media={entry.item.media} />;
+}
+
+/** A decision's own attachments; images open full screen. */
+function AttachedMedia({
+  entry,
+  media,
+}: {
+  entry: DecisionEntry;
+  media: ReadonlyArray<DecisionMediaRef>;
+}) {
+  const fullScreen = useContext(FullScreenContext);
+  const resolveMedia = useDecisionMediaResolver(entry.environmentId);
+  const glbs = media.filter((ref) => ref.type === "glb");
+  const images = media.filter((ref) => ref.type === "image");
+  if (media.length === 0) return null;
   return (
     <div className={cn("grid gap-3", glbs.length === 2 && "md:grid-cols-2")}>
-      {entry.item.media.map((media) => (
-        <figure key={media.key} className="space-y-1">
-          <DecisionMedia environmentId={entry.environmentId} media={media} />
-          {media.caption ? (
-            <figcaption className="text-xs text-muted-foreground">{media.caption}</figcaption>
+      {media.map((ref) => (
+        <figure key={ref.key} className="space-y-1">
+          {ref.type === "image" ? (
+            <button
+              type="button"
+              aria-label={`Open ${ref.caption ?? ref.name} full screen`}
+              className="block w-full cursor-zoom-in rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() =>
+                fullScreen.open(
+                  images.map((image) => ({
+                    src: resolveMedia(image),
+                    name: image.caption ?? image.name,
+                  })),
+                  images.indexOf(ref),
+                )
+              }
+            >
+              <DecisionMedia environmentId={entry.environmentId} media={ref} />
+            </button>
+          ) : (
+            <DecisionMedia environmentId={entry.environmentId} media={ref} />
+          )}
+          {ref.caption ? (
+            <figcaption className="text-xs text-muted-foreground">{ref.caption}</figcaption>
           ) : null}
         </figure>
       ))}
@@ -263,6 +472,8 @@ function MediaList({ entry }: { entry: DecisionEntry }) {
 
 function PickBody({ entry, draft, update }: BodyProps) {
   const { item } = entry;
+  const fullScreen = useContext(FullScreenContext);
+  const resolveMedia = useDecisionMediaResolver(entry.environmentId);
   const toggle = (id: string) => {
     if (item.max_choices === 1) return update({ optionIds: [id] });
     update({
@@ -271,53 +482,103 @@ function PickBody({ entry, draft, update }: BodyProps) {
         : [...draft.optionIds, id],
     });
   };
+  const mediaOf = (option: (typeof item.options)[number]) =>
+    option.media_idx === null ? null : (item.media[option.media_idx] ?? null);
+  // Options share one frame as soon as any of them has a picture, so tiles,
+  // captions and text-only options line up.
+  const framed = item.options.some((option) => mediaOf(option) !== null);
+  const imageOptions = item.options.filter((option) => mediaOf(option)?.type === "image");
+  const optionMedia = new Set(item.options.map((option) => option.media_idx));
+  const context = item.media.filter((_, index) => !optionMedia.has(index));
   return (
-    <div
-      className="grid grid-cols-2 gap-3 md:grid-cols-3"
-      role="listbox"
-      aria-multiselectable={item.max_choices > 1}
-    >
-      {item.options.map((option) => {
-        const media = option.media_idx === null ? null : item.media[option.media_idx];
-        const selected = draft.optionIds.includes(option.id);
-        return (
-          <div
-            key={option.id}
-            role="option"
-            tabIndex={0}
-            aria-selected={selected}
-            aria-label={option.label}
-            // Players inside the tile keep their own clicks; anywhere else selects it.
-            onClick={(event) => {
-              if ((event.target as HTMLElement).closest("audio,video,model-viewer")) return;
-              toggle(option.id);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
+    <div className="space-y-4">
+      <AttachedMedia entry={entry} media={context} />
+      <div
+        className={cn("grid gap-3", framed ? "grid-cols-2 md:grid-cols-3" : "sm:grid-cols-2")}
+        role="listbox"
+        aria-multiselectable={item.max_choices > 1}
+      >
+        {item.options.map((option, index) => {
+          const media = mediaOf(option);
+          const selected = draft.optionIds.includes(option.id);
+          return (
+            <div
+              key={option.id}
+              role="option"
+              tabIndex={0}
+              aria-selected={selected}
+              aria-label={option.label}
+              // Players and the full-screen button keep their own clicks; anywhere else selects.
+              onClick={(event) => {
+                if (
+                  (event.target as HTMLElement).closest("audio,video,model-viewer,[data-open-full]")
+                )
+                  return;
                 toggle(option.id);
-              }
-            }}
-            className={cn(
-              "flex cursor-pointer flex-col gap-2 rounded-lg border p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              selected ? "border-primary ring-2 ring-primary" : "border-border",
-            )}
-          >
-            {media ? <DecisionMedia environmentId={entry.environmentId} media={media} /> : null}
-            <span className="flex items-center gap-1.5 text-sm font-medium">
-              {option.label}
-              {option.recommended ? (
-                <Badge variant="info" size="sm">
-                  Recommended
-                </Badge>
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  toggle(option.id);
+                }
+              }}
+              className={cn(
+                "flex cursor-pointer flex-col gap-2 rounded-lg border p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                selected ? "border-primary ring-2 ring-primary" : "border-border",
+              )}
+            >
+              {framed ? (
+                media?.type === "image" ? (
+                  <button
+                    type="button"
+                    data-open-full
+                    aria-label={`Open ${option.label} full screen`}
+                    className="block w-full cursor-zoom-in rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() =>
+                      fullScreen.open(
+                        imageOptions.map((candidate) => ({
+                          src: resolveMedia(mediaOf(candidate)),
+                          name: candidate.label,
+                        })),
+                        imageOptions.indexOf(option),
+                        imageOptions.map((candidate) => candidate.id),
+                      )
+                    }
+                  >
+                    <DecisionMedia environmentId={entry.environmentId} media={media} framed />
+                  </button>
+                ) : media ? (
+                  <DecisionMedia environmentId={entry.environmentId} media={media} framed />
+                ) : (
+                  <div
+                    className={cn(
+                      DECISION_OPTION_FRAME_CLASS,
+                      "flex items-center justify-center p-4 text-center text-base font-medium text-foreground",
+                    )}
+                  >
+                    {option.label}
+                  </div>
+                )
               ) : null}
-            </span>
-            {option.reason ? (
-              <span className="text-xs text-muted-foreground">{option.reason}</span>
-            ) : null}
-          </div>
-        );
-      })}
+              <span className="flex items-start gap-1.5 text-sm font-medium">
+                <kbd className="mt-px rounded border border-border px-1 text-2xs text-muted-foreground">
+                  {index + 1}
+                </kbd>
+                <span className="min-w-0 flex-1">{framed && !media ? null : option.label}</span>
+                {option.recommended ? (
+                  <Badge variant="info" size="sm">
+                    Recommended
+                  </Badge>
+                ) : null}
+              </span>
+              {option.reason ? (
+                <span className="text-xs text-muted-foreground">{option.reason}</span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
