@@ -2,7 +2,7 @@ import { Box, Text } from "ink";
 import { createElement as h, useState } from "react";
 
 import { useViewport } from "./hooks.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 
 export interface PickerChoice<T> {
   readonly label: string;
@@ -13,8 +13,8 @@ export interface PickerChoice<T> {
 
 /**
  * A list to choose one entry from, for snooze times, models, and projects.
- * Typing filters, ↑/↓ (or ctrl+p/n) move, Enter picks, Esc cancels. j/k move
- * too until something is typed, so short lists keep vim keys.
+ * Vim keys move and q/h/Esc cancel; `/` types a filter (↑/↓ or ctrl+p/n move
+ * while filtering); Enter picks.
  */
 export function Picker<T>(props: {
   readonly title: string;
@@ -25,6 +25,8 @@ export function Picker<T>(props: {
   readonly onCancel: () => void;
 }) {
   const [query, setQuery] = useState("");
+  // `/` types a filter, as in vim; otherwise keys move (j/k, gg/G) and q/h cancel.
+  const [filtering, setFiltering] = useState(false);
   const [cursor, setCursor] = useState(props.initialIndex ?? 0);
   const { rows: height } = useViewport();
   const needle = query.toLowerCase();
@@ -35,26 +37,36 @@ export function Picker<T>(props: {
   const visible = Math.max(3, height - 6);
   const top = Math.max(0, Math.min(selected - Math.floor(visible / 2), shown.length - visible));
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
-      if (key.escape) return props.onCancel();
       if (key.return) {
         const choice = shown[selected];
         if (choice) props.onPick(choice.value);
         return;
       }
-      const vim = query === "";
-      if (key.downArrow || (key.ctrl && input === "n") || (vim && input === "j"))
-        return setCursor(Math.min(shown.length - 1, selected + 1));
-      if (key.upArrow || (key.ctrl && input === "p") || (vim && input === "k"))
-        return setCursor(Math.max(0, selected - 1));
-      if (key.backspace || key.delete) {
-        setQuery(query.slice(0, -1));
+      if (filtering) {
+        if (key.escape) return setFiltering(false);
+        if (key.downArrow || (key.ctrl && input === "n"))
+          return setCursor(Math.min(shown.length - 1, selected + 1));
+        if (key.upArrow || (key.ctrl && input === "p")) return setCursor(Math.max(0, selected - 1));
+        if (key.backspace || key.delete) {
+          setQuery(query.slice(0, -1));
+          return setCursor(0);
+        }
+        if (key.ctrl || key.tab || !input) return;
+        setQuery(query + input);
         return setCursor(0);
       }
-      if (key.ctrl || key.tab || !input) return;
-      setQuery(query + input);
-      setCursor(0);
+      if (key.escape) return props.onCancel();
+      if (input === "/") return setFiltering(true);
+      vim(input, key, {
+        cursor: selected,
+        count: shown.length,
+        page: visible,
+        onMove: setCursor,
+        onBack: props.onCancel,
+      });
     },
     { isActive: props.active },
   );
@@ -62,7 +74,12 @@ export function Picker<T>(props: {
   return h(
     Box,
     { flexDirection: "column" },
-    h(Text, { bold: true }, props.title, query ? h(Text, { color: "cyan" }, `  /${query}`) : null),
+    h(
+      Text,
+      { bold: true },
+      props.title,
+      query || filtering ? h(Text, { color: "cyan" }, `  /${query}${filtering ? "█" : ""}`) : null,
+    ),
     shown.length === 0
       ? h(Text, { dimColor: true }, "Nothing matches.")
       : shown.slice(top, top + visible).map((choice, offset) => {
@@ -77,6 +94,12 @@ export function Picker<T>(props: {
               : null,
           );
         }),
-    h(Text, { dimColor: true }, "type to filter · enter pick · esc cancel"),
+    h(
+      Text,
+      { dimColor: true },
+      filtering
+        ? "type to filter · enter pick · esc stop filtering"
+        : "/ filter · enter pick · q back",
+    ),
   );
 }

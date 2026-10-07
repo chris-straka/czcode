@@ -10,7 +10,7 @@ import { createElement as h, useContext, useMemo, useState, type ReactNode } fro
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useCommand } from "./command.ts";
 import { useNow } from "./hooks.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 import { HostLoadLine, type HostResult, useHostLoads } from "./useHostLoads.ts";
 import { anyLoading } from "../model/hostLoad.ts";
 
@@ -81,11 +81,11 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
   const refresh = (environmentId: EnvironmentId) =>
     registry.refresh(atoms.queue.list({ environmentId, input: null }));
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
-      if (key.downArrow || input === "j") setCursor(Math.min(rows.length - 1, cursor + 1));
-      else if (key.upArrow || input === "k") setCursor(Math.max(0, cursor - 1));
-      else if (selected?.run.status === "queued" && input === "r") {
+      if (vim(input, key, { cursor, count: rows.length, page: 10, onMove: setCursor })) return;
+      if (selected?.run.status === "queued" && input === "r") {
         const { environmentId } = selected;
         void runNow({ environmentId, input: { id: selected.run.id } }).then(() =>
           refresh(environmentId),

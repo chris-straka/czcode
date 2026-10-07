@@ -35,7 +35,7 @@ import { LOCAL_CONNECTION_ID } from "../runtime/platform.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 import { Picker } from "./Picker.ts";
 import { QuestionPanel } from "./QuestionPanel.ts";
 import { TextInput } from "./TextInput.ts";
@@ -53,7 +53,7 @@ const TONE: Record<
   error: { color: "red" },
 };
 
-type Composer = "closed" | "reply" | "attach";
+type Composer = "closed" | "reply" | "attach" | "search";
 
 /**
  * One thread, live: the transcript tail, what it's waiting on, and the
@@ -93,6 +93,9 @@ export function ThreadScreen(props: {
   const [answering, setAnswering] = useState(false);
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const [scroll, setScroll] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  // Index into `matches` of the match on show; null before the first search.
+  const [matchIndex, setMatchIndex] = useState<number | null>(null);
   const startTurn = useCommand(atoms.threadEnvironment.startTurn);
   const interrupt = useCommand(atoms.threadEnvironment.interruptTurn);
   const setRuntimeMode = useCommand(atoms.threadEnvironment.setRuntimeMode);
@@ -113,7 +116,9 @@ export function ThreadScreen(props: {
     const timer = setTimeout(() => {
       const state = AsyncResult.value(registry.get(atoms.catalog.stateAtom(environmentId)));
       if (Option.isSome(state) && state.value.phase === "connected") return;
-      void wakeHost(environmentId).then((message) => message && setStatus(message));
+      void wakeHost(environmentId, { userInitiated: false }).then(
+        (message) => message && setStatus(message),
+      );
     }, 3000);
     return () => clearTimeout(timer);
   }, [atoms, environmentId, registry, setStatus, wakeHost]);
@@ -185,6 +190,27 @@ export function ThreadScreen(props: {
   const maxScroll = Math.max(0, rows.length - visible);
   const offset = Math.min(scroll, maxScroll);
   const shown = rows.slice(rows.length - visible - offset, rows.length - offset);
+  const needle = searchQuery.trim().toLowerCase();
+  const matches = useMemo(
+    () =>
+      needle === ""
+        ? []
+        : rows.flatMap((row, index) => (row.text.toLowerCase().includes(needle) ? [index] : [])),
+    [rows, needle],
+  );
+  const currentMatchRow = matchIndex === null ? null : (matches[matchIndex] ?? null);
+  /** Scrolls so the given transcript row sits in view, a few lines from the top. */
+  const showRow = (row: number) =>
+    setScroll(Math.max(0, Math.min(maxScroll, rows.length - visible - row + 2)));
+  const jumpToMatch = (index: number) => {
+    if (matches.length === 0) return setStatus(`No match for "${searchQuery.trim()}".`);
+    const wrapped = ((index % matches.length) + matches.length) % matches.length;
+    setMatchIndex(wrapped);
+    const row = matches[wrapped];
+    if (row !== undefined) showRow(row);
+    setStatus(`${wrapped + 1}/${matches.length} · n next · N previous`);
+  };
+  const vim = useVimMotion();
 
   const send = (text: string, extra: { readonly planId?: PlanId } = {}) => {
     if (!projection || (text.trim() === "" && attachments.length === 0)) return;
@@ -290,13 +316,20 @@ export function ThreadScreen(props: {
       if (input === "+") return setComposer("attach");
       if (key.ctrl && input === "v") return pasteImage();
       if (input === "F") return fork();
-      if (key.pageUp || (key.ctrl && input === "b"))
-        return setScroll(Math.min(maxScroll, offset + visible - 1));
-      if (key.pageDown || (key.ctrl && input === "f"))
-        return setScroll(Math.max(0, offset - visible + 1));
-      if (input === "k" || key.upArrow) return setScroll(Math.min(maxScroll, offset + 1));
-      if (input === "j" || key.downArrow) return setScroll(Math.max(0, offset - 1));
-      if (input === "G") return setScroll(0);
+      // Scroll position counts from the top here; `scroll` counts up from the end.
+      if (
+        vim(input, key, {
+          cursor: maxScroll - offset,
+          count: maxScroll + 1,
+          page: visible,
+          onMove: (top) => setScroll(maxScroll - top),
+          onBack: props.onBack,
+        })
+      )
+        return;
+      if (input === "/") return setComposer("search");
+      if (input === "n" && needle) return jumpToMatch((matchIndex ?? matches.length) + 1);
+      if (input === "N" && needle) return jumpToMatch((matchIndex ?? 0) - 1);
       if (input === "m" && projection) {
         const modes = RuntimeMode.literals;
         const next = modes[(modes.indexOf(projection.thread.runtimeMode) + 1) % modes.length];
@@ -406,8 +439,9 @@ export function ThreadScreen(props: {
     "+ image",
     `v ${verbose ? "brief" : "detail"}`,
     "F fork",
-    offset > 0 ? `${offset} up, G end` : "pgup/pgdn",
-    "esc back",
+    "/ search",
+    offset > 0 ? `${offset} up, G end` : "ctrl-u/d",
+    "q back",
   ].filter(Boolean);
 
   return h(
@@ -426,7 +460,19 @@ export function ThreadScreen(props: {
     h(
       Box,
       { flexDirection: "column", height: visible },
-      shown.map((row) => h(Text, { key: row.key, ...TONE[row.tone] }, row.text || " ")),
+      shown.map((row, index) =>
+        h(
+          Text,
+          {
+            key: row.key,
+            ...TONE[row.tone],
+            ...(rows.length - visible - offset + index === currentMatchRow
+              ? { inverse: true }
+              : {}),
+          },
+          row.text || " ",
+        ),
+      ),
     ),
     approval
       ? h(
@@ -513,20 +559,37 @@ export function ThreadScreen(props: {
               `enter ${running ? (steer ? "steer" : "queue") : "send"}${running ? ` · tab ${steer ? "queue" : "steer"}` : ""} · alt+enter newline · ↑ last sent · ctrl+v paste image · esc`,
             ),
           )
-        : composer === "attach"
+        : composer === "search"
           ? h(
               Box,
-              { flexDirection: "column" },
-              h(Text, null, "Image to attach (path; drag a file in):"),
+              null,
+              h(Text, { color: "cyan" }, "/"),
               h(TextInput, {
-                value: attachPath,
+                value: searchQuery,
                 active: props.active,
-                placeholder: "~/Desktop/screenshot.png",
-                onChange: setAttachPath,
-                onSubmit: attachFile,
+                placeholder: "search this thread",
+                onChange: setSearchQuery,
+                onSubmit: () => {
+                  setComposer("closed");
+                  // Like vim's /, start from the newest match.
+                  jumpToMatch(matches.length - 1);
+                },
               }),
             )
-          : h(Text, { dimColor: true, wrap: "wrap" }, hints.join(" · ")),
+          : composer === "attach"
+            ? h(
+                Box,
+                { flexDirection: "column" },
+                h(Text, null, "Image to attach (path; drag a file in):"),
+                h(TextInput, {
+                  value: attachPath,
+                  active: props.active,
+                  placeholder: "~/Desktop/screenshot.png",
+                  onChange: setAttachPath,
+                  onSubmit: attachFile,
+                }),
+              )
+            : h(Text, { dimColor: true, wrap: "wrap" }, hints.join(" · ")),
     ),
   );
 }

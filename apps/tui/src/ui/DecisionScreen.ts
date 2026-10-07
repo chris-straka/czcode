@@ -26,7 +26,7 @@ import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
 import { MediaView } from "./MediaView.ts";
 import { TextInput } from "./TextInput.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 
 type Typing =
   | { readonly field: "comment" }
@@ -152,6 +152,7 @@ export function DecisionScreen(props: {
     else openWithSystem(mediaPath);
   };
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
       if (key.escape) {
@@ -164,15 +165,28 @@ export function DecisionScreen(props: {
         setText(draft.comment);
         return setTyping({ field: "comment" });
       }
-      if (key.downArrow || input === "j") return setCursor(Math.min(rows.length - 1, cursor + 1));
-      if (key.upArrow || input === "k") return setCursor(Math.max(0, cursor - 1));
+      // Playtest keeps a lone g for its "good" note, so gg isn't a motion there.
+      if (
+        !(item.kind === "playtest" && input === "g") &&
+        vim(input, key, {
+          cursor,
+          count: rows.length,
+          page: 10,
+          onMove: setCursor,
+          onBack: () => {
+            stop();
+            props.onDone();
+          },
+        })
+      )
+        return;
       if (key.tab && item.media.length > 1)
         return setMediaIndex((mediaIndex + 1) % item.media.length);
       if (input === "o") return openMedia();
       if (media?.type === "glb") {
-        if (key.leftArrow || input === "h")
+        if (key.leftArrow || input === "<")
           return setFrame((frame + TURNTABLE_FRAMES - 1) % TURNTABLE_FRAMES);
-        if (key.rightArrow || input === "l") return setFrame((frame + 1) % TURNTABLE_FRAMES);
+        if (key.rightArrow || input === ">") return setFrame((frame + 1) % TURNTABLE_FRAMES);
         if (input === "C") return setClay(!clay);
       }
       const verdicts = VERDICT_BUTTONS[item.kind];
@@ -406,5 +420,5 @@ function keyHelp(
         : media === "file" || media === "text"
           ? " · o open"
           : "";
-  return `${byKind[kind]}${mediaKeys}${manyMedia ? " · tab media" : ""} · c note · enter send · N none · esc`;
+  return `${byKind[kind]}${mediaKeys}${manyMedia ? " · tab media" : ""} · c note · enter send · N none · q back`;
 }

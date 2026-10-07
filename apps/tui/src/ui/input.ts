@@ -10,7 +10,9 @@
  * @module input
  */
 import { type DOMElement, type Key, useApp, useInput, useStdin, useStdout } from "ink";
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
+
+import { type VimContext, vimMotion } from "../model/vim.ts";
 
 export interface MouseEvent {
   readonly kind: "wheel-up" | "wheel-down" | "click";
@@ -163,4 +165,34 @@ export function useMouseRouter() {
       stdout.write("\u001b[?1006l\u001b[?1000l");
     };
   }, [stdin, stdout, exit]);
+}
+
+/**
+ * Vim motions for a screen (see model/vim.ts). Call the returned function
+ * first in the screen's key handler; it reports whether it used the key.
+ * Without `onBack`, q and h fall through (q then quits from the top level).
+ */
+export function useVimMotion() {
+  const pendingG = useRef(false);
+  return useCallback(
+    (
+      input: string,
+      key: Key,
+      context: Omit<VimContext, "pendingG"> & {
+        readonly onMove: (cursor: number) => void;
+        readonly onBack?: () => void;
+      },
+    ): boolean => {
+      const action = vimMotion(input, key, { ...context, pendingG: pendingG.current });
+      pendingG.current = action?.kind === "pending";
+      if (action === null) return false;
+      if (action.kind === "move") context.onMove(action.cursor);
+      else if (action.kind === "back") {
+        if (!context.onBack) return false;
+        context.onBack();
+      }
+      return true;
+    },
+    [],
+  );
 }

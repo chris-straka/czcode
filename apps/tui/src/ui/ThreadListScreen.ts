@@ -22,7 +22,7 @@ import {
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext, useCommand } from "./command.ts";
 import { useNow, useViewport } from "./hooks.ts";
-import { useClick, useKeys } from "./input.ts";
+import { useClick, useKeys, useVimMotion } from "./input.ts";
 import { Picker } from "./Picker.ts";
 import { HostLoadLine, useHostLoads } from "./useHostLoads.ts";
 import { anyLoading, hostLoadSummary } from "../model/hostLoad.ts";
@@ -279,13 +279,13 @@ export function ThreadListScreen({
           () => unarchive(ref(row)),
         );
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
-      if (key.downArrow || input === "j")
-        return setCursor(Math.min(items.length - 1, selected + 1));
-      if (key.upArrow || input === "k") return setCursor(Math.max(0, selected - 1));
-      if (input === "g") return setCursor(0);
-      if (input === "G") return setCursor(Math.max(0, items.length - 1));
+      if (
+        vim(input, key, { cursor: selected, count: items.length, page: visible, onMove: setCursor })
+      )
+        return;
       if (input === "/") return setMode({ kind: "search" });
       if (key.escape && query) {
         setQuery("");

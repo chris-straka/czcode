@@ -7,7 +7,7 @@ import { createElement as h, useMemo, useState } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useViewport } from "./hooks.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 
 const lineColor = (line: string) =>
   line.startsWith("+++") || line.startsWith("---")
@@ -57,22 +57,27 @@ export function DiffScreen(props: {
   const visible = Math.max(3, height - 3);
   const maxTop = Math.max(0, lines.length - visible);
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
       if (key.escape || input === "d") return props.onBack();
-      if (input === "h" || key.leftArrow) return showTurn(turn - 1);
-      if (input === "l" || key.rightArrow) return showTurn(turn + 1);
+      if (input === "<" || key.leftArrow) return showTurn(turn - 1);
+      if (input === ">" || key.rightArrow) return showTurn(turn + 1);
       if (input === "a") {
         setWhole(!whole);
         return setTop(0);
       }
-      if (input === "j" || key.downArrow) setTop(Math.min(maxTop, top + 1));
-      else if (input === "k" || key.upArrow) setTop(Math.max(0, top - 1));
-      else if (key.pageDown || (key.ctrl && input === "f") || input === " ")
-        setTop(Math.min(maxTop, top + visible - 1));
-      else if (key.pageUp || (key.ctrl && input === "b")) setTop(Math.max(0, top - visible + 1));
-      else if (input === "g") setTop(0);
-      else if (input === "G") setTop(maxTop);
+      if (
+        vim(input, key, {
+          cursor: top,
+          count: maxTop + 1,
+          page: visible,
+          onMove: setTop,
+          onBack: props.onBack,
+        })
+      )
+        return;
+      if (input === " ") setTop(Math.min(maxTop, top + visible - 1));
       else if (input === "]") {
         const next = lines.findIndex((line, index) => index > top && line.startsWith("diff "));
         if (next >= 0) setTop(Math.min(maxTop, next));
@@ -94,9 +99,9 @@ export function DiffScreen(props: {
     );
   }
   const scopeLabel = whole ? "all turns" : `turn ${turn}/${props.toTurnCount}`;
-  const keys = `h/l turn · a ${whole ? "one turn" : "all turns"}`;
+  const keys = `</> turn · a ${whole ? "one turn" : "all turns"}`;
   if (diff.trim() === "")
-    return h(Text, { dimColor: true }, `No changes in ${scopeLabel}. ${keys} · esc back`);
+    return h(Text, { dimColor: true }, `No changes in ${scopeLabel}. ${keys} · q back`);
   return h(
     Box,
     { flexDirection: "column" },
@@ -116,7 +121,7 @@ export function DiffScreen(props: {
     h(
       Text,
       { dimColor: true },
-      `${scopeLabel} · ${top + 1}-${Math.min(lines.length, top + visible)}/${lines.length} · ]/[ file · ${keys} · esc back`,
+      `${scopeLabel} · ${top + 1}-${Math.min(lines.length, top + visible)}/${lines.length} · ]/[ file · ${keys} · q back`,
     ),
   );
 }
