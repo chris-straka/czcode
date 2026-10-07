@@ -7,7 +7,8 @@ phone and desktop, and back. Started inside a project folder, it shows that proj
 `a` switches to all projects.
 
 Tabs: **1** Threads, **2** Decisions, **3** Queue, **4** Hosts, **5** [Fleet](./fleet.md). Each
-screen lists its keys at the bottom; `esc` goes back and `q` quits.
+screen lists its keys at the bottom. Vim keys work everywhere: `j`/`k`, `gg`/`G`,
+`ctrl-d`/`ctrl-u`, `/` to search, and `q`, `h` or `esc` to go back (`q` quits from a tab).
 
 ## Threads
 
@@ -23,6 +24,14 @@ message, `e` steps its reasoning effort, `p` toggles plan mode, `I` implements a
 `m` cycles access. `d` shows the latest turn's changes (`h`/`l` other turns, `a` all of them),
 `v` expands tool output, `F` forks from the last finished turn, and `s` stops the run. Agent
 questions are answered in place: digits pick options, `i` types your own answer.
+
+## Decisions
+
+The tab's count covers the decisions the current filter shows (`a` switches between this project
+and all). In a decision, `1`-`9` pick an option (or a verdict), `]`/`[` move between options,
+Enter sends, `c` adds a note, and `n`/`p` step to the next or previous decision. `j`/`k` scroll,
+`o` opens the focused image full screen, and `t` opens the thread that asked. Images show
+inline in Ghostty and kitty, including inside a neovim float.
 
 ## Queue
 
