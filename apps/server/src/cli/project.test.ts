@@ -147,6 +147,14 @@ it.effect("adds, renames, and removes projects through the V2 project CLI domain
     yield* runCli(["project", "rename", workspaceRoot, "Beta", "--base-dir", baseDir]);
     assert.equal((yield* readProjects(baseDir)).projects[0]?.title, "Beta");
 
+    // A moved folder: the old path no longer exists, the project follows it.
+    const movedRoot = `${workspaceRoot}-moved`;
+    NodeFS.renameSync(workspaceRoot, movedRoot);
+    yield* runCli(["project", "move", workspaceRoot, movedRoot, "--base-dir", baseDir]);
+    const moved = (yield* readProjects(baseDir)).projects[0];
+    assert.equal(moved?.workspaceRoot, movedRoot);
+    assert.equal(moved?.title, "Beta");
+
     yield* runCli(["project", "remove", added?.id ?? "", "--base-dir", baseDir]);
     assert.deepEqual((yield* readProjects(baseDir)).projects, []);
   }).pipe(Effect.provide(NodeServices.layer)),
