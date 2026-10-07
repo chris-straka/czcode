@@ -46,6 +46,12 @@ export class DesktopEnvironment extends Context.Service<
     readonly appDataDirectory: string;
     readonly baseDir: string;
     readonly stateDir: string;
+    /**
+     * Holds the computer's shared machine list (`@cz/shared/configDir`), which
+     * the terminal app and CLI use too. Development builds keep theirs in
+     * `stateDir` unless `CZ_CONFIG_DIR` says otherwise.
+     */
+    readonly machineListDir: string;
     readonly desktopSettingsPath: string;
     readonly clientSettingsPath: string;
     readonly savedEnvironmentRegistryPath: string;
@@ -207,6 +213,14 @@ const make = Effect.fn("desktop.environment.make")(function* (
     appDataDirectory,
     baseDir,
     stateDir,
+    machineListDir: Option.getOrElse(config.czConfigDir, () =>
+      isDevelopment
+        ? stateDir
+        : path.join(
+            Option.getOrElse(config.xdgConfigHome, () => path.join(homeDirectory, ".config")),
+            "czcode",
+          ),
+    ),
     desktopSettingsPath: path.join(stateDir, "desktop-settings.json"),
     clientSettingsPath: path.join(stateDir, "client-settings.json"),
     savedEnvironmentRegistryPath: path.join(stateDir, "saved-environments.json"),

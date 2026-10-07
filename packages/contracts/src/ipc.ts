@@ -1113,7 +1113,8 @@ export interface DesktopBridge {
   setClientSettings: (settings: ClientSettings) => Promise<void>;
   getConnectionCatalog?: () => Promise<string | null>;
   setConnectionCatalog?: (catalog: string) => Promise<boolean>;
-  clearConnectionCatalog?: () => Promise<void>;
+  /** Another app on this computer changed the shared machine list. */
+  onConnectionCatalogChange?: (listener: () => void) => () => void;
   discoverSshHosts: () => Promise<readonly DesktopDiscoveredSshHost[]>;
   /** Resolves a suggested SSH alias before populating the connection form. */
   resolveSshHost: (alias: string) => Promise<DesktopSshEnvironmentTarget>;

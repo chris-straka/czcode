@@ -236,3 +236,40 @@ export function putRemoteDpopTokenInCatalog(
     ),
   };
 }
+
+/**
+ * Adds the environments `other` saved that `document` lacks, with their
+ * routes, profiles, credentials, and on/off state. Environments both have keep
+ * `document`'s records: used to fold an app's own old list into the shared one
+ * without overwriting a machine another app already paired.
+ */
+export function addMissingEnvironmentsToCatalog(
+  document: ConnectionCatalogDocument,
+  other: ConnectionCatalogDocument,
+): ConnectionCatalogDocument {
+  const known = new Set(document.targets.map((target) => target.environmentId));
+  const added = other.targets.filter((target) => !known.has(target.environmentId));
+  if (added.length === 0) return document;
+  const environmentIds = new Set(added.map((target) => target.environmentId));
+  const connectionIds = new Set(added.flatMap((target) => connectionIdOf(target) ?? []));
+  return {
+    ...document,
+    targets: [...document.targets, ...added],
+    profiles: [
+      ...document.profiles,
+      ...other.profiles.filter((profile) => connectionIds.has(profile.connectionId)),
+    ],
+    credentials: [
+      ...document.credentials,
+      ...other.credentials.filter((entry) => connectionIds.has(entry.connectionId)),
+    ],
+    remoteDpopTokens: [
+      ...document.remoteDpopTokens,
+      ...other.remoteDpopTokens.filter((token) => environmentIds.has(token.environmentId)),
+    ],
+    disabledEnvironmentIds: [
+      ...document.disabledEnvironmentIds,
+      ...other.disabledEnvironmentIds.filter((id) => environmentIds.has(id)),
+    ],
+  };
+}

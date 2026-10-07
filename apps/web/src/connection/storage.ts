@@ -391,6 +391,11 @@ export interface CatalogBackend {
   readonly read: Effect.Effect<string | null, ConnectionTransientError>;
   readonly write: (raw: string) => Effect.Effect<void, ConnectionTransientError>;
   readonly quarantine?: (raw: string) => Effect.Effect<void, ConnectionTransientError>;
+  /**
+   * Set when other apps on the computer share the list (the desktop app's
+   * machine list): reads skip the cache and it emits after they change it.
+   */
+  readonly sharedChanges?: Stream.Stream<void>;
 }
 
 export function makeCatalogBackend(database: DatabaseHandle): CatalogBackend {
@@ -417,6 +422,18 @@ export function makeCatalogBackend(database: DatabaseHandle): CatalogBackend {
                 ),
           ),
         ),
+      ...(bridge.onConnectionCatalogChange === undefined
+        ? {}
+        : {
+            sharedChanges: Stream.callback<void>((queue) =>
+              Effect.acquireRelease(
+                Effect.sync(() =>
+                  bridge.onConnectionCatalogChange!(() => Queue.offerUnsafe(queue, undefined)),
+                ),
+                (unsubscribe) => Effect.sync(unsubscribe),
+              ),
+            ),
+          }),
     };
   }
 
@@ -431,6 +448,7 @@ export function makeCatalogBackend(database: DatabaseHandle): CatalogBackend {
 }
 
 interface CatalogStore {
+  readonly changes: Stream.Stream<void> | undefined;
   readonly read: Effect.Effect<ConnectionCatalogDocumentType, ConnectionTransientError>;
   readonly update: (
     transform: (catalog: ConnectionCatalogDocumentType) => ConnectionCatalogDocumentType,
@@ -445,7 +463,7 @@ export const makeCatalogStore = Effect.fn("web.connectionStorage.makeCatalogStor
 
   const loadUnlocked = Effect.fn("web.connectionStorage.loadCatalog")(function* () {
     const cached = yield* Ref.get(state);
-    if (Option.isSome(cached)) {
+    if (Option.isSome(cached) && backend.sharedChanges === undefined) {
       return cached.value;
     }
     const raw = yield* backend.read;
@@ -496,7 +514,7 @@ export const makeCatalogStore = Effect.fn("web.connectionStorage.makeCatalogStor
     },
   );
 
-  return { read, update } satisfies CatalogStore;
+  return { read, update, changes: backend.sharedChanges } satisfies CatalogStore;
 });
 
 const GITHUB_ROUTING_KEY_PREFIX = "czcode:github-routing:";
@@ -618,6 +636,7 @@ export const layer = Layer.effectContext(
         Effect.map((document) => document.disabledEnvironmentIds),
         Effect.mapError((cause) => persistenceError("list-disabled-targets", cause)),
       ),
+      ...(catalog.changes === undefined ? {} : { changes: catalog.changes }),
     });
     const registrationStore = Persistence.ConnectionRegistrationStore.of({
       register: (registration, routes) =>

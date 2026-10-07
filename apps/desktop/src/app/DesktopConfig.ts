@@ -38,6 +38,7 @@ export const DesktopConfig = Config.all({
   xdgConfigHome: trimmedString("XDG_CONFIG_HOME"),
   xdgDataHome: trimmedString("XDG_DATA_HOME"),
   czHome: trimmedString("CZ_HOME"),
+  czConfigDir: trimmedString("CZ_CONFIG_DIR"),
   devServerUrl: Config.URL("VITE_DEV_SERVER_URL").pipe(Config.option),
   appUserModelIdOverride: trimmedString("CZ_DESKTOP_APP_USER_MODEL_ID"),
   devRemoteCzServerEntryPath: trimmedString("CZ_DEV_REMOTE_CZ_SERVER_ENTRY_PATH"),
