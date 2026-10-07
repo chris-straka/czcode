@@ -23,7 +23,7 @@ import * as NodePath from "node:path";
 import { expandPath, imageAttachment } from "../model/attachments.ts";
 import { cycleEffort, hostModels, modelLabel } from "../model/hosts.ts";
 import { hasActiveRun, type LineTone, transcriptLines } from "../model/transcript.ts";
-import { wrapText } from "../model/wrap.ts";
+import { READING_WIDTH, wrapText } from "../model/wrap.ts";
 import {
   floatTerminalLua,
   parentNvim,
@@ -169,7 +169,8 @@ export function ThreadScreen(props: {
   const rows = useMemo(() => {
     const out: Array<{ key: string; tone: LineTone; text: string }> = [];
     for (const line of transcriptLines(projection?.visibleTurnItems ?? [], { verbose })) {
-      wrapText(line.text, width).forEach((text, index) =>
+      const prose = line.tone === "user" || line.tone === "assistant";
+      wrapText(line.text, prose ? Math.min(width, READING_WIDTH) : width).forEach((text, index) =>
         out.push({ key: `${line.key}:${index}`, tone: line.tone, text }),
       );
     }

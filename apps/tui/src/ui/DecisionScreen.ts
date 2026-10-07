@@ -21,7 +21,7 @@ import {
 } from "../model/decisionDraft.ts";
 import { adbInstall, openInF3d, openWithSystem, play, TURNTABLE_FRAMES } from "../model/media.ts";
 import { tileGrid } from "../model/decisionTiles.ts";
-import { wrapText } from "../model/wrap.ts";
+import { READING_WIDTH, wrapText } from "../model/wrap.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext, useCommand } from "./command.ts";
 import { useViewport } from "./hooks.ts";
@@ -167,6 +167,7 @@ export function DecisionScreen(props: {
 
   const verdicts = VERDICT_BUTTONS[item.kind];
   const width = Math.max(20, columns - 2);
+  const reading = Math.min(width, READING_WIDTH);
   const optionMedia = rows.map((row) =>
     row.media === null ? null : (item.media[row.media] ?? null),
   );
@@ -360,14 +361,14 @@ export function DecisionScreen(props: {
     [];
   const line = (key: string, node: ReactNode) => blocks.push({ key, height: 1, node });
   const title = (item.title || item.question).trim();
-  for (const [index, text] of wrapText(title, width).entries())
+  for (const [index, text] of wrapText(title, reading).entries())
     line(`title${index}`, h(Text, { bold: true }, text));
   if (item.title && item.question.trim() !== item.title.trim()) {
-    for (const [index, text] of wrapText(item.question, width).entries())
+    for (const [index, text] of wrapText(item.question, reading).entries())
       line(`q${index}`, h(Text, null, text));
   }
   if (item.kind !== "read") {
-    for (const [index, text] of wrapText(item.body_md, width).entries())
+    for (const [index, text] of wrapText(item.body_md, reading).entries())
       line(`b${index}`, h(Text, { dimColor: true }, text || " "));
   }
   if (contextMedia && !tiled) {
