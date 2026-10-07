@@ -423,7 +423,12 @@ export const makeWithHosts = Effect.fn("DeviceService.makeWithHosts")(function* 
         }
       }
     }
-    return { devices, detail: list.errors?.map((error) => error.message).join("\n") || undefined };
+    // The hub still tries simctl where iOS is unavailable; that failure isn't news.
+    const iosAvailable = (yield* host.platformAvailability("ios")).available;
+    const errors = (list.errors ?? []).filter(
+      (error) => iosAvailable || !/apple-utils|simctl|xcrun/i.test(error.message),
+    );
+    return { devices, detail: errors.map((error) => error.message).join("\n") || undefined };
   });
 
   const refresh = Effect.fn("DeviceService.refresh")(function* (ready: DeviceReadiness) {
