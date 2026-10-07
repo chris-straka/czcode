@@ -164,6 +164,8 @@ healthy() {
   systemctl --user is-active -q "$unit" && cz thread list --json > /dev/null 2>&1
 }
 if healthy; then
+  # Job definitions and scripts may have changed with the release.
+  bash "$current/ccez/hosts/host-jobs.sh" > /dev/null || echo "Couldn't reinstall the host jobs."
   echo "Updated cz to $(short "$(release_sha "$(readlink -f "$current")")")."
   exit 0
 fi

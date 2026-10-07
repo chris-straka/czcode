@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # Installs this host's scheduled jobs as systemd user timers. linux.sh runs
-# it; to (re)install by hand:
+# it, and so does each cz update; to (re)install by hand:
 #
-#   bash ~/.local/lib/cz-host/cz/current/ccez/hosts/host-jobs.sh
+#   bash ~/SWE/czcode/ccez/hosts/host-jobs.sh
 #
 # Set CZ_HOST_PR_AUTOMERGE=1 on the one host that should merge the owner's
-# green PRs; it stays on through later runs until CZ_HOST_PR_AUTOMERGE=0. The jobs run the scripts from the installed cz release
-# (~/.local/lib/cz-host/cz/current), so they update along with cz.
+# green PRs; it stays on through later runs until CZ_HOST_PR_AUTOMERGE=0.
 #
 # Each job is a cz-job-<name> service and timer, listed with its schedule in
 # ~/.config/cz-host/jobs.toml for czcode's Schedules view. job-run.sh records
@@ -15,7 +14,10 @@
 # idle sleep) and stays up while a job runs, so the nightly jobs find the
 # other hosts awake.
 set -euo pipefail
+# The installed release's copy, so jobs change only with cz updates (which
+# rerun this); this folder's until a release exists.
 hosts="$HOME/.local/lib/cz-host/cz/current/ccez/hosts"
+[ -f "$hosts/job-run.sh" ] || hosts=$(cd "$(dirname "$0")" && pwd)
 units="$HOME/.config/systemd/user"
 config="$HOME/.config/cz-host"
 wake=03:30
@@ -33,8 +35,6 @@ automerge=0
   "pr-automerge|*:0/10|pr-automerge.sh|Merge the owner's green PRs; ask Dependabot to rebase conflicting ones"
 )
 
-[ -f "$hosts/job-run.sh" ] ||
-  { echo "No cz release at $hosts yet; run cz-update.sh first." >&2 && exit 1; }
 mkdir -p "$units" "$config" "$units/cz-host.service.d"
 
 # The pr-automerge timer from before host jobs (install-pr-automerge.sh).
