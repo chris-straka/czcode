@@ -15,10 +15,10 @@ import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
 import { Box, Text } from "ink";
 import { createElement as h, useContext, useEffect, useMemo, useState } from "react";
-import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { basename } from "node:path";
+import * as NodeCrypto from "node:crypto";
+import * as NodeFSP from "node:fs/promises";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 
 import { expandPath, imageAttachment } from "../model/attachments.ts";
 import { cycleEffort, hostModels, modelLabel } from "../model/hosts.ts";
@@ -195,10 +195,10 @@ export function ThreadScreen(props: {
     void startTurn({
       environmentId,
       input: {
-        commandId: CommandId.make(randomUUID()),
+        commandId: CommandId.make(NodeCrypto.randomUUID()),
         threadId,
         message: {
-          messageId: MessageId.make(randomUUID()),
+          messageId: MessageId.make(NodeCrypto.randomUUID()),
           role: "user",
           text,
           attachments,
@@ -223,10 +223,10 @@ export function ThreadScreen(props: {
   const attachFile = (typed: string) => {
     setComposer(draft ? "reply" : "closed");
     setAttachPath("");
-    const path = expandPath(typed, homedir());
+    const path = expandPath(typed, NodeOS.homedir());
     if (!path) return;
-    void readFile(path).then(
-      (bytes) => attach(new Uint8Array(bytes), basename(path)),
+    void NodeFSP.readFile(path).then(
+      (bytes) => attach(new Uint8Array(bytes), NodePath.basename(path)),
       () => setStatus(`Can't read ${path}.`),
     );
   };
@@ -247,7 +247,7 @@ export function ThreadScreen(props: {
   const fork = () => {
     const run = projection?.runs.findLast((candidate) => candidate.status === "completed");
     if (!run) return setStatus("Nothing finished to fork from yet.");
-    const targetThreadId = ThreadId.make(randomUUID());
+    const targetThreadId = ThreadId.make(NodeCrypto.randomUUID());
     void forkFromRun({
       environmentId,
       input: { sourceThreadId: threadId, targetThreadId, runId: run.id },

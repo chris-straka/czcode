@@ -113,7 +113,7 @@ export function fleetWarnings(resources: HostResourcesSnapshot | null): Array<Fl
   // Least headroom first.
   const headroom = (warning: FleetWarning) =>
     warning.kind === "disk" ? warning.freeRatio : 1 - warning.usedRatio;
-  return warnings.toSorted((left, right) => headroom(left) - headroom(right));
+  return [...warnings].sort((left, right) => headroom(left) - headroom(right));
 }
 
 function machineState(input: FleetMachineInput): FleetMachineState {
@@ -155,7 +155,7 @@ function agentsOf(shell: FleetMachineInput["shell"]): Array<FleetAgent> {
         sinceMs: toMs(thread.activityRunStartedAt) ?? toMs(thread.latestRunStartedAt),
       };
     })
-    .toSorted(
+    .sort(
       (left, right) =>
         Number(right.needsYou) - Number(left.needsYou) ||
         (left.sinceMs ?? Infinity) - (right.sinceMs ?? Infinity),
@@ -181,7 +181,7 @@ export function fleetMachines(inputs: ReadonlyArray<FleetMachineInput>): Array<F
       // snapshot; they aren't known to be running, so don't show them.
       agents: input.phase === "connected" ? agentsOf(input.shell) : [],
     }))
-    .toSorted(
+    .sort(
       (left, right) =>
         order[left.state] - order[right.state] ||
         right.agents.length - left.agents.length ||

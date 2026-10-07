@@ -4,11 +4,12 @@
  *
  * @module clipboard
  */
-import { execFile } from "node:child_process";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeOS from "node:os";
 
 const run = (command: string, args: ReadonlyArray<string>, encoding: "buffer" | "utf8") =>
   new Promise<Buffer | string | null>((resolve) => {
-    execFile(
+    NodeChildProcess.execFile(
       command,
       args,
       { encoding, maxBuffer: 64 * 1024 * 1024, timeout: 5000 },
@@ -24,7 +25,7 @@ export function parseAppleScriptData(output: string): Uint8Array | null {
 
 /** PNG bytes of the clipboard's image, or null when it holds none. */
 export async function readClipboardImage(): Promise<Uint8Array | null> {
-  if (process.platform === "darwin") {
+  if (NodeOS.platform() === "darwin") {
     const output = await run("osascript", ["-e", "the clipboard as «class PNGf»"], "utf8");
     return typeof output === "string" ? parseAppleScriptData(output) : null;
   }
