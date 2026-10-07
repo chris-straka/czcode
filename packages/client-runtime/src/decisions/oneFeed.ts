@@ -198,12 +198,24 @@ export function shortMachineLabel(label: string): string {
   return label.split(/[-.\s]/)[0] || label;
 }
 
+/**
+ * Where a decision can be acted on. A playtest that ships an Android build is
+ * a phone item even when it was asked before devices were targeted.
+ */
+export function effectiveTargetDevice(
+  item: Pick<DecisionItem, "target_device" | "kind" | "media">,
+): "phone" | "desktop" | "any" {
+  if (item.target_device && item.target_device !== "any") return item.target_device;
+  const apk = item.media.some((media) => media.type === "apk" || /\.(apk|aab)$/i.test(media.name));
+  return item.kind === "playtest" && apk ? "phone" : "any";
+}
+
 /** True when a decision can be acted on from this kind of device. */
 export function isForDevice(
-  item: Pick<DecisionItem, "target_device">,
+  item: Pick<DecisionItem, "target_device" | "kind" | "media">,
   device: FeedDevice,
 ): boolean {
-  const target = item.target_device ?? "any";
+  const target = effectiveTargetDevice(item);
   return target === "any" || target === device;
 }
 

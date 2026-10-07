@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { readmeBlurb } from "./ProjectBlurbService.ts";
+import { projectGroupOf, readmeBlurb } from "./ProjectBlurbService.ts";
 
 describe("readmeBlurb", () => {
   it("takes the opening sentences of the first prose paragraph", () => {
@@ -28,5 +28,16 @@ describe("readmeBlurb", () => {
 
   it("returns null when there is no prose", () => {
     expect(readmeBlurb("# title\n\n## only headings\n")).toBeNull();
+  });
+});
+
+describe("projectGroupOf", () => {
+  it("puts anything under a games folder in Games", () => {
+    expect(projectGroupOf("/home/f/SWE/games/blackout")).toBe("games");
+    expect(projectGroupOf("/home/f/SWE/games/tools")).toBe("games");
+    expect(projectGroupOf("/home/f/SWE/games")).toBe("games");
+    expect(projectGroupOf("/home/f/SWE/czcode")).toBe("software");
+    expect(projectGroupOf("/home/f/SWE/minigames")).toBe("software");
+    expect(projectGroupOf("channel:politics")).toBe("software");
   });
 });

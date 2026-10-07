@@ -65,12 +65,25 @@ export function readmeBlurb(markdown: string): string | null {
   return line.length <= MAX_CHARS ? line : `${line.slice(0, MAX_CHARS - 1).trimEnd()}…`;
 }
 
+export type ProjectGroup = "games" | "software";
+
+/**
+ * Games are whatever lives under a `games` folder (~/SWE/games/blackout,
+ * ~/SWE/games/tools), so a new game lands in Games without any config.
+ */
+export function projectGroupOf(folderOrName: string): ProjectGroup {
+  return /(^|\/)games(\/|$)/.test(folderOrName) ? "games" : "software";
+}
+
 const make = Effect.gen(function* () {
   const { sql } = yield* ForkDatabase.ForkDatabase;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const projects = yield* ProjectService.ProjectService;
-  const readmeCache = new Map<string, { readonly at: number; readonly line: string | null }>();
+  const readmeCache = new Map<
+    string,
+    { readonly at: number; readonly line: string | null; readonly group: ProjectGroup }
+  >();
   const storage = (operation: string) => (cause: unknown) =>
     new DecisionStorageError({ operation, cause });
 
@@ -84,7 +97,8 @@ const make = Effect.gen(function* () {
   const folderFor = Effect.fn("ProjectBlurbService.folderFor")(function* (name: string) {
     if (!/^[\w.-]+$/.test(name)) return null;
     const live = (yield* projects.snapshot).projects.filter((p) => p.deletedAt === null);
-    const titled = live.find((p) => p.title === name);
+    const titled =
+      live.find((p) => p.title === name) ?? live.find((p) => p.repositoryIdentity?.name === name);
     if (titled) return titled.workspaceRoot;
     for (const root of new Set(live.map((p) => p.workspaceRoot))) {
       if (path.basename(root) === name) return root;
@@ -100,10 +114,11 @@ const make = Effect.gen(function* () {
     return null;
   });
 
-  const readmeLine = Effect.fn("ProjectBlurbService.readmeLine")(function* (name: string) {
+  /** The README opening and group for a project name, re-read at most every few minutes. */
+  const folderFacts = Effect.fn("ProjectBlurbService.folderFacts")(function* (name: string) {
     const now = yield* Clock.currentTimeMillis;
     const cached = readmeCache.get(name);
-    if (cached && now - cached.at < README_TTL_MS) return cached.line;
+    if (cached && now - cached.at < README_TTL_MS) return cached;
     const folder = yield* folderFor(name).pipe(Effect.orElseSucceed(() => null));
     let line: string | null = null;
     if (folder !== null) {
@@ -117,8 +132,9 @@ const make = Effect.gen(function* () {
         }
       }
     }
-    readmeCache.set(name, { at: now, line });
-    return line;
+    const facts = { at: now, line, group: projectGroupOf(folder ?? name) };
+    readmeCache.set(name, facts);
+    return facts;
   });
 
   const ownerLines = sql<{ project: string; description: string }>`
@@ -135,12 +151,13 @@ const make = Effect.gen(function* () {
         [...new Set(names)],
         (project) =>
           Effect.gen(function* () {
+            const { line, group } = yield* folderFacts(project);
             const own = owned.get(project);
-            if (own !== undefined) return { project, description: own, source: "owner" } as const;
-            const line = yield* readmeLine(project);
+            if (own !== undefined)
+              return { project, description: own, source: "owner", group } as const;
             return line === null
-              ? ({ project, description: null, source: null } as const)
-              : ({ project, description: line, source: "readme" } as const);
+              ? ({ project, description: null, source: null, group } as const)
+              : ({ project, description: line, source: "readme", group } as const);
           }),
         { concurrency: 4 },
       );

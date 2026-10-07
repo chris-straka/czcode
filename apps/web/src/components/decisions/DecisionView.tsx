@@ -24,6 +24,7 @@ import {
   createContext,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -45,6 +46,7 @@ import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import {
   DECISION_OPTION_FRAME_CLASS,
   DecisionMedia,
+  DecisionMediaEngagement,
   useDecisionMediaResolver,
   useDecisionMediaUrl,
 } from "./DecisionMedia";
@@ -53,6 +55,7 @@ import {
   draftProblem,
   draftToAnswer,
   emptyDraft,
+  unseenMediaProblem,
   VERDICT_BUTTONS,
 } from "@cz/client-runtime/decisions/draft";
 
@@ -103,7 +106,16 @@ export function DecisionView({
   const [draft, setDraft] = useState<DecisionDraft>(() => emptyDraft(item));
   const update = (patch: Partial<DecisionDraft>) =>
     setDraft((current) => ({ ...current, ...patch }));
-  const problem = draftProblem(item, draft);
+  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
+  const engage = useCallback(
+    (key: string) =>
+      setEngaged((current) => (current.has(key) ? current : new Set(current).add(key))),
+    [],
+  );
+  // You can't approve what you haven't seen: verdicts wait for videos to be
+  // played, sounds heard, and builds installed.
+  const unseen = unseenMediaProblem(item, engaged);
+  const problem = unseen ?? draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
   const submit = (patch: Partial<DecisionDraft> = {}, retry = false) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, retry));
@@ -178,7 +190,7 @@ export function DecisionView({
             return option !== undefined;
           }
           const verdict = verdicts?.[digit - 1];
-          if (verdict) submit({ choice: verdict.value });
+          if (verdict && unseen === null) submit({ choice: verdict.value });
           return verdict !== undefined;
         }
       }
@@ -263,7 +275,8 @@ export function DecisionView({
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6">
-          <div className="space-y-1">
+          {/* Text keeps a reading width (~70 characters); option images use the full column. */}
+          <div className="max-w-2xl space-y-1">
             <h1 className="text-lg font-semibold text-foreground">{title}</h1>
             {item.title && item.question !== item.title ? (
               <p className="text-sm text-foreground/80">{item.question}</p>
@@ -273,11 +286,15 @@ export function DecisionView({
             ) : null}
           </div>
           {item.kind !== "read" && item.body_md ? (
-            <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
+            <div className="max-w-2xl">
+              <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
+            </div>
           ) : null}
           <UploadContext value={onUpload}>
             <FullScreenContext value={fullScreenImages}>
-              <DecisionBody entry={entry} draft={draft} update={update} />
+              <DecisionMediaEngagement value={engage}>
+                <DecisionBody entry={entry} draft={draft} update={update} />
+              </DecisionMediaEngagement>
             </FullScreenContext>
           </UploadContext>
         </div>
@@ -348,7 +365,11 @@ export function DecisionView({
               ))
             ) : item.kind === "timeline" ? (
               <>
-                <Button onClick={() => submit({ choice: "approve", redoFrom: null })}>
+                <Button
+                  disabled={unseen !== null}
+                  title={unseen ?? undefined}
+                  onClick={() => submit({ choice: "approve", redoFrom: null })}
+                >
                   Approve run
                 </Button>
                 <Button
@@ -891,7 +912,7 @@ function ReadBody({ entry, draft, update }: BodyProps) {
     setNote("");
   };
   return (
-    <div className="space-y-3">
+    <div className="max-w-2xl space-y-3">
       <div
         ref={containerRef}
         onMouseUp={capture}

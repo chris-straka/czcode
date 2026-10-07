@@ -13,8 +13,16 @@ import {
 } from "@cz/client-runtime/decisions/oneFeed";
 import { useMemo } from "react";
 import { compareFeedItems } from "@cz/client-runtime/decisions/feed";
-import { createDecisionEnvironmentAtoms } from "@cz/client-runtime/state/decisions";
-import type { DecisionItemWithAnswer, DecisionProjectBlurb, EnvironmentId } from "@cz/contracts";
+import {
+  createDecisionEnvironmentAtoms,
+  threadDigestKey,
+} from "@cz/client-runtime/state/decisions";
+import type {
+  DecisionItemWithAnswer,
+  DecisionProjectBlurb,
+  EnvironmentId,
+  ThreadDigest,
+} from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 
@@ -149,6 +157,7 @@ export function useFeedFilter(): OneFeedFilter {
   const machine = useFeedFilterStore((state) => state.machine);
   const projects = useFeedFilterStore((state) => state.projects);
   const kinds = useFeedFilterStore((state) => state.kinds);
+  const showPhoneItems = useFeedFilterStore((state) => state.showPhoneItems);
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const phone = useMediaQuery("(pointer: coarse) and (max-width: 640px)");
   return useMemo(
@@ -156,9 +165,14 @@ export function useFeedFilter(): OneFeedFilter {
       machine: resolveMachineFilter(machine, primaryEnvironmentId),
       projects: new Set(projects),
       kinds: new Set(kinds),
-      device: phone ? "phone" : "desktop",
+      // On the desktop, phone items (Android playtests) stay out unless asked for.
+      ...(phone
+        ? { device: "phone" as const }
+        : showPhoneItems
+          ? {}
+          : { device: "desktop" as const }),
     }),
-    [machine, projects, kinds, primaryEnvironmentId, phone],
+    [machine, projects, kinds, primaryEnvironmentId, phone, showPhoneItems],
   );
 }
 
@@ -180,4 +194,47 @@ export function useFilteredOpenDecisions(): {
       filter,
     };
   }, [feed.entries, filter]);
+}
+
+const threadDigestsAtom = Atom.family((spec: string) =>
+  Atom.make((get): ReadonlyMap<string, ThreadDigest> => {
+    const digests = new Map<string, ThreadDigest>();
+    if (spec === "") return digests;
+    for (const part of spec.split("\u0001")) {
+      const separator = part.indexOf("\u0002");
+      const environmentId = part.slice(0, separator) as EnvironmentId;
+      const result = get(
+        decisionEnvironment.threadDigests({ environmentId, input: part.slice(separator + 1) }),
+      );
+      for (const digest of Option.getOrNull(AsyncResult.value(result)) ?? []) {
+        digests.set(`${environmentId}:${digest.threadId}`, digest);
+      }
+    }
+    return digests;
+  }),
+);
+
+/**
+ * Result excerpts and working folders for the threads a feed shows, keyed
+ * `environmentId:threadId`. A thread re-reads only when a run of it finishes.
+ */
+export function useThreadDigests(
+  threads: ReadonlyArray<{
+    readonly environmentId: EnvironmentId;
+    readonly id: string;
+    readonly latestRun: { readonly completedAt: string | null } | null;
+  }>,
+): ReadonlyMap<string, ThreadDigest> {
+  const spec = useMemo(() => {
+    const byEnvironment = new Map<EnvironmentId, Array<{ id: string; version: string | null }>>();
+    for (const thread of threads) {
+      const list = byEnvironment.get(thread.environmentId) ?? [];
+      list.push({ id: thread.id, version: thread.latestRun?.completedAt ?? null });
+      byEnvironment.set(thread.environmentId, list);
+    }
+    return [...byEnvironment]
+      .map(([environmentId, list]) => `${environmentId}\u0002${threadDigestKey(list)}`)
+      .join("\u0001");
+  }, [threads]);
+  return useAtomValue(threadDigestsAtom(spec));
 }

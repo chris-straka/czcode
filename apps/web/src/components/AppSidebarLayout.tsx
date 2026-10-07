@@ -1,21 +1,9 @@
 import { useAtomValue } from "@effect/atom-react";
-import * as Schema from "effect/Schema";
-import {
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 
 import { isElectron } from "../env";
-import { getLocalStorageItem, removeLocalStorageItem } from "../hooks/useLocalStorage";
-import {
-  isRichTextBoldShortcut,
-  resolveShortcutCommand,
-  shortcutLabelForCommand,
-} from "../keybindings";
+import { resolveShortcutCommand } from "../keybindings";
 import { isEditableFocused } from "../lib/editableFocus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
@@ -23,140 +11,22 @@ import { isModelPickerOpen } from "../modelPickerVisibility";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { resolveThreadRouteRef } from "../threadRoutes";
-import { cn, isMacPlatform } from "../lib/utils";
+import { isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
-import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
 import {
   PanelAnimationSuppressionProvider,
   usePanelAnimationSettings,
   usePanelNavigationSuppression,
 } from "../panelAnimations";
-import LegacyThreadSidebar from "./LegacySidebar";
 import { useThreadVisitedMigration } from "../hooks/useThreadVisitedMigration";
-import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
-import { SidebarBrandWidthProbe, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
-import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
 import { useProjects } from "../state/entities";
-import {
-  clampThreadSidebarWidth,
-  resolveInitialThreadSidebarWidth,
-  resolveThreadSidebarMaximumWidth,
-  resolveThreadSidebarMinimumWidth,
-  THREAD_MAIN_CONTENT_MIN_WIDTH,
-  THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
-} from "./threadSidebarWidth";
-import {
-  Sidebar,
-  SidebarProvider,
-  SidebarRail,
-  SidebarTrigger,
-  useSidebar,
-  useSidebarVisibility,
-} from "./ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
+import { SidebarProvider } from "./ui/sidebar";
+import { FeedModal } from "./feed/FeedModal";
+import { FeedPage } from "./feed/FeedPage";
 
 const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
-
-function subscribeToViewportWidth(onChange: () => void): () => void {
-  window.addEventListener("resize", onChange);
-  return () => window.removeEventListener("resize", onChange);
-}
-
-function readViewportWidth(): number {
-  return window.innerWidth;
-}
-
-function readInitialThreadSidebarWidth(): number {
-  try {
-    return resolveInitialThreadSidebarWidth(
-      getLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY, Schema.Finite),
-      window.innerWidth,
-    );
-  } catch (error) {
-    console.error("Could not read persisted thread sidebar width.", error);
-    return resolveInitialThreadSidebarWidth(null, window.innerWidth);
-  }
-}
-
-function SidebarControl() {
-  const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
-  const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const { toggleSidebar } = useSidebar();
-  const isSidebarVisible = useSidebarVisibility();
-  const environmentIdentificationMode = useEnvironmentIdentificationMode();
-  const stageBackdropVariant = useSidebarStageBackdropVariant(
-    environmentIdentificationMode === "artwork",
-  );
-  const shortcutLabel = shortcutLabelForCommand(keybindings, "sidebar.toggle", {
-    context: { usagePageOpen },
-  });
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      if (
-        event.target instanceof HTMLElement &&
-        event.target.closest("[data-keybinding-capture]")
-      ) {
-        return;
-      }
-      if (
-        isRichTextBoldShortcut(event) &&
-        event.target instanceof HTMLElement &&
-        event.target.closest('[data-composer-rich-text="true"]')
-      ) {
-        // The rich-text composer claims Mod+B for bold; the toggle stays
-        // available everywhere else, including the plain-text composer.
-        return;
-      }
-      if (
-        resolveShortcutCommand(event, keybindings, { context: { usagePageOpen } }) !==
-        "sidebar.toggle"
-      )
-        return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      toggleSidebar();
-    };
-
-    // Capture before focused editors consume commands such as Mod+B for rich-text formatting.
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [keybindings, toggleSidebar, usagePageOpen]);
-
-  return (
-    // The right-side layout controls carry mr-px (border compensation inside
-    // the panel), so the trigger mirrors it: both clusters sit one extra pixel
-    // off their edge and the titlebar reads symmetric.
-    <div
-      className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center"
-      data-sidebar-control=""
-    >
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <SidebarTrigger
-              // Over the stage artwork the trigger is a control on imagery, like the media
-              // viewer's arrows; that variant positions itself, so the layout is reset here.
-              variant={isSidebarVisible && stageBackdropVariant ? "media-navigation" : "ghost"}
-              className={cn(
-                "pointer-events-auto",
-                isSidebarVisible && stageBackdropVariant && "relative top-auto translate-y-0",
-              )}
-              aria-label="Toggle main sidebar"
-            />
-          }
-        />
-        <TooltipPopup side="bottom">
-          Toggle main sidebar{shortcutLabel ? ` (${shortcutLabel})` : ""}
-        </TooltipPopup>
-      </Tooltip>
-    </div>
-  );
-}
 
 // Moves through the app's route history like a browser's back/forward buttons.
 function NavigationHistoryShortcuts() {
@@ -208,17 +78,59 @@ function NavigationHistoryShortcuts() {
   return null;
 }
 
-// Settings swaps the thread sidebar out of the tree. Keep the lightweight
-// project projection subscribed so returning to a draft never renders the
-// zero-project state while the environment snapshot reconnects.
+// Keep the lightweight project projection subscribed so returning to a draft
+// never renders the zero-project state while the environment snapshot
+// reconnects.
 function ProjectProjectionRetention() {
   useProjects();
   return null;
 }
 
+/** Routes the feed itself answers; everything else opens over it in a modal. */
+function isFeedRoute(pathname: string): boolean {
+  return pathname === "/" || pathname === "/decisions";
+}
+
+/**
+ * The one feed stays mounted under every route, keeping its scroll and state;
+ * any other page (a thread, a draft, settings, usage, pull requests) opens in
+ * a modal over it, and closing goes back to the feed.
+ */
+function OneFeedShell({ pathname, children }: { pathname: string; children: ReactNode }) {
+  const navigate = useNavigate();
+  if (pathname === "/welcome") return children;
+  const isSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  return (
+    <>
+      <FeedPage />
+      {isFeedRoute(pathname) ? (
+        children
+      ) : (
+        <FeedModal
+          label={isSettings ? "Settings" : "Thread"}
+          onClose={() => void navigate({ to: "/" })}
+        >
+          {isSettings ? (
+            <div className="flex min-h-0 flex-1">
+              <nav
+                aria-label="Settings"
+                className="w-56 shrink-0 overflow-y-auto border-e border-border max-md:hidden"
+              >
+                <SettingsSidebarNav pathname={pathname} />
+              </nav>
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+            </div>
+          ) : (
+            children
+          )}
+        </FeedModal>
+      )}
+    </>
+  );
+}
+
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const legacySidebarEnabled = useLegacySidebarEnabled();
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings();
   // Settings routes show the settings nav in place of whichever thread
@@ -228,24 +140,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const pathname = useLocation({ select: (location) => location.pathname });
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
-  const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
-  const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
-  // Subscribed rather than read once: the clamp must track live window size,
-  // and a clamped drag ends with an unchanged width, which skips the re-render
-  // that would otherwise refresh a render-time snapshot.
-  const viewportWidth = useSyncExternalStore(subscribeToViewportWidth, readViewportWidth);
-  const [brandWidth, setBrandWidth] = useState(0);
-  const sidebarMinimumWidth = resolveThreadSidebarMinimumWidth(brandWidth);
-  const sidebarMaximumWidth = resolveThreadSidebarMaximumWidth(viewportWidth, sidebarMinimumWidth);
-  const resetSidebarWidth = () => {
-    try {
-      removeLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY);
-    } catch (error) {
-      console.error("Could not clear persisted thread sidebar width.", error);
-    }
-    setSidebarWidth(resolveInitialThreadSidebarWidth(null, viewportWidth));
-  };
   const [isWindowFullscreen, setIsWindowFullscreen] = useState(() => {
     const getWindowFullscreenState = window.desktopBridge?.getWindowFullscreenState;
     return isMacosDesktop && typeof getWindowFullscreenState === "function"
@@ -253,7 +148,6 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       : false;
   });
   const sidebarProviderStyle = {
-    "--sidebar-width": `${clampThreadSidebarWidth(sidebarWidth, sidebarMinimumWidth, sidebarMaximumWidth)}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     ...(isMacosDesktop && !isWindowFullscreen
       ? { "--workspace-controls-left": MACOS_TRAFFIC_LIGHTS_LEFT_INSET }
@@ -299,44 +193,17 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
 
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
+      {/* No sidebar: the provider stays collapsed so every header keeps its
+          title-bar inset, and components that read sidebar state keep working. */}
       <SidebarProvider
         className="h-dvh! min-h-0!"
         data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
-        defaultOpen
+        open={false}
+        onOpenChange={() => {}}
         style={sidebarProviderStyle}
       >
-        <SidebarBrandWidthProbe onWidthChange={setBrandWidth} />
         <ProjectProjectionRetention />
-        <Sidebar
-          side="left"
-          collapsible="offcanvas"
-          data-app-sidebar=""
-          role="navigation"
-          aria-label={isOnSettings ? "Settings" : "Threads"}
-          resizable={{
-            maxWidth: sidebarMaximumWidth,
-            minWidth: sidebarMinimumWidth,
-            shouldAcceptWidth: ({ currentWidth, nextWidth, wrapper }) =>
-              nextWidth <= currentWidth ||
-              wrapper.clientWidth - nextWidth >= THREAD_MAIN_CONTENT_MIN_WIDTH,
-            storageKey: THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
-            onResize: setSidebarWidth,
-          }}
-        >
-          {isOnSettings ? (
-            <>
-              <SidebarChromeHeader isElectron={isElectron} />
-              <SettingsSidebarNav pathname={pathname} />
-            </>
-          ) : legacySidebarEnabled ? (
-            <LegacyThreadSidebar />
-          ) : (
-            <ThreadSidebar />
-          )}
-          <SidebarRail onDoubleClick={resetSidebarWidth} />
-        </Sidebar>
-        {children}
-        <SidebarControl />
+        <OneFeedShell pathname={pathname}>{children}</OneFeedShell>
         <NavigationHistoryShortcuts />
         <MainAppLocationTracker />
       </SidebarProvider>

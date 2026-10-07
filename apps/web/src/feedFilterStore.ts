@@ -1,8 +1,8 @@
 /**
  * What the feed shows: which machines, and which decision projects and
  * kinds. The inbox badge reads the same filter, so every count agrees with
- * the cards on screen. Only the machine choice persists; chips reset per
- * session.
+ * the cards on screen. The machine choice and "show phone items" persist;
+ * chips reset per session.
  */
 import type { MachineFilter } from "@cz/client-runtime/decisions/oneFeed";
 import type { EnvironmentId } from "@cz/contracts";
@@ -16,6 +16,9 @@ interface FeedFilterState {
   readonly machine: MachineFilter | null;
   readonly projects: ReadonlyArray<string>;
   readonly kinds: ReadonlyArray<string>;
+  /** Desktop only: phone playtests and other phone items stay hidden unless this is on. */
+  readonly showPhoneItems: boolean;
+  readonly setShowPhoneItems: (show: boolean) => void;
   readonly setMachine: (machine: MachineFilter | null) => void;
   readonly setProjects: (projects: ReadonlyArray<string>) => void;
   readonly setKinds: (kinds: ReadonlyArray<string>) => void;
@@ -27,6 +30,8 @@ export const useFeedFilterStore = create<FeedFilterState>()(
       machine: null,
       projects: [],
       kinds: [],
+      showPhoneItems: false,
+      setShowPhoneItems: (showPhoneItems) => set({ showPhoneItems }),
       setMachine: (machine) => set({ machine }),
       setProjects: (projects) => set({ projects }),
       setKinds: (kinds) => set({ kinds }),
@@ -36,7 +41,7 @@ export const useFeedFilterStore = create<FeedFilterState>()(
       storage: createJSONStorage(() =>
         resolveStorage(typeof window !== "undefined" ? window.localStorage : undefined),
       ),
-      partialize: (state) => ({ machine: state.machine }),
+      partialize: (state) => ({ machine: state.machine, showPhoneItems: state.showPhoneItems }),
     },
   ),
 );

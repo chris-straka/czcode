@@ -342,6 +342,8 @@ export const DecisionProjectBlurb = Schema.Struct({
   project: Schema.String,
   description: Schema.NullOr(Schema.String),
   source: Schema.NullOr(Schema.Literals(["owner", "readme"])),
+  /** "games" when the project's folder sits under a `games` folder; filters group by it. */
+  group: Schema.Literals(["games", "software"]),
 });
 export type DecisionProjectBlurb = typeof DecisionProjectBlurb.Type;
 

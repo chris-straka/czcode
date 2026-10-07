@@ -37,6 +37,7 @@ const decision = (id: string, overrides: Partial<DecisionItem> = {}, environment
     project: "games",
     kind: "pick",
     status: "open",
+    media: [],
     blocking: false,
     priority: 0,
     thread: null,
@@ -109,6 +110,14 @@ describe("buildOneFeed", () => {
 });
 
 describe("device targeting", () => {
+  it("treats an old playtest with an apk as a phone item", () => {
+    const apk = { type: "apk", key: "a", name: "hll.apk", mime: "x", size: 1 } as const;
+    const decisions = [decision("play", { kind: "playtest", media: [apk] })];
+    expect(buildOneFeed({ threads: [], decisions, filter: { ...all, device: "desktop" } })).toEqual(
+      [],
+    );
+  });
+
   it("keeps phone playtests off the desktop and counts them for one quiet line", () => {
     const decisions = [
       decision("play", { kind: "playtest", target_device: "phone" }),

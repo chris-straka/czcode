@@ -1,12 +1,18 @@
 import { resolveAssetUrl } from "@cz/client-runtime/state/assets";
 import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { BoxIcon, DownloadIcon, FileIcon } from "lucide-react";
-import { createElement, useEffect, useRef, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useRef, useState } from "react";
 
 import { cn } from "~/lib/utils";
 import { usePreparedConnection } from "~/state/session";
 import { Button } from "../ui/button";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
+
+/**
+ * Told when the owner plays, scrubs, or installs a media item, so a decision
+ * can hold its verdict until they have (see `unseenMediaProblem`).
+ */
+export const DecisionMediaEngagement = createContext<(key: string) => void>(() => {});
 
 /** Resolves any of a host's decision media to a loadable URL. */
 export function useDecisionMediaResolver(
@@ -175,6 +181,7 @@ export function DecisionMedia({
   className?: string;
 }) {
   const url = useDecisionMediaUrl(environmentId, media);
+  const engage = useContext(DecisionMediaEngagement);
   if (url === null) {
     return (
       <div
@@ -199,7 +206,14 @@ export function DecisionMedia({
             className="size-full object-contain"
           />
         ) : media.type === "video" ? (
-          <video controls preload="metadata" src={url} className="size-full object-contain" />
+          <video
+            controls
+            preload="metadata"
+            src={url}
+            onPlay={() => engage(media.key)}
+            onSeeked={() => engage(media.key)}
+            className="size-full object-contain"
+          />
         ) : (
           <BoxIcon className="size-6 text-muted-foreground" />
         )}
@@ -222,13 +236,24 @@ export function DecisionMedia({
       );
     case "audio":
     case "voice":
-      return <audio controls preload="none" src={url} className={cn("w-full", className)} />;
+      return (
+        <audio
+          controls
+          preload="none"
+          src={url}
+          onPlay={() => engage(media.key)}
+          onSeeked={() => engage(media.key)}
+          className={cn("w-full", className)}
+        />
+      );
     case "video":
       return (
         <video
           controls
           preload="metadata"
           src={url}
+          onPlay={() => engage(media.key)}
+          onSeeked={() => engage(media.key)}
           className={cn("w-full rounded-md bg-black", compact ? "h-24" : "max-h-[70vh]", className)}
         />
       );
@@ -242,7 +267,11 @@ export function DecisionMedia({
       );
     case "apk":
       return (
-        <Button render={<a href={url} download={media.name} />} className={className}>
+        <Button
+          render={<a href={url} download={media.name} />}
+          onClick={() => engage(media.key)}
+          className={className}
+        >
           <DownloadIcon />
           Install {media.name}
         </Button>
