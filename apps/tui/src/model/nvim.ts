@@ -38,6 +38,47 @@ export function floatTerminalLua(command: string): string {
 end)(${JSON.stringify(command)})`;
 }
 
+/**
+ * Lua giving the TUI its own Esc. A common terminal-mode mapping (toggleterm's
+ * suggested `tnoremap <Esc> <C-\\><C-n>`) makes nvim take Esc before the
+ * program sees it, so "back" never arrives. This maps Esc to itself, buffer
+ * local, in the terminal whose job is one of `pids` (the TUI or a shell
+ * above it), leaving the mapping alone everywhere else. Returns how many
+ * buffers it mapped.
+ */
+export function passEscapeLua(pids: ReadonlyArray<number>): string {
+  return `(function(pids)
+  local wanted = {}
+  for _, pid in ipairs(pids) do wanted[pid] = true end
+  local mapped = 0
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    local ok, job = pcall(vim.api.nvim_buf_get_var, buf, 'terminal_job_pid')
+    if ok and wanted[job] then
+      vim.keymap.set('t', '<Esc>', '<Esc>', { buffer = buf, nowait = true })
+      mapped = mapped + 1
+    end
+  end
+  return mapped
+end)({${pids.map((pid) => Math.trunc(pid)).join(", ")}})`;
+}
+
+/** `pid` and its ancestors (nearest first), up to `depth`, via `ps` (Linux and macOS). */
+export async function processAncestors(pid: number, depth = 8): Promise<Array<number>> {
+  const chain = [pid];
+  let current = pid;
+  for (let step = 0; step < depth; step++) {
+    const parent = await new Promise<number | null>((resolve) =>
+      execFile("ps", ["-o", "ppid=", "-p", String(current)], { timeout: 2000 }, (error, out) =>
+        resolve(error ? null : Number(out.trim()) || null),
+      ),
+    );
+    if (parent === null || parent <= 1) break;
+    chain.push(parent);
+    current = parent;
+  }
+  return chain;
+}
+
 /** Runs Lua in the parent nvim. Resolves to an error message, or null on success. */
 export function runInParentNvim(lua: string): Promise<string | null> {
   const socket = parentNvim();

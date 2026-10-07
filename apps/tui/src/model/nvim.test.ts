@@ -4,7 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
-import { floatTerminalLua, remoteShellCommand, runInParentNvim } from "./nvim.ts";
+import {
+  floatTerminalLua,
+  passEscapeLua,
+  processAncestors,
+  remoteShellCommand,
+  runInParentNvim,
+} from "./nvim.ts";
 
 const hasNvim = (() => {
   try {
@@ -45,6 +51,30 @@ describe.skipIf(!hasNvim)("runInParentNvim against a headless nvim", () => {
       "nvim_win_get_config(0).relative .. ':' .. &buftype",
     ]).toString();
     expect(kind.trim()).toBe("editor:terminal");
+  });
+
+  it("lets Esc through to the TUI's terminal despite a global tnoremap <Esc>", async () => {
+    process.env.NVIM = socket;
+    const remote = (expr: string) =>
+      execFileSync("nvim", ["--server", socket, "--remote-expr", expr]).toString().trim();
+    remote(`luaeval("vim.keymap.set('t', '<Esc>', [[<C-\\\\><C-n>]])")`);
+    remote("execute('enew')");
+    const job = Number(remote(`luaeval("vim.fn.jobstart('sleep 30', { term = true })")`));
+    expect(job).toBeGreaterThan(0);
+    const pid = Number(remote("b:terminal_job_pid"));
+    expect(await runInParentNvim(passEscapeLua([pid + 100000, pid]))).toBeNull();
+    // The TUI's buffer sends Esc on; the global mapping still applies elsewhere.
+    expect(remote(`maparg('<Esc>', 't')`)).toBe("<Esc>");
+    remote("execute('enew')");
+    expect(remote(`maparg('<Esc>', 't')`)).toBe("<C-\\><C-N>");
+  });
+});
+
+describe("processAncestors", () => {
+  it("walks from a process up through its parents", async () => {
+    const chain = await processAncestors(process.pid, 3);
+    expect(chain[0]).toBe(process.pid);
+    expect(chain[1]).toBe(process.ppid);
   });
 });
 
