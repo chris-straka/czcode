@@ -443,7 +443,11 @@ export function FeedPage() {
         </div>
       </div>
       {opened && upload ? (
-        <FeedModal label={opened.item.title || opened.item.question} onClose={closeDecision}>
+        <FeedModal
+          label={opened.item.title || opened.item.question}
+          onClose={closeDecision}
+          showClose={false}
+        >
           <DecisionView
             key={openKey}
             entry={opened}

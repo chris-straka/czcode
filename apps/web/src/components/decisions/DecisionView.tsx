@@ -218,7 +218,10 @@ export function DecisionView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-decision-kind={item.kind}>
-      <WorkspacePageHeader electron={isElectron} className="border-b border-border">
+      <WorkspacePageHeader
+        electron={isElectron}
+        className="border-b border-border [--workspace-gutter-end:0.75rem]"
+      >
         <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
           <Badge variant="secondary" size="sm">
             {item.kind}
