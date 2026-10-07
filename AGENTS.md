@@ -164,6 +164,6 @@ Architecture and its constraints: `docs/internals/overview.md`. Glossary: `docs/
 
 ## Upstream
 
-czcode is a fork of the project at the `upstream` remote. Last synced: upstream `570b72d839` on 2026-10-05, merged into main as `upstream-cz` `aedefd0b76`. Sync only when the owner asks; there is no scheduled sync. Never open issues or pull requests on the upstream repository; `gh` in this checkout defaults to the fork (`chris-straka/czcode`).
+czcode is a fork of the project at the `upstream` remote. Last synced: upstream `f8ed2a039b` on 2026-10-06, merged into main as `upstream-cz` `8cf5605113`. Sync only when the owner asks; there is no scheduled sync. Never open issues or pull requests on the upstream repository; `gh` in this checkout defaults to the fork (`chris-straka/czcode`).
 
 To sync, run `ccez/rename/sync.sh` on a clean main. It regenerates `upstream-cz` (the rename codemod over `upstream/main`) and merges it. Resolve conflicts; when upstream adds an old name the rules miss, fix the rule in `ccez/rename/map.ts`, not the output. Then run `ccez/rename/check` plus typecheck and tests for what changed, rebuild (`ccez/release/mac.sh --install`), and update the "Last synced" line above.
