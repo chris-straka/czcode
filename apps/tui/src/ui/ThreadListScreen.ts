@@ -169,9 +169,8 @@ export function ThreadListScreen({
   const items = useMemo(
     () =>
       archived
-        ? threadListItems(rows, { nowMs: now, unfolded, query }).map(
-            (item): ThreadListItem =>
-              item.kind === "thread" ? { ...item, section: "active" } : item,
+        ? threadListItems(rows, { nowMs: now, unfolded, query }).map((item): ThreadListItem =>
+            item.kind === "thread" ? { ...item, section: "active" } : item,
           )
         : threadListItems(rows, { nowMs: now, unfolded, query, messageMatches }),
     [rows, now, unfolded, query, messageMatches, archived],
@@ -242,8 +241,16 @@ export function ThreadListScreen({
         );
   const togglePin = (row: ThreadRow) =>
     row.thread.pinnedAt != null
-      ? act("Unpinned", () => unpin(ref(row)), () => pin(ref(row)))
-      : act("Pinned", () => pin(ref(row)), () => unpin(ref(row)));
+      ? act(
+          "Unpinned",
+          () => unpin(ref(row)),
+          () => pin(ref(row)),
+        )
+      : act(
+          "Pinned",
+          () => pin(ref(row)),
+          () => unpin(ref(row)),
+        );
   const wake = (row: ThreadRow) =>
     act(
       "Woke",
@@ -252,7 +259,10 @@ export function ThreadListScreen({
         row.thread.snoozedUntil
           ? snooze({
               ...ref(row),
-              input: { threadId: row.thread.id, snoozedUntil: DateTime.formatIso(row.thread.snoozedUntil) },
+              input: {
+                threadId: row.thread.id,
+                snoozedUntil: DateTime.formatIso(row.thread.snoozedUntil),
+              },
             })
           : Promise.resolve(null),
     );
@@ -271,7 +281,8 @@ export function ThreadListScreen({
 
   useKeys(
     (input, key) => {
-      if (key.downArrow || input === "j") return setCursor(Math.min(items.length - 1, selected + 1));
+      if (key.downArrow || input === "j")
+        return setCursor(Math.min(items.length - 1, selected + 1));
       if (key.upArrow || input === "k") return setCursor(Math.max(0, selected - 1));
       if (input === "g") return setCursor(0);
       if (input === "G") return setCursor(Math.max(0, items.length - 1));
@@ -334,7 +345,10 @@ export function ThreadListScreen({
         });
       } else if (mode.kind === "delete") setMode({ kind: "browse" });
     },
-    { isActive: active && (mode.kind === "search" || mode.kind === "rename" || mode.kind === "delete") },
+    {
+      isActive:
+        active && (mode.kind === "search" || mode.kind === "rename" || mode.kind === "delete"),
+    },
   );
   const list = useRef<DOMElement>(null);
   // A click selects a row; a click on the selected row opens it.
@@ -428,7 +442,11 @@ export function ThreadListScreen({
               Box,
               { flexDirection: "column" },
               h(Text, { color: "red", wrap: "truncate" }, `Delete "${mode.row.thread.title}"?`),
-              h(Text, { dimColor: true }, "This can't be undone. y delete · any other key keeps it"),
+              h(
+                Text,
+                { dimColor: true },
+                "This can't be undone. y delete · any other key keeps it",
+              ),
             )
           : h(
               Text,
@@ -461,7 +479,11 @@ export function ThreadListScreen({
               return h(
                 Box,
                 { key: `header:${item.section}` },
-                h(Box, { width: 2, flexShrink: 0 }, h(Text, { color: "cyan" }, isSelected ? "›" : " ")),
+                h(
+                  Box,
+                  { width: 2, flexShrink: 0 },
+                  h(Text, { color: "cyan" }, isSelected ? "›" : " "),
+                ),
                 h(
                   Text,
                   { dimColor: !isSelected, bold: isSelected },
@@ -478,7 +500,11 @@ export function ThreadListScreen({
             return h(
               Box,
               { key: threadKey(row) },
-              h(Box, { width: 2, flexShrink: 0 }, h(Text, { color: "cyan" }, isSelected ? "›" : " ")),
+              h(
+                Box,
+                { width: 2, flexShrink: 0 },
+                h(Text, { color: "cyan" }, isSelected ? "›" : " "),
+              ),
               h(
                 Box,
                 { width: projectWidth, marginRight: 1, flexShrink: 0 },
@@ -502,7 +528,9 @@ export function ThreadListScreen({
                 { width: stateWidth, flexShrink: 0 },
                 h(
                   Text,
-                  { color: state === "needs you" ? "yellow" : state === "failed" ? "red" : "green" },
+                  {
+                    color: state === "needs you" ? "yellow" : state === "failed" ? "red" : "green",
+                  },
                   state,
                 ),
               ),

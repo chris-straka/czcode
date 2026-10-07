@@ -21,7 +21,9 @@ function connectionPhasesAtom(atoms: TuiAtoms) {
     const phases = new Map<EnvironmentId, SupervisorConnectionState["phase"]>();
     for (const [environmentId, entry] of get(atoms.catalog.catalogValueAtom).entries) {
       if (!entry.enabled) continue;
-      const state = Option.getOrNull(AsyncResult.value(get(atoms.catalog.stateAtom(environmentId))));
+      const state = Option.getOrNull(
+        AsyncResult.value(get(atoms.catalog.stateAtom(environmentId))),
+      );
       if (state) phases.set(environmentId, state.phase);
     }
     return phases;
@@ -60,5 +62,7 @@ export function useHostLoads(
 /** One dim line naming the hosts a screen isn't showing yet, or nothing. */
 export function HostLoadLine({ hosts }: { readonly hosts: ReadonlyArray<HostLoadEntry> }) {
   const summary = hostLoadSummary(hosts);
-  return summary ? h(Text, { color: "yellow", dimColor: true, wrap: "truncate" }, `⚠ ${summary}`) : null;
+  return summary
+    ? h(Text, { color: "yellow", dimColor: true, wrap: "truncate" }, `⚠ ${summary}`)
+    : null;
 }

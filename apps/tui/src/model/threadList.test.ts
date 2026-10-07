@@ -40,7 +40,10 @@ const rowsOf = (threads: ReadonlyArray<OrchestrationV2ThreadShell>) =>
 
 describe("threadSection", () => {
   it("puts a snoozed thread on the snoozed shelf until it wakes", () => {
-    const snoozed = thread("a", { snoozedUntil: at("2026-10-06T13:00:00Z"), pinnedAt: at("2026-10-01T00:00:00Z") });
+    const snoozed = thread("a", {
+      snoozedUntil: at("2026-10-06T13:00:00Z"),
+      pinnedAt: at("2026-10-01T00:00:00Z"),
+    });
     expect(threadSection(snoozed, NOW)).toBe("snoozed");
     expect(threadSection(snoozed, Date.parse("2026-10-06T14:00:00Z"))).toBe("pinned");
   });
@@ -54,7 +57,10 @@ describe("threadSection", () => {
   });
 
   it("lets settled win over a stale pin", () => {
-    const settled = thread("a", { settledOverride: "settled", pinnedAt: at("2026-10-01T00:00:00Z") });
+    const settled = thread("a", {
+      settledOverride: "settled",
+      pinnedAt: at("2026-10-01T00:00:00Z"),
+    });
     expect(threadSection(settled, NOW)).toBe("settled");
   });
 });
@@ -67,7 +73,9 @@ describe("threadListItems", () => {
     thread("later", { snoozedUntil: at("2026-10-07T09:00:00Z") }),
   ]);
   const ids = (items: ReturnType<typeof threadListItems>) =>
-    items.map((item) => (item.kind === "header" ? `[${item.section} ${item.count}]` : item.row.thread.id));
+    items.map((item) =>
+      item.kind === "header" ? `[${item.section} ${item.count}]` : item.row.thread.id,
+    );
 
   it("folds the snoozed and settled shelves by default", () => {
     expect(ids(threadListItems(rows, { nowMs: NOW, unfolded: new Set() }))).toEqual([

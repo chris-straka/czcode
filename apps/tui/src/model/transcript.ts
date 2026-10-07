@@ -21,7 +21,9 @@ function outputTail(output: string | undefined, count: number): Array<Omit<Trans
   const lines = (output ?? "").split("\n").filter((line) => line.trim() !== "");
   const tail = lines.slice(-count);
   return [
-    ...(lines.length > count ? [{ tone: "dim" as const, text: `  … ${lines.length - count} more lines` }] : []),
+    ...(lines.length > count
+      ? [{ tone: "dim" as const, text: `  … ${lines.length - count} more lines` }]
+      : []),
     ...tail.map((line) => ({ tone: "dim" as const, text: `  ${line}` })),
   ];
 }
@@ -44,7 +46,8 @@ export function itemLines(
     case "assistant_message":
       return [{ tone: "assistant", text: item.text + (item.streaming ? " ▍" : "") }];
     case "reasoning":
-      if (verbose && item.text.trim() !== "") return [{ tone: "dim", text: `∴ ${item.text.trim()}` }];
+      if (verbose && item.text.trim() !== "")
+        return [{ tone: "dim", text: `∴ ${item.text.trim()}` }];
       return item.streaming ? [{ tone: "dim", text: "thinking…" }] : [];
     case "proposed_plan":
       return [{ tone: "assistant", text: `Plan:\n${item.markdown}` }];

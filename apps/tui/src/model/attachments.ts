@@ -42,6 +42,9 @@ export function imageAttachment(
 
 /** `~/shot.png` or `'/path with spaces.png'` as typed or dropped into a terminal. */
 export function expandPath(typed: string, home: string): string {
-  const trimmed = typed.trim().replace(/^(['"])(.*)\1$/, "$2").replace(/\\ /g, " ");
+  const trimmed = typed
+    .trim()
+    .replace(/^(['"])(.*)\1$/, "$2")
+    .replace(/\\ /g, " ");
   return trimmed === "~" || trimmed.startsWith("~/") ? home + trimmed.slice(1) : trimmed;
 }

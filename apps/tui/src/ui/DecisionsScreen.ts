@@ -31,7 +31,12 @@ export function openDecisionsAtom(atoms: TuiAtoms) {
       const result = get(atoms.decisions.list({ environmentId, input: { status: "open" } }));
       const items = Option.getOrNull(AsyncResult.value(result));
       const label = entry.target.label;
-      results.push({ environmentId, label, hasValue: items !== null, failed: result._tag === "Failure" });
+      results.push({
+        environmentId,
+        label,
+        hasValue: items !== null,
+        failed: result._tag === "Failure",
+      });
       if (items !== null) hosts.push({ environmentId, label, items });
     }
     return { hosts, results };
@@ -121,38 +126,38 @@ export function DecisionsScreen(props: {
       Box,
       { ref: list, flexDirection: "column" },
       entries.slice(top, top + visible).map((entry, offset) => {
-      const index = top + offset;
-      const focused = index === selected;
-      return h(
-        Box,
-        { key: `${entry.environmentId}:${entry.item.id}` },
-        h(Box, { width: 2, flexShrink: 0 }, h(Text, { color: "cyan" }, focused ? "›" : " ")),
-        h(
+        const index = top + offset;
+        const focused = index === selected;
+        return h(
           Box,
-          { width: tagWidth, flexShrink: 0 },
+          { key: `${entry.environmentId}:${entry.item.id}` },
+          h(Box, { width: 2, flexShrink: 0 }, h(Text, { color: "cyan" }, focused ? "›" : " ")),
           h(
-            Text,
-            entry.item.blocking ? { color: "yellow" } : { dimColor: true },
-            KIND_TAG[entry.item.kind],
+            Box,
+            { width: tagWidth, flexShrink: 0 },
+            h(
+              Text,
+              entry.item.blocking ? { color: "yellow" } : { dimColor: true },
+              KIND_TAG[entry.item.kind],
+            ),
           ),
-        ),
-        h(
-          Box,
-          { width: projectWidth, flexShrink: 0, marginRight: 1 },
-          h(Text, { dimColor: true, wrap: "truncate" }, entry.item.project),
-        ),
-        h(
-          Box,
-          { flexGrow: 1, marginRight: 1 },
-          h(Text, { bold: focused, wrap: "truncate" }, entry.item.title || entry.item.question),
-        ),
-        h(
-          Box,
-          { width: 4, flexShrink: 0, justifyContent: "flex-end" },
-          h(Text, { dimColor: true }, age(now, entry.item.created_at)),
-        ),
-      );
-    }),
+          h(
+            Box,
+            { width: projectWidth, flexShrink: 0, marginRight: 1 },
+            h(Text, { dimColor: true, wrap: "truncate" }, entry.item.project),
+          ),
+          h(
+            Box,
+            { flexGrow: 1, marginRight: 1 },
+            h(Text, { bold: focused, wrap: "truncate" }, entry.item.title || entry.item.question),
+          ),
+          h(
+            Box,
+            { width: 4, flexShrink: 0, justifyContent: "flex-end" },
+            h(Text, { dimColor: true }, age(now, entry.item.created_at)),
+          ),
+        );
+      }),
     ),
     h(HostLoadLine, { hosts: loads }),
   );

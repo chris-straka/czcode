@@ -50,7 +50,8 @@ export function QuestionPanel(props: {
   useKeys(
     (input, key) => {
       if (!question) return;
-      if (input === "]") return setIndex(Math.min(questions.length - 1, progress.questionIndex + 1));
+      if (input === "]")
+        return setIndex(Math.min(questions.length - 1, progress.questionIndex + 1));
       if (input === "[") return setIndex(Math.max(0, progress.questionIndex - 1));
       if (input === "X") return props.onDismiss();
       if (input === "i" && question.allowCustomAnswer !== false) return setTyping(true);

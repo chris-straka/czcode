@@ -72,7 +72,9 @@ export function Picker<T>(props: {
             { key: `${top + offset}:${choice.label}` },
             h(Text, { color: "cyan" }, isSelected ? "› " : "  "),
             h(Text, { bold: isSelected, wrap: "truncate" }, choice.label),
-            choice.detail ? h(Text, { dimColor: true, wrap: "truncate" }, `  ${choice.detail}`) : null,
+            choice.detail
+              ? h(Text, { dimColor: true, wrap: "truncate" }, `  ${choice.detail}`)
+              : null,
           );
         }),
     h(Text, { dimColor: true }, "type to filter · enter pick · esc cancel"),

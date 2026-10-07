@@ -206,9 +206,7 @@ export function ThreadScreen(props: {
         ...(modelOverride ? { modelSelection: modelOverride } : {}),
         runtimeMode: projection.thread.runtimeMode,
         interactionMode: extra.planId ? "default" : interactionMode,
-        ...(extra.planId
-          ? { sourceProposedPlan: { threadId, planId: extra.planId } }
-          : {}),
+        ...(extra.planId ? { sourceProposedPlan: { threadId, planId: extra.planId } } : {}),
         ...(running ? { dispatchMode: steer ? "steer" : "queue" } : {}),
         createdAt: new Date().toISOString(),
       },
@@ -467,13 +465,15 @@ export function ThreadScreen(props: {
       ? h(
           Box,
           { flexDirection: "column", marginTop: 1 },
-          ...queued.slice(-3).map((entry) =>
-            h(
-              Text,
-              { key: entry.run.id, dimColor: true, wrap: "truncate" },
-              `⏳ ${entry.text.split("\n")[0] ?? ""}`,
+          ...queued
+            .slice(-3)
+            .map((entry) =>
+              h(
+                Text,
+                { key: entry.run.id, dimColor: true, wrap: "truncate" },
+                `⏳ ${entry.text.split("\n")[0] ?? ""}`,
+              ),
             ),
-          ),
           h(Text, { dimColor: true }, "queued after this run · c cancel last · ! steer first now"),
         )
       : null,
