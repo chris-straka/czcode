@@ -273,6 +273,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
             CZ_TAILSCALE_SERVE: "1",
             CZ_TAILSCALE_SERVE_PORT: "443",
             CZ_SLEEP_WHEN_IDLE_MINUTES: "30",
+            CZ_AGENT_SCOPES: "1",
           },
           serverOffset: 0,
           webOffset: 0,
@@ -290,6 +291,7 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
         assert.equal(env.CZ_TAILSCALE_SERVE, undefined);
         assert.equal(env.CZ_TAILSCALE_SERVE_PORT, undefined);
         assert.equal(env.CZ_SLEEP_WHEN_IDLE_MINUTES, undefined);
+        assert.equal(env.CZ_AGENT_SCOPES, undefined);
       }),
     );
 

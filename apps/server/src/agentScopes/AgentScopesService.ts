@@ -10,7 +10,8 @@
  * `cz-agent-<pid>-<name>.scope` units through the user manager; whatever they
  * start afterwards is born in the scope. Quick commands finish before a sweep
  * picks them up. Scopes set no memory limit. Scopes left by a previous server
- * are stopped at startup, as their agents lost their server anyway.
+ * are stopped at startup, as their agents lost their server anyway. Only a
+ * server running as a systemd service does any of this.
  *
  * @module AgentScopesService
  */
@@ -55,6 +56,15 @@ const run = Effect.gen(function* () {
     .trim();
   if (!cgroupPath || !cgroupPath.includes("user@")) {
     yield* Effect.logInfo("Agent scopes are off: not running under a systemd user manager");
+    return;
+  }
+  // Only the host's own service manages scopes. A server an agent started (a
+  // dev server inheriting the service's environment) lives in that agent's
+  // scope, and its startup cleanup below would stop every agent on the host.
+  if (!cgroupPath.endsWith(".service")) {
+    yield* Effect.logInfo("Agent scopes are off: not running as a systemd service", {
+      cgroup: cgroupPath,
+    });
     return;
   }
   const procsFile = `/sys/fs/cgroup${cgroupPath}/cgroup.procs`;
