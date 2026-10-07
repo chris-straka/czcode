@@ -9,8 +9,11 @@ import { useAtomValue } from "@effect/atom-react";
 import { buildOneFeed, waitingOnOtherDevice } from "@cz/client-runtime/decisions/oneFeed";
 import { useMemo } from "react";
 import { compareFeedItems } from "@cz/client-runtime/decisions/feed";
-import { createDecisionEnvironmentAtoms } from "@cz/client-runtime/state/decisions";
-import type { DecisionItemWithAnswer, EnvironmentId } from "@cz/contracts";
+import {
+  createDecisionEnvironmentAtoms,
+  threadDigestKey,
+} from "@cz/client-runtime/state/decisions";
+import type { DecisionItemWithAnswer, EnvironmentId, ThreadDigest } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 
@@ -140,21 +143,74 @@ export function useAnsweredDecisions(): DecisionFeed {
   return useAtomValue(answeredFeedAtom);
 }
 
-const projectBlurbsAtom = Atom.make((get): ReadonlyMap<string, string> => {
-  const blurbs = new Map<string, { readonly text: string; readonly owner: boolean }>();
+export interface ProjectBlurb {
+  readonly description: string | null;
+  readonly group: "games" | "software";
+}
+
+const projectBlurbsAtom = Atom.make((get): ReadonlyMap<string, ProjectBlurb> => {
+  const blurbs = new Map<string, ProjectBlurb & { readonly owner: boolean }>();
   for (const [environmentId] of get(environmentPresentations.presentationsAtom)) {
     const result = get(decisionEnvironment.projects({ environmentId, input: "all" }));
     for (const blurb of Option.getOrNull(AsyncResult.value(result)) ?? []) {
-      if (blurb.description === null) continue;
-      if (!blurbs.has(blurb.project) || blurb.source === "owner") {
-        blurbs.set(blurb.project, { text: blurb.description, owner: blurb.source === "owner" });
+      const known = blurbs.get(blurb.project);
+      // The owner's own line beats a README's, whichever host has it.
+      if (
+        !known ||
+        (blurb.description !== null && (!known.description || blurb.source === "owner"))
+      ) {
+        blurbs.set(blurb.project, {
+          description: blurb.description,
+          group: blurb.group,
+          owner: blurb.source === "owner",
+        });
       }
     }
   }
-  return new Map([...blurbs].map(([project, blurb]) => [project, blurb.text] as const));
+  return blurbs;
 }).pipe(Atom.withLabel("mobile-decisions:project-blurbs"));
 
-/** One line per decision project to jog the owner's memory. */
-export function useProjectBlurbs(): ReadonlyMap<string, string> {
+/** One line and a Games/Software group per decision project. */
+export function useProjectBlurbs(): ReadonlyMap<string, ProjectBlurb> {
   return useAtomValue(projectBlurbsAtom);
+}
+
+const threadDigestsAtom = Atom.family((spec: string) =>
+  Atom.make((get): ReadonlyMap<string, ThreadDigest> => {
+    const digests = new Map<string, ThreadDigest>();
+    if (spec === "") return digests;
+    for (const part of spec.split("\u0001")) {
+      const separator = part.indexOf("\u0002");
+      const environmentId = part.slice(0, separator) as EnvironmentId;
+      const result = get(
+        decisionEnvironment.threadDigests({ environmentId, input: part.slice(separator + 1) }),
+      );
+      for (const digest of Option.getOrNull(AsyncResult.value(result)) ?? []) {
+        digests.set(`${environmentId}:${digest.threadId}`, digest);
+      }
+    }
+    return digests;
+  }),
+);
+
+/** Working folders and result excerpts for the threads shown, keyed `environmentId:threadId`. */
+export function useThreadDigests(
+  threads: ReadonlyArray<{
+    readonly environmentId: EnvironmentId;
+    readonly id: string;
+    readonly latestRun: { readonly completedAt: string | null } | null;
+  }>,
+): ReadonlyMap<string, ThreadDigest> {
+  const spec = useMemo(() => {
+    const byEnvironment = new Map<EnvironmentId, Array<{ id: string; version: string | null }>>();
+    for (const thread of threads) {
+      const list = byEnvironment.get(thread.environmentId) ?? [];
+      list.push({ id: thread.id, version: thread.latestRun?.completedAt ?? null });
+      byEnvironment.set(thread.environmentId, list);
+    }
+    return [...byEnvironment]
+      .map(([environmentId, list]) => `${environmentId}\u0002${threadDigestKey(list)}`)
+      .join("\u0001");
+  }, [threads]);
+  return useAtomValue(threadDigestsAtom(spec));
 }

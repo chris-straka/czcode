@@ -4,6 +4,7 @@ import {
   draftProblem,
   draftToAnswer,
   emptyDraft,
+  unseenMediaProblem,
   VERDICT_BUTTONS,
 } from "@cz/client-runtime/decisions/draft";
 import type {
@@ -21,7 +22,7 @@ import {
 } from "expo-audio";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PanResponder, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -35,6 +36,7 @@ import { DecisionImageViewer } from "./DecisionImageViewer";
 import {
   DecisionAudio,
   DecisionMedia,
+  DecisionMediaEngagement,
   OPTION_FRAME_STYLE,
   useDecisionMediaResolver,
   useDecisionMediaUrl,
@@ -186,17 +188,26 @@ function DecisionAnswerForm({
     setDraft((current) => ({ ...current, ...patch }));
   const submit = (patch: Partial<DecisionDraft> = {}, retry = false) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, retry));
-  const problem = draftProblem(item, draft);
+  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
+  const engage = useCallback(
+    (key: string) =>
+      setEngaged((current) => (current.has(key) ? current : new Set(current).add(key))),
+    [],
+  );
+  // You can't approve what you haven't seen: verdicts wait for videos to be
+  // played, sounds heard, and builds installed.
+  const unseen = unseenMediaProblem(item, engaged);
+  const problem = unseen ?? draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
   const hasNote = draft.comment.trim().length > 0 || draft.voiceKey !== null;
 
   return (
     <View className="flex-1">
       <ScrollView className="flex-1" contentContainerClassName="gap-4 p-4">
+        <Text className="text-xl font-cz-bold text-foreground">{item.title || item.question}</Text>
         {item.title && item.title !== item.question ? (
-          <Text className="text-sm font-cz-medium text-foreground-muted">{item.title}</Text>
+          <Text className="text-base text-foreground">{item.question}</Text>
         ) : null}
-        <Text className="text-xl font-cz-bold text-foreground">{item.question}</Text>
         {item.blocking ? (
           <Text className="text-sm text-warning">An agent is waiting on this.</Text>
         ) : null}
@@ -204,7 +215,9 @@ function DecisionAnswerForm({
         {item.kind !== "read" && item.body_md ? (
           <Text className="text-sm text-foreground-muted">{item.body_md}</Text>
         ) : null}
-        <DecisionBody entry={entry} draft={draft} update={update} onUpload={onUpload} />
+        <DecisionMediaEngagement value={engage}>
+          <DecisionBody entry={entry} draft={draft} update={update} onUpload={onUpload} />
+        </DecisionMediaEngagement>
       </ScrollView>
       <View
         className="gap-3 border-t border-subtle-strong bg-screen p-4"
@@ -242,6 +255,7 @@ function DecisionAnswerForm({
                   verdict.value === "reject" || verdict.value === "never" ? "secondary" : "primary"
                 }
                 label={verdict.label}
+                disabled={unseen !== null}
                 onPress={() => submit({ choice: verdict.value })}
               />
             ))
@@ -250,6 +264,7 @@ function DecisionAnswerForm({
               <MaterialButton
                 tone="primary"
                 label="Approve run"
+                disabled={unseen !== null}
                 onPress={() => submit({ choice: "approve", redoFrom: null })}
               />
               <MaterialButton
@@ -275,7 +290,7 @@ function DecisionAnswerForm({
             />
           ) : null}
         </View>
-        {problem && !verdicts && item.kind !== "timeline" ? (
+        {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
           <Text className="text-xs text-foreground-muted">{problem}</Text>
         ) : null}
       </View>

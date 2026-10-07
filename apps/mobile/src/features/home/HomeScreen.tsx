@@ -67,6 +67,8 @@ import {
 import { createSwipeRowActivation } from "./swipe-row-activation";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-swipe-actions";
 import { useMaterialFabScroll } from "./MaterialFabScrollContext";
+import { FeedNeedsYou } from "./FeedNeedsYou";
+import { useThreadDigests } from "../../state/decisions";
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
 
@@ -656,6 +658,16 @@ export function HomeScreen(props: HomeScreenProps) {
     if (swipeEnabled) activateVisibleRows(threadListV2Items);
   }, [activateVisibleRows, swipeEnabled, threadListV2Items]);
 
+  // The folder each shown thread worked in (games/hll rather than SWE).
+  const digestThreads = useMemo(
+    () =>
+      threadListV2Items
+        .flatMap((item) => (item.type === "v2-thread" ? [item.item.thread] : []))
+        .slice(0, 60),
+    [threadListV2Items],
+  );
+  const threadDigests = useThreadDigests(digestThreads);
+
   const renderV2Item = useCallback(
     ({ item }: { readonly item: ThreadListV2ListItem }) => {
       if (item.type === "v2-pending") {
@@ -728,9 +740,10 @@ export function HomeScreen(props: HomeScreenProps) {
           project={
             projectByKey.get(scopedProjectKey(thread.environmentId, thread.projectId)) ?? null
           }
-          projectTitle={v2ProjectTitleByProjectKey.get(
-            scopedProjectKey(thread.environmentId, thread.projectId),
-          )}
+          projectTitle={
+            threadDigests.get(`${thread.environmentId}:${thread.id}`)?.workingSubpath ??
+            v2ProjectTitleByProjectKey.get(scopedProjectKey(thread.environmentId, thread.projectId))
+          }
           providerInstance={resolveProviderInstance(thread)}
           providers={providersByEnvironmentId.get(thread.environmentId)}
           environmentLabel={
@@ -778,6 +791,7 @@ export function HomeScreen(props: HomeScreenProps) {
       );
     },
     [
+      threadDigests,
       handleDeleteThread,
       activeReorderEnvironmentIds,
       handleMoveThread,
@@ -828,6 +842,7 @@ export function HomeScreen(props: HomeScreenProps) {
     () => ({
       projectByKey,
       projectTitleByProjectKey: v2ProjectTitleByProjectKey,
+      threadDigests,
       listEnvironments,
       savedConnectionsById: props.savedConnectionsById,
       searchQuery: props.searchQuery,
@@ -841,6 +856,7 @@ export function HomeScreen(props: HomeScreenProps) {
       props.savedConnectionsById,
       listEnvironments,
       threadSearchMatchByKey,
+      threadDigests,
       v2ProjectTitleByProjectKey,
       workingShelfEnabled,
     ],
@@ -912,8 +928,16 @@ export function HomeScreen(props: HomeScreenProps) {
   const listHeader = Platform.OS === "ios" ? undefined : <HomeTopContentSpacer />;
 
   // Project scoping lives in the header filter menu (no inline chip row on
-  // mobile — the menu is the one filter surface).
-  const v2ListHeader = listHeader;
+  // mobile — the menu is the one filter surface). Cards that need the owner
+  // lead the list, as in the one feed on the desktop.
+  const v2ListHeader = hasSearchQuery ? (
+    listHeader
+  ) : (
+    <>
+      {listHeader}
+      <FeedNeedsYou />
+    </>
+  );
 
   // Use the v2 project scope for its empty state. Snoozed threads need no
   // special empty state: their shelf header is a list row even while collapsed.

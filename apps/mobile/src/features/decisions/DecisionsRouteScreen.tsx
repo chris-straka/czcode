@@ -1,4 +1,8 @@
-import { answerSummary, VERDICT_BUTTONS } from "@cz/client-runtime/decisions/draft";
+import {
+  answerSummary,
+  canAnswerFromCard,
+  VERDICT_BUTTONS,
+} from "@cz/client-runtime/decisions/draft";
 import { filterChips } from "@cz/client-runtime/decisions/feed";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
@@ -96,46 +100,86 @@ export function DecisionsRouteScreen() {
           </Pressable>
         ))}
       </View>
-      {tab === "open" && chips.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2 px-4 pt-3"
-          className="grow-0"
-        >
-          {chips.map((project) => {
-            const selected = projects.includes(project);
+      {tab === "open" && chips.length > 1
+        ? (["games", "software"] as const).map((group) => {
+            const groupProjects = chips.filter(
+              (project) => (blurbs.get(project)?.group ?? "software") === group,
+            );
+            if (groupProjects.length === 0) return null;
+            const all = groupProjects.every((project) => projects.includes(project));
+            const label = group === "games" ? "Games" : "Software";
             return (
-              <Pressable
-                key={project}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityHint={blurbs.get(project)}
-                onPress={() => toggleProject(project)}
-                onLongPress={() => setPeek(peek === project ? null : project)}
-                className={
-                  selected
-                    ? "rounded-full bg-primary px-3 py-1.5"
-                    : "rounded-full bg-subtle px-3 py-1.5"
-                }
+              <ScrollView
+                key={group}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="gap-2 px-4 pt-3"
+                className="grow-0"
               >
-                <Text
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: all }}
+                  accessibilityLabel={`All ${label.toLowerCase()} projects`}
+                  onPress={() =>
+                    setProjects(
+                      all
+                        ? projects.filter((project) => !groupProjects.includes(project))
+                        : [...new Set([...projects, ...groupProjects])],
+                    )
+                  }
                   className={
-                    selected ? "text-sm text-primary-foreground" : "text-sm text-foreground"
+                    all
+                      ? "rounded-full border border-primary bg-primary px-3 py-1.5"
+                      : "rounded-full border border-subtle-strong px-3 py-1.5"
                   }
                 >
-                  {project}
-                </Text>
-              </Pressable>
+                  <Text
+                    className={
+                      all
+                        ? "font-cz-medium text-sm text-primary-foreground"
+                        : "font-cz-medium text-sm text-foreground"
+                    }
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+                {groupProjects.map((project) => {
+                  const selected = projects.includes(project);
+                  return (
+                    <Pressable
+                      key={project}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityHint={blurbs.get(project)?.description ?? undefined}
+                      onPress={() => toggleProject(project)}
+                      onLongPress={() => setPeek(peek === project ? null : project)}
+                      className={
+                        selected
+                          ? "rounded-full bg-primary px-3 py-1.5"
+                          : "rounded-full bg-subtle px-3 py-1.5"
+                      }
+                    >
+                      <Text
+                        className={
+                          selected ? "text-sm text-primary-foreground" : "text-sm text-foreground"
+                        }
+                      >
+                        {project}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             );
-          })}
-        </ScrollView>
-      ) : null}
+          })
+        : null}
       {tab === "open"
         ? described.map((project) => (
             <Text key={project} className="px-4 pt-2 text-sm text-foreground-muted">
               <Text className="font-cz-medium text-foreground">{project}</Text>
-              {blurbs.get(project) ? `: ${blurbs.get(project)}` : ": no description yet"}
+              {blurbs.get(project)?.description
+                ? `: ${blurbs.get(project)?.description}`
+                : ": no description yet"}
             </Text>
           ))
         : null}
@@ -193,8 +237,12 @@ export function DecisionsRouteScreen() {
         ) : (
           entries.map((entry) => {
             const { item } = entry;
+            // A card answers in place only when nothing on it needs watching,
+            // hearing, or installing first; otherwise tapping opens it.
             const quick =
-              item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
+              (item.kind === "review" || item.kind === "pitch") && canAnswerFromCard(item)
+                ? VERDICT_BUTTONS[item.kind]
+                : null;
             const thumbs = item.options.flatMap((option) => {
               const media = option.media_idx === null ? undefined : item.media[option.media_idx];
               return item.kind === "pick" && media?.type === "image" ? [media] : [];
