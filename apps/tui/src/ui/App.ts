@@ -5,6 +5,7 @@ import { createElement as h, useCallback, useEffect, useMemo, useRef, useState }
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext } from "./command.ts";
+import { FleetScreen } from "./FleetScreen.ts";
 import { HostsScreen } from "./HostsScreen.ts";
 import { NewThreadScreen } from "./NewThreadScreen.ts";
 import { projectScope } from "../model/scope.ts";
@@ -15,7 +16,7 @@ import { environmentShellsAtom, ThreadListScreen } from "./ThreadListScreen.ts";
 import { ThreadScreen } from "./ThreadScreen.ts";
 import { useClick, useKeys, useMouseRouter } from "./input.ts";
 
-const TABS = ["Threads", "Decisions", "Queue", "Hosts"] as const;
+const TABS = ["Threads", "Decisions", "Queue", "Hosts", "Fleet"] as const;
 type Tab = (typeof TABS)[number];
 
 type Overlay =
@@ -30,7 +31,7 @@ type Overlay =
     };
 
 /**
- * Tabs across the top (1-2 or Tab to switch), one screen below, a status line
+ * Tabs across the top (digits or Tab to switch), one screen below, a status line
  * at the bottom. Keys stay off `\` and `|` (the owner's float toggle and
  * terminal-normal exit) and Cmd chords; Esc always goes back.
  */
@@ -129,6 +130,8 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
     body = h(QueueScreen, { atoms, active: true });
   } else if (tab === "Hosts") {
     body = h(HostsScreen, { atoms, active: true });
+  } else if (tab === "Fleet") {
+    body = h(FleetScreen, { atoms, active: true, onOpen: openThread });
   } else {
     body = h(ThreadListScreen, {
       atoms,

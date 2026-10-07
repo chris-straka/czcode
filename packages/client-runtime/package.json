@@ -315,6 +315,10 @@
       "types": "./src/state/threadSubagents.ts",
       "default": "./src/state/threadSubagents.ts"
     },
+    "./state/fleet": {
+      "types": "./src/state/fleet.ts",
+      "default": "./src/state/fleet.ts"
+    },
     "./state/thread-settled": {
       "types": "./src/state/threadSettled.ts",
       "default": "./src/state/threadSettled.ts"

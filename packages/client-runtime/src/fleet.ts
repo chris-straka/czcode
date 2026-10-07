@@ -227,6 +227,14 @@ export function formatBytes(bytes: number): string {
   return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
 
+/** "8.5/30 GB": a used/total pair sharing the total's unit. */
+export function formatUsedOfTotal(used: number, total: number): string {
+  const [totalValue, unit] = formatBytes(total).split(" ");
+  const scale = 1024 ** ["B", "KB", "MB", "GB", "TB"].indexOf(unit ?? "B");
+  const value = used / scale;
+  return `${value >= 10 ? Math.round(value) : value.toFixed(1)}/${totalValue} ${unit}`;
+}
+
 /** "a few seconds", "12m", "3h": how long an agent has been at it. */
 export function formatSince(sinceMs: number | null, nowMs: number): string {
   if (sinceMs === null) return "";

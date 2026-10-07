@@ -13,6 +13,7 @@ import {
   fleetTotals,
   fleetWarnings,
   formatSince,
+  formatUsedOfTotal,
 } from "./fleet.ts";
 
 const GB = 1024 ** 3;
@@ -140,6 +141,13 @@ describe("fleetTotals", () => {
       cpuCores: 12,
     });
     expect(totals.memoryUsedBytes).toBe(16 * GB);
+  });
+});
+
+describe("formatUsedOfTotal", () => {
+  it("puts used and total in the total's unit", () => {
+    expect(formatUsedOfTotal(8.5 * GB, 30 * GB)).toBe("8.5/30 GB");
+    expect(formatUsedOfTotal(600 * 1024 ** 2, 31 * GB)).toBe("0.6/31 GB");
   });
 });
 

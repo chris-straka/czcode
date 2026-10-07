@@ -1,0 +1,385 @@
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
+import {
+  type FleetMachine,
+  type FleetWarning,
+  fleetTotals,
+  formatBytes,
+  formatSince,
+  formatUsedOfTotal,
+} from "@cz/client-runtime/fleet";
+import { createFleetAtom } from "@cz/client-runtime/state/fleet";
+import type { EnvironmentId, ThreadId } from "@cz/contracts";
+import { Box, Text } from "ink";
+import {
+  createElement as h,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import type { TuiAtoms } from "../state/atoms.ts";
+import { StatusContext, useCommand } from "./command.ts";
+import { useNow, useViewport } from "./hooks.ts";
+import { useKeys } from "./input.ts";
+import { useWakeHost } from "./useWakeHost.ts";
+
+/** How often host readings refresh while the tab is open (the server caches 5 s). */
+const REFRESH_MS = 3000;
+
+const STATE_MARK: Record<FleetMachine["state"], { readonly mark: string; readonly color: string }> =
+  {
+    awake: { mark: "●", color: "green" },
+    connecting: { mark: "◌", color: "yellow" },
+    asleep: { mark: "○", color: "blue" },
+    unreachable: { mark: "✕", color: "red" },
+  };
+
+const levelColor = (ratio: number) => (ratio >= 0.9 ? "red" : ratio >= 0.7 ? "yellow" : "green");
+
+/** A meter: `████░░░░` filled to `ratio`. */
+function Meter(props: { readonly ratio: number; readonly width: number; readonly color?: string }) {
+  const ratio = Math.min(1, Math.max(0, props.ratio));
+  const filled = Math.round(ratio * props.width);
+  return h(
+    Text,
+    null,
+    h(Text, { color: props.color ?? levelColor(ratio) }, "█".repeat(filled)),
+    h(Text, { dimColor: true }, "░".repeat(props.width - filled)),
+  );
+}
+
+/** A labelled meter in fixed-width columns, so gauges line up from machine to machine. */
+function Gauge(props: {
+  readonly label: string;
+  readonly ratio: number;
+  readonly detail: string;
+  readonly width: number;
+  readonly detailWidth: number;
+  readonly color?: string;
+}) {
+  return h(
+    Box,
+    { flexShrink: 0, marginRight: 1 },
+    h(Box, { width: 6, flexShrink: 0 }, h(Text, { dimColor: true, wrap: "truncate" }, props.label)),
+    h(Meter, {
+      ratio: props.ratio,
+      width: props.width,
+      ...(props.color ? { color: props.color } : {}),
+    }),
+    h(
+      Box,
+      { width: props.detailWidth + 1, flexShrink: 0 },
+      h(Text, { wrap: "truncate" }, ` ${props.detail}`),
+    ),
+  );
+}
+
+const warningText = (warning: FleetWarning) =>
+  warning.kind === "disk"
+    ? `disk ${warning.mount} ${formatBytes(warning.freeBytes)} free`
+    : warning.kind === "memory"
+      ? `memory ${Math.round(warning.usedRatio * 100)}% used`
+      : `swap ${Math.round(warning.usedRatio * 100)}% used`;
+
+type Row =
+  | { readonly kind: "machine"; readonly machine: FleetMachine }
+  | {
+      readonly kind: "agent";
+      readonly machine: FleetMachine;
+      readonly agent: FleetMachine["agents"][number];
+    };
+
+/**
+ * Every paired machine at once, live: state, CPU, memory, swap and zram,
+ * disks, load, and the agents working there now. j/k move, Enter opens an
+ * agent's thread, s stops it, w wakes a sleeping machine.
+ */
+export function FleetScreen(props: {
+  readonly atoms: TuiAtoms;
+  readonly active: boolean;
+  readonly onOpen: (environmentId: EnvironmentId, threadId: ThreadId) => void;
+}) {
+  const { atoms } = props;
+  const registry = useContext(RegistryContext);
+  const setStatus = useContext(StatusContext);
+  const fleetAtom = useMemo(
+    () =>
+      createFleetAtom({
+        catalogValueAtom: atoms.catalog.catalogValueAtom,
+        connectionStateAtom: atoms.catalog.stateAtom,
+        shellSnapshotAtom: atoms.snapshotAtom,
+        hostResourcesAtom: (environmentId) =>
+          atoms.server.hostResources({ environmentId, input: {} }),
+      }),
+    [atoms],
+  );
+  const machines = useAtomValue(fleetAtom);
+  const totals = fleetTotals(machines);
+  const now = useNow(15_000);
+  const { columns, rows: height } = useViewport();
+  const [cursor, setCursor] = useState(0);
+  const interrupt = useCommand(atoms.threadEnvironment.interruptTurn);
+  const wakeHost = useWakeHost(atoms);
+
+  // Live while open: re-read every awake machine's host resources.
+  const awakeIds = machines
+    .filter((machine) => machine.state === "awake")
+    .map((machine) => machine.environmentId)
+    .join(",");
+  useEffect(() => {
+    if (!props.active) return;
+    const timer = setInterval(() => {
+      for (const environmentId of awakeIds.split(",").filter(Boolean)) {
+        registry.refresh(
+          atoms.server.hostResources({ environmentId: environmentId as EnvironmentId, input: {} }),
+        );
+      }
+    }, REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [props.active, awakeIds, atoms, registry]);
+
+  const rows: Array<Row> = machines.flatMap((machine) => [
+    { kind: "machine" as const, machine },
+    ...machine.agents.map((agent) => ({ kind: "agent" as const, machine, agent })),
+  ]);
+  const selected = Math.min(cursor, Math.max(0, rows.length - 1));
+  const current = rows[selected];
+
+  useKeys(
+    (input, key) => {
+      if (key.downArrow || input === "j") return setCursor(Math.min(rows.length - 1, selected + 1));
+      if (key.upArrow || input === "k") return setCursor(Math.max(0, selected - 1));
+      if (input === "g") return setCursor(0);
+      if (input === "G") return setCursor(Math.max(0, rows.length - 1));
+      if (!current) return;
+      if (key.return && current.kind === "agent") {
+        return props.onOpen(current.machine.environmentId, current.agent.threadId);
+      }
+      if (input === "s" && current.kind === "agent" && !current.agent.needsYou) {
+        void interrupt({
+          environmentId: current.machine.environmentId,
+          input: { threadId: current.agent.threadId },
+        }).then((result) => result !== null && setStatus(`Stopping "${current.agent.title}".`));
+        return;
+      }
+      if (input === "w") {
+        const { machine } = current;
+        if (machine.state === "awake") return setStatus(`${machine.label} is awake.`);
+        setStatus(`Waking ${machine.label}…`);
+        void wakeHost(machine.environmentId).then((message) =>
+          setStatus(message ?? `${machine.label} has no address to wake by.`),
+        );
+      }
+    },
+    { isActive: props.active },
+  );
+
+  if (machines.length === 0) {
+    return h(Text, { dimColor: true }, "No machines yet. Pair one in Hosts.");
+  }
+
+  const wide = columns >= 100;
+  const meterWidth = wide ? 12 : 8;
+  const fleetCpu = totals.cpuCores > 0 ? totals.cpuBusyCores / totals.cpuCores : 0;
+  const fleetRam =
+    totals.memoryTotalBytes > 0 ? totals.memoryUsedBytes / totals.memoryTotalBytes : 0;
+  const header = h(
+    Box,
+    { flexWrap: "wrap" },
+    h(Text, { bold: true }, `${totals.awake}/${totals.machines} awake`),
+    h(Text, { dimColor: true }, "  ·  "),
+    h(
+      Text,
+      totals.agents > 0 ? { bold: true, color: "cyan" } : { bold: true },
+      `${totals.agents} agent${totals.agents === 1 ? "" : "s"} working`,
+    ),
+    totals.needsYou > 0
+      ? h(
+          Text,
+          { color: "yellow", bold: true },
+          `  ${totals.needsYou} need${totals.needsYou === 1 ? "s" : ""} you`,
+        )
+      : null,
+    h(Text, { dimColor: true }, "  ·  CPU "),
+    h(Meter, { ratio: fleetCpu, width: 10 }),
+    h(Text, null, ` ${totals.cpuBusyCores.toFixed(1)}/${totals.cpuCores} cores`),
+    h(Text, { dimColor: true }, "  ·  RAM "),
+    h(Meter, { ratio: fleetRam, width: 10 }),
+    h(Text, null, ` ${formatUsedOfTotal(totals.memoryUsedBytes, totals.memoryTotalBytes)}`),
+  );
+
+  const lines: Array<ReactNode> = [];
+  rows.forEach((row, index) => {
+    const isSelected = index === selected;
+    const pointer = h(Text, { color: "cyan" }, isSelected ? "› " : "  ");
+    if (row.kind === "machine") {
+      const { machine } = row;
+      const resources = machine.resources;
+      const mark = STATE_MARK[machine.state];
+      const awake = machine.state === "awake";
+      const facts = [
+        machine.state === "asleep" ? "asleep · w wakes it" : machine.state,
+        awake && resources?.loadAverage?.[0] !== undefined
+          ? `load ${resources.loadAverage[0].toFixed(1)}`
+          : null,
+        awake && resources ? `${resources.cpuCount} cores` : null,
+      ].filter(Boolean);
+      lines.push(
+        h(
+          Box,
+          { key: `m:${machine.environmentId}`, marginTop: index === 0 ? 0 : 1 },
+          pointer,
+          h(Text, { color: mark.color }, `${mark.mark} `),
+          h(Text, { bold: true }, machine.label),
+          h(Text, { dimColor: true }, `  ${facts.join(" · ")}`),
+          machine.warnings.length > 0
+            ? h(
+                Text,
+                { color: "red", bold: true, wrap: "truncate" },
+                `  ⚠ ${machine.warnings.map(warningText).join(" · ")}`,
+              )
+            : null,
+        ),
+      );
+      if (resources && machine.state !== "unreachable") {
+        // Readings from a machine that stopped answering are its last known state, greyed.
+        const tone = awake ? {} : { color: "gray" };
+        const memUsed = resources.totalMemoryBytes - resources.availableMemoryBytes;
+        const zramRam = (resources.swap?.devices ?? [])
+          .filter((device) => device.kind === "zram")
+          .reduce((sum, device) => sum + (device.memoryBytes ?? 0), 0);
+        const cpu = resources.cpuUtilization ?? 0;
+        const vitals = [
+          h(Gauge, {
+            key: "cpu",
+            label: "CPU",
+            ratio: cpu,
+            width: meterWidth,
+            detailWidth: 5,
+            detail: `${Math.round(cpu * 100)}%`,
+            ...tone,
+          }),
+          h(Gauge, {
+            key: "ram",
+            label: "RAM",
+            ratio: resources.totalMemoryBytes > 0 ? memUsed / resources.totalMemoryBytes : 0,
+            width: meterWidth,
+            detailWidth: 10,
+            detail: formatUsedOfTotal(memUsed, resources.totalMemoryBytes),
+            ...tone,
+          }),
+          resources.swap && resources.swap.totalBytes > 0
+            ? h(Gauge, {
+                key: "swap",
+                label: "Swap",
+                ratio: resources.swap.usedBytes / resources.swap.totalBytes,
+                width: meterWidth,
+                detailWidth: 22,
+                detail: `${formatUsedOfTotal(resources.swap.usedBytes, resources.swap.totalBytes)}${zramRam > 0 ? ` zram ${formatBytes(zramRam)}` : ""}`,
+                ...tone,
+              })
+            : null,
+        ].filter(Boolean);
+        const disks = (resources.disks ?? []).map((disk) =>
+          h(Gauge, {
+            key: `disk:${disk.mount}`,
+            label: disk.mount,
+            ratio: disk.totalBytes > 0 ? 1 - disk.freeBytes / disk.totalBytes : 0,
+            width: meterWidth,
+            detailWidth: 13,
+            detail: `${formatBytes(disk.freeBytes)} free`,
+            ...tone,
+          }),
+        );
+        lines.push(
+          h(Box, { key: `v:${machine.environmentId}`, marginLeft: 4, flexWrap: "wrap" }, ...vitals),
+        );
+        if (disks.length > 0) {
+          lines.push(
+            h(
+              Box,
+              { key: `d:${machine.environmentId}`, marginLeft: 4, flexWrap: "wrap" },
+              ...disks,
+            ),
+          );
+        }
+        if (!awake) {
+          const since = formatSince(resources.sampledAt, now);
+          lines.push(
+            h(
+              Text,
+              { key: `s:${machine.environmentId}`, dimColor: true },
+              `    last reading ${since === "now" ? "just now" : `${since} ago`}`,
+            ),
+          );
+        }
+      }
+      if (awake && machine.agents.length === 0) {
+        lines.push(h(Text, { key: `i:${machine.environmentId}`, dimColor: true }, "    idle"));
+      }
+      return;
+    }
+    const { agent } = row;
+    const titleWidth = Math.max(12, Math.floor(columns * (wide ? 0.26 : 0.35)));
+    lines.push(
+      h(
+        Box,
+        { key: `a:${row.machine.environmentId}:${agent.threadId}`, marginLeft: 2 },
+        pointer,
+        h(
+          Box,
+          { width: titleWidth, flexShrink: 0, marginRight: 1 },
+          h(Text, { bold: isSelected, wrap: "truncate" }, agent.title),
+        ),
+        wide
+          ? h(
+              Box,
+              { width: 14, flexShrink: 0, marginRight: 1 },
+              h(Text, { dimColor: true, wrap: "truncate" }, agent.project),
+            )
+          : null,
+        wide
+          ? h(
+              Box,
+              { width: 16, flexShrink: 0, marginRight: 1 },
+              h(Text, { dimColor: true, wrap: "truncate" }, agent.model),
+            )
+          : null,
+        h(
+          Box,
+          { flexGrow: 1, marginRight: 1 },
+          h(Text, { color: agent.needsYou ? "yellow" : "cyan", wrap: "truncate" }, agent.activity),
+        ),
+        h(
+          Box,
+          { width: 7, flexShrink: 0, justifyContent: "flex-end" },
+          h(Text, { dimColor: true }, formatSince(agent.sinceMs, now)),
+        ),
+      ),
+    );
+  });
+
+  // Keep the selection on screen: show a window of lines around it.
+  const visible = Math.max(5, height - 7);
+  const selectedLine = lines.findIndex((line) => {
+    const key = (line as { key?: string } | null)?.key ?? "";
+    return current?.kind === "agent"
+      ? key === `a:${current.machine.environmentId}:${current.agent.threadId}`
+      : key === `m:${current?.machine.environmentId}`;
+  });
+  const top = Math.max(0, Math.min(selectedLine - Math.floor(visible / 2), lines.length - visible));
+
+  return h(
+    Box,
+    { flexDirection: "column" },
+    header,
+    h(Box, { flexDirection: "column", marginTop: 1 }, ...lines.slice(top, top + visible)),
+    h(
+      Text,
+      { dimColor: true, wrap: "truncate" },
+      `${current?.kind === "agent" ? "enter open · s stop · " : ""}w wake · j/k move · live`,
+    ),
+  );
+}
