@@ -12,6 +12,8 @@ import {
   type DecisionMediaRef,
   type DecisionMediaType,
   type DecisionOption,
+  type DecisionSubmitInput,
+  decisionSubmitWarnings,
   type DecisionTimelineStep,
   normalizeDecisionKind,
 } from "@cz/contracts";
@@ -197,6 +199,10 @@ const submitCommand = Command.make("submit", {
     Flag.optional,
   ),
   costNote: Flag.String("cost-note").pipe(Flag.optional),
+  device: Flag.Literals("device", ["phone", "desktop", "any"]).pipe(
+    Flag.withDescription("Where the owner acts on it (default: phone for a playtest with an apk)."),
+    Flag.optional,
+  ),
   resumePrompt: Flag.String("resume-prompt").pipe(
     Flag.withDescription("If you won't be waiting: what a new thread should do with the answer."),
     Flag.optional,
@@ -231,7 +237,7 @@ const submitCommand = Command.make("submit", {
         if (Option.isSome(flags.expires) && expiresAt === null) {
           return yield* fail(`Can't read --expires ${flags.expires.value}.`);
         }
-        const item = yield* decisions.submit({
+        const input = {
           project: flags.project,
           kind,
           question: flags.question,
@@ -254,8 +260,12 @@ const submitCommand = Command.make("submit", {
           resume: Option.isSome(flags.resumePrompt)
             ? { project: flags.project, prompt: flags.resumePrompt.value }
             : null,
-        });
-        yield* flags.json ? printJson({ item }) : Console.log(item.id);
+          ...(Option.isSome(flags.device) ? { target_device: flags.device.value } : {}),
+        } satisfies DecisionSubmitInput;
+        const item = yield* decisions.submit(input);
+        const warnings = decisionSubmitWarnings(input);
+        for (const warning of warnings) yield* Console.error(`warning: ${warning}`);
+        yield* flags.json ? printJson({ item, warnings }) : Console.log(item.id);
       }),
     ),
   ),

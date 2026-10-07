@@ -50,12 +50,18 @@ const DecisionId = Schema.Struct({
   id: Schema.String.annotate({ description: "The decision id returned by ask_owner." }),
 });
 
+/** The item, plus anything the agent should fix next time it asks. */
+const AskOwnerResult = Schema.Struct({
+  ...DecisionItem.fields,
+  warnings: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
 const AskOwnerTool = Tool.make("ask_owner", {
-  description: `Ask the owner a judgment call with media; it appears in czcode's Decisions tab on their phone and desktop. ${WHEN_TO_ASK} Upload files with upload_decision_media first and pass the returned refs in media; options point at them with media_idx. Kinds: pick (choose one or max_choices), review (approve/reject/changes, redlines on images), listen (sound board: keep/kill/favourite per option), look (3D model), read (long text in body_md, passage comments), playtest (an apk in media), rank (order options), pitch (yes/later/never), request (owner uploads or writes something), timeline (genforge steps with redo-from-here). Returns the item; poll or wait_for_decision for the answer.`,
+  description: `Ask the owner a judgment call with media; it appears in czcode's Decisions tab on their phone and desktop. ${WHEN_TO_ASK} Upload files with upload_decision_media first and pass the returned refs in media; options point at them with media_idx. Kinds: pick (choose one or max_choices), review (approve/reject/changes, redlines on images), listen (sound board: keep/kill/favourite per option), look (3D model), read (long text in body_md, passage comments), playtest (an apk in media), rank (order options), pitch (yes/later/never), request (owner uploads or writes something), timeline (genforge steps with redo-from-here). Render every option the same way: an image of the same size for each, or none. target_device: phone, desktop, or any; a playtest with an apk defaults to phone. Returns the item (with warnings to heed next time); poll or wait_for_decision for the answer.`,
   parameters: DecisionSubmitInput.mapFields(
     ({ thread: _thread, created_by: _createdBy, ...fields }) => fields,
   ),
-  success: DecisionItem,
+  success: AskOwnerResult,
   failure: DecisionToolError,
   dependencies,
 })

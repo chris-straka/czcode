@@ -98,6 +98,13 @@ export const DecisionResumePlan = Schema.Struct({
 });
 export type DecisionResumePlan = typeof DecisionResumePlan.Type;
 
+/**
+ * Where the owner can act on a decision: a phone playtest needs the phone.
+ * Clients show their own device's decisions and fold the rest into one line.
+ */
+export const DecisionTargetDevice = Schema.Literals(["phone", "desktop", "any"]);
+export type DecisionTargetDevice = typeof DecisionTargetDevice.Type;
+
 /** What an agent sends to ask. The server stamps id, status, and times. */
 export const DecisionSubmitInput = Schema.Struct({
   project: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(120)),
@@ -126,8 +133,24 @@ export const DecisionSubmitInput = Schema.Struct({
   /** What answering yes spends, e.g. "runs Tripo, about $0.40". */
   cost_note: Schema.optionalKey(Schema.NullOr(Schema.String)),
   resume: Schema.optionalKey(Schema.NullOr(DecisionResumePlan)),
+  /** Omitted: a playtest with an app build goes to the phone, the rest to any device. */
+  target_device: Schema.optionalKey(DecisionTargetDevice),
 });
 export type DecisionSubmitInput = typeof DecisionSubmitInput.Type;
+
+/**
+ * Problems worth telling the asking agent about, without refusing the item:
+ * options read best when every one is shown the same way.
+ */
+export function decisionSubmitWarnings(input: DecisionSubmitInput): ReadonlyArray<string> {
+  const options = input.options ?? [];
+  const withMedia = options.filter((option) => option.media_idx !== null).length;
+  return withMedia > 0 && withMedia < options.length
+    ? [
+        `Only ${withMedia} of ${options.length} options have media. Render every option at the same size (an image for each), or none.`,
+      ]
+    : [];
+}
 
 export const DecisionItem = Schema.Struct({
   id: Schema.String,
@@ -149,6 +172,8 @@ export const DecisionItem = Schema.Struct({
   expires_at: Schema.NullOr(Schema.Number),
   cost_note: Schema.NullOr(Schema.String),
   resume: Schema.NullOr(DecisionResumePlan),
+  /** Absent on items from before devices were targeted; read as "any". */
+  target_device: Schema.optionalKey(DecisionTargetDevice),
   status: DecisionItemStatus,
   created_at: Schema.Number,
   updated_at: Schema.Number,
