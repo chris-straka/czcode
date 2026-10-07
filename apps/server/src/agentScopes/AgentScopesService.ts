@@ -11,7 +11,7 @@
  * start afterwards is born in the scope. Quick commands finish before a sweep
  * picks them up. Scopes set no memory limit. Scopes left by a previous server
  * are stopped at startup, as their agents lost their server anyway, which is
- * why only the service itself may turn scopes on (see agentScopesCgroupProblem).
+ * why only the service itself may turn scopes on (see hostServiceCgroupProblem).
  *
  * @module AgentScopesService
  */
@@ -23,15 +23,9 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { hostServiceCgroupProblem, readOwnCgroupPath } from "../hostService.ts";
 import * as ProcessRunner from "../processRunner.ts";
-import {
-  agentScopesCgroupProblem,
-  parseProcStat,
-  planScopes,
-  processKey,
-  scopeUnitName,
-  type ProcessEntry,
-} from "./plan.ts";
+import { parseProcStat, planScopes, processKey, scopeUnitName, type ProcessEntry } from "./plan.ts";
 
 const SWEEP_INTERVAL = Duration.seconds(5);
 const enabledConfig = Config.Boolean("CZ_AGENT_SCOPES").pipe(Config.option);
@@ -55,13 +49,8 @@ const run = Effect.gen(function* () {
   const serverPid = process.pid;
 
   // cgroup v2: "0::/user.slice/.../app.slice/cz-host.service".
-  const cgroupLine = yield* fs.readFileString("/proc/self/cgroup");
-  const cgroupPath = cgroupLine
-    .split("\n")
-    .find((line) => line.startsWith("0::"))
-    ?.slice(3)
-    .trim();
-  const problem = agentScopesCgroupProblem(cgroupPath);
+  const cgroupPath = yield* readOwnCgroupPath;
+  const problem = hostServiceCgroupProblem(cgroupPath);
   if (problem !== null || !cgroupPath) {
     yield* Effect.logInfo(`Agent scopes are off: ${problem ?? "no cgroup"}`);
     return;
