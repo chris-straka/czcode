@@ -6,6 +6,9 @@ import type {
   DecisionListQuery,
   DecisionMediaRef,
   DecisionMediaUploadQuery,
+  DecisionProjectBlurb,
+  DecisionProjectBlurbInput,
+  ThreadDigest,
 } from "@cz/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -46,6 +49,19 @@ export class DecisionsHttpClient extends Context.Service<
       meta: DecisionMediaUploadQuery,
       bytes: Uint8Array,
     ) => Effect.Effect<DecisionMediaRef, RemoteEnvironmentRequestError>;
+    /** One-line descriptions for the projects with open decisions. */
+    readonly projects: (
+      prepared: PreparedConnection,
+    ) => Effect.Effect<ReadonlyArray<DecisionProjectBlurb>, RemoteEnvironmentRequestError>;
+    readonly describeProject: (
+      prepared: PreparedConnection,
+      input: DecisionProjectBlurbInput,
+    ) => Effect.Effect<DecisionProjectBlurb, RemoteEnvironmentRequestError>;
+    /** Feed card extras for threads: latest result and the folder they worked in. */
+    readonly threadDigests: (
+      prepared: PreparedConnection,
+      threadIds: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyArray<ThreadDigest>, RemoteEnvironmentRequestError>;
   }
 >()("@cz/client-runtime/state/decisionsHttp/DecisionsHttpClient") {}
 
@@ -106,6 +122,39 @@ export const layer: Layer.Layer<DecisionsHttpClient, never, HttpClient.HttpClien
             request: ({ client, headers }) =>
               client.upload({ query: meta, payload: bytes, headers }),
           }),
+        ),
+      projects: (prepared) =>
+        run(
+          executeAuthenticatedEnvironmentHttpRequest({
+            ...common(prepared),
+            method: "GET",
+            url: (base) => urls(base).projects(),
+            timeoutMs: REQUEST_TIMEOUT_MS,
+            request: ({ client, headers }) => client.projects({ headers }),
+          }).pipe(Effect.map((result) => result.blurbs)),
+        ),
+      describeProject: (prepared, input) =>
+        run(
+          executeAuthenticatedEnvironmentHttpRequest({
+            ...common(prepared),
+            method: "POST",
+            url: (base) => urls(base).describeProject(),
+            timeoutMs: REQUEST_TIMEOUT_MS,
+            request: ({ client, headers }) => client.describeProject({ payload: input, headers }),
+          }),
+        ),
+      threadDigests: (prepared, threadIds) =>
+        run(
+          executeAuthenticatedEnvironmentHttpRequest({
+            prepared,
+            signer,
+            remoteAuthorization,
+            group: "threads",
+            method: "POST",
+            url: (base) => makeEnvironmentHttpApiUrlBuilder(base).threads.digests(),
+            timeoutMs: REQUEST_TIMEOUT_MS,
+            request: ({ client, headers }) => client.digests({ payload: { threadIds }, headers }),
+          }).pipe(Effect.map((result) => result.digests)),
         ),
     });
   }),
