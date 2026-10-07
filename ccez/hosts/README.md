@@ -117,6 +117,40 @@ is in `~/.local/state/cz-host/jobs/<name>.log`, every run is in
 The Mac isn't part of the host jobs: it has no SSH server for the others to
 reach, so `health` and `fleet-status.sh` only check that it's online.
 
+## Where heavy work goes
+
+Before starting a long build, render or test run, agents ask which host has
+room:
+
+```sh
+bash ~/SWE/czcode/ccez/hosts/pick-host.sh cpu        # or gpu, emulator; --list explains
+```
+
+It prints the least loaded Linux host with the hardware the work needs (the
+fourth column of `hosts.txt`), for example `basement b@basement`, waking it
+if it's asleep. `art-ms-7917` (RTX 2060 SUPER) is the only `gpu` and
+`emulator` host: Blender GPU renders, Whisper, local models, shader work and
+fast Android testing go there. CPU work goes wherever the load is lowest;
+`f-ms-7917` has the most threads (8) when it isn't busy.
+
+## Android emulator
+
+Android testing happens on emulators only; the phone is the owner's. Every
+Linux host has one AVD, `cz`, set up by the build tools:
+
+```sh
+serial=$(bash ~/SWE/czcode/ccez/hosts/android-emulator.sh start)   # e.g. emulator-5554
+adb -s "$serial" install app.apk
+bash ~/SWE/czcode/ccez/hosts/android-emulator.sh stop
+```
+
+It starts from a saved snapshot in under 10 seconds and is shared by the
+agents on that host. On `art-ms-7917` it has 4 cores, 4 GB and renders on
+the GPU, so frame rates there are realistic; that needs a desktop session on
+art (automatic login, in [FLEET.md](FLEET.md)), and without one it renders in software like the others. On
+`f-ms-7917` and `basement` it has 2 cores, 3 GB and a software GPU: right
+for checking that things work, not for judging smoothness.
+
 ## A Mac
 
 `mac.sh` is made for a separate macOS account on a Mac someone else also
