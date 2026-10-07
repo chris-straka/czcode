@@ -19,7 +19,7 @@ set -euo pipefail
 
 BLENDER_VERSION=5.2.1                         # same as the Mac
 NDK_VERSIONS="28.2.13676358 30.0.16138531"    # first one is the default (games/tools/build_android.sh)
-ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2"
+ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2 emulator system-images;android-36;google_apis;x86_64"
 JDK=21
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
