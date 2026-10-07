@@ -11,7 +11,7 @@
  */
 import {
   AuthStandardClientScopes,
-  ExecutionEnvironmentDescriptor,
+  type ExecutionEnvironmentDescriptor,
   PortSchema,
 } from "@cz/contracts";
 import { resolveWorktreeCzHome } from "@cz/shared/devHome";
@@ -21,6 +21,7 @@ import {
   buildTailscaleHttpsBaseUrl,
   DEFAULT_TAILSCALE_SERVE_PORT,
   ensureTailscaleServe,
+  readTailscaleServeProxy,
   readTailscaleStatus,
 } from "@cz/tailscale";
 import * as Config from "effect/Config";
@@ -33,7 +34,7 @@ import * as Option from "effect/Option";
 import * as References from "effect/References";
 import * as Schema from "effect/Schema";
 import { Command, Flag, GlobalFlag } from "effect/cli";
-import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import { FetchHttpClient } from "effect/http";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
@@ -51,10 +52,13 @@ import {
   renderTerminalQrCode,
   resolveHeadlessConnectionString,
 } from "../startupAccess.ts";
+import {
+  type EnvironmentProbeResult,
+  probeEnvironmentDescriptor,
+  resolveServePortOwner,
+} from "../tailscaleServeOwnership.ts";
 import { baseDirFlag, DurationFromString } from "./config.ts";
 
-const WELL_KNOWN_ENVIRONMENT_PATH = "/.well-known/cz/environment";
-const PAIR_PROBE_TIMEOUT = Duration.millis(2_500);
 // Tailscale provisions an HTTPS certificate on the first request to a fresh
 // serve mapping, which can take a few seconds.
 const TAILSCALE_PROBE_ATTEMPTS = 5;
@@ -189,43 +193,6 @@ const formatPairOutput = (input: {
     ...input.notes.flatMap((note) => ["", `Note: ${note}`]),
     "",
   ].join("\n");
-
-/**
- * Three outcomes, because they drive different decisions: a cz descriptor
- * (pair with it), nothing answering (safe to configure Tailscale Serve), or
- * something answering that is not a cz server (do NOT overwrite its mapping).
- */
-type EnvironmentProbeResult =
-  | { readonly _tag: "descriptor"; readonly descriptor: ExecutionEnvironmentDescriptor }
-  | { readonly _tag: "unreachable" }
-  | { readonly _tag: "not-a-cz-server" };
-
-const probeEnvironmentDescriptor = (
-  baseUrl: string,
-): Effect.Effect<EnvironmentProbeResult, never, HttpClient.HttpClient> =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const request = HttpClientRequest.get(new URL(WELL_KNOWN_ENVIRONMENT_PATH, baseUrl).toString());
-    const response = yield* client.execute(request).pipe(
-      Effect.timeout(PAIR_PROBE_TIMEOUT),
-      // Transport failure or timeout: nothing (reachable) is listening there.
-      Effect.mapError(() => ({ _tag: "unreachable" }) as const),
-    );
-    // Bad-gateway family means a proxy (Tailscale Serve) answered for a
-    // backend that is gone — a stale mapping, not a live occupant. Treating
-    // it as unreachable lets `cz pair --tailscale` repair its own mapping
-    // after the server's port changed.
-    if (response.status === 502 || response.status === 503 || response.status === 504) {
-      return { _tag: "unreachable" } as const;
-    }
-    // Anything else that answered HTTP but not with a valid descriptor is
-    // some other service.
-    const descriptor = yield* HttpClientResponse.filterStatusOk(response).pipe(
-      Effect.flatMap(HttpClientResponse.schemaBodyJson(ExecutionEnvironmentDescriptor)),
-      Effect.mapError(() => ({ _tag: "not-a-cz-server" }) as const),
-    );
-    return { _tag: "descriptor", descriptor } as const;
-  }).pipe(Effect.catch((outcome) => Effect.succeed(outcome)));
 
 interface DiscoveredPairTarget {
   readonly baseDir: string;
@@ -370,30 +337,33 @@ const resolveTailscalePairingBase = Effect.fn("pair.resolveTailscalePairingBase"
       servePort: input.servePort,
     });
 
-    // Only an unreachable port, or a mapping already fronting this exact
-    // environment, is safe to (re)configure. Any other responder — cz or not
-    // — must not have its mapping silently replaced.
-    const existing = yield* probeEnvironmentDescriptor(baseUrl);
-    if (existing._tag === "descriptor") {
-      if (existing.descriptor.environmentId !== input.target.descriptor.environmentId) {
-        return yield* new ServesOtherEnvironmentError({ servePort: input.servePort });
-      }
-      // Matching environment id proves the mapping reaches this server, but
-      // not through which port: for a dev server it may front the backend
-      // (whose /.well-known also answers) while /pair only renders through
-      // the web origin. Reuse as-is for regular servers; fall through and
-      // repoint our own mapping at the web port for dev servers.
-      if (input.target.state.devUrl === undefined) {
-        return { baseUrl, notes };
-      }
-    }
-    if (existing._tag === "not-a-cz-server") {
-      return yield* new ServePortOccupiedError({ servePort: input.servePort });
-    }
-
     const localTarget = resolveTailscaleLocalTarget(input.target.state);
     if (isDevServerNotProxiableError(localTarget)) {
       return yield* localTarget;
+    }
+    // Decide from this machine's Serve config, probing what it points at
+    // locally: a probe over the tailnet can time out on a hairpin, and taking
+    // that for "nothing there" would repoint the running host's route.
+    // Only a free or stale port, or our own mapping, may be (re)configured.
+    const proxy = yield* readTailscaleServeProxy(input.servePort).pipe(
+      Effect.mapError((cause) => new TailscaleUnavailableError({ cause })),
+    );
+    const owner = yield* resolveServePortOwner({
+      proxy,
+      ownLocalUrl: `http://${localTarget.localHost ?? "127.0.0.1"}:${String(localTarget.localPort)}`,
+      ownEnvironmentId: input.target.descriptor.environmentId,
+    });
+    if (owner._tag === "other-environment") {
+      return yield* new ServesOtherEnvironmentError({ servePort: input.servePort });
+    }
+    if (owner._tag === "occupied") {
+      return yield* new ServePortOccupiedError({ servePort: input.servePort });
+    }
+    // A dev server's environment also answers on its backend port, while
+    // /pair only renders through the web origin: repoint our own mapping
+    // there. A regular server's mapping is reused as-is.
+    if (owner._tag === "ours" && input.target.state.devUrl === undefined) {
+      return { baseUrl, notes };
     }
     yield* ensureTailscaleServe({
       localPort: localTarget.localPort,

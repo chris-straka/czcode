@@ -16,6 +16,7 @@ import {
   ensureTailscaleServe,
   TailscaleServeNotEnabledError,
   isTailscaleIpv4Address,
+  parseServeProxyTarget,
   parseTailscaleMagicDnsName,
   parseTailscaleStatus,
   readTailscaleStatus,
@@ -127,6 +128,24 @@ function layerMockSpawner(
 }
 
 describe("tailscale", () => {
+  it.effect("reads which local URL a Serve port proxies to", () =>
+    Effect.gen(function* () {
+      const status = JSON.stringify({
+        TCP: { "443": { HTTPS: true }, "8443": { HTTPS: true } },
+        Web: {
+          "host.tail.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:3773" } } },
+          "host.tail.ts.net:8443": { Handlers: { "/docs": { Path: "/srv" } } },
+        },
+      });
+      assert.equal(yield* parseServeProxyTarget(status, 443), "http://127.0.0.1:3773");
+      assert.equal(yield* parseServeProxyTarget(status, 8443), null);
+      assert.equal(yield* parseServeProxyTarget(status, 444), null);
+      // `tailscale serve status --json` with no config prints `{}` (or nothing).
+      assert.equal(yield* parseServeProxyTarget("{}", 443), null);
+      assert.equal(yield* parseServeProxyTarget("", 443), null);
+    }),
+  );
+
   it.effect("detects Tailnet IPv4 addresses", () =>
     Effect.sync(() => {
       assert.equal(isTailscaleIpv4Address("100.64.0.1"), true);

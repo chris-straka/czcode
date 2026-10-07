@@ -117,6 +117,7 @@ import * as Observability from "./observability/Observability.ts";
 import * as HeapSnapshot from "./observability/HeapSnapshot.ts";
 import * as EventLoopMonitor from "./observability/EventLoopMonitor.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
+import { resolveServePortOwner, sameOrigin } from "./tailscaleServeOwnership.ts";
 import * as DirectEndpoints from "./environment/DirectEndpoints.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as AuthHttp from "./auth/http.ts";
@@ -178,7 +179,11 @@ import * as OrchestrationHttp from "./orchestration-v2/http.ts";
 import * as ProjectHttp from "./project/http.ts";
 import * as NetService from "@cz/shared/Net";
 import * as RelayClient from "@cz/shared/relayClient";
-import { disableTailscaleServe, ensureTailscaleServe } from "@cz/tailscale";
+import {
+  disableTailscaleServe,
+  ensureTailscaleServe,
+  readTailscaleServeProxy,
+} from "@cz/tailscale";
 import * as ServerActivation from "./serverActivation.ts";
 
 // MCP handoff thread IDs include escaped provenance and can exceed find-my-way's
@@ -785,6 +790,27 @@ const layerMakeServer = Layer.unwrap(
               }
 
               const localPort = address.port;
+              const ownLocalUrl = `http://127.0.0.1:${localPort}`;
+              const owner = yield* readTailscaleServeProxy(config.tailscaleServePort).pipe(
+                Effect.flatMap((proxy) =>
+                  ServerEnvironment.ServerEnvironment.pipe(
+                    Effect.flatMap((environment) => environment.getEnvironmentId),
+                    Effect.flatMap((ownEnvironmentId) =>
+                      resolveServePortOwner({ proxy, ownLocalUrl, ownEnvironmentId }),
+                    ),
+                  ),
+                ),
+                Effect.provide(FetchHttpClient.layer),
+                // Unreadable Serve config: configure as before; release still checks.
+                Effect.catch(() => Effect.succeed({ _tag: "free" } as const)),
+              );
+              if (owner._tag === "other-environment" || owner._tag === "occupied") {
+                yield* Effect.logWarning(
+                  "Tailscale Serve port already fronts another server; leaving it alone",
+                  { servePort: config.tailscaleServePort, proxy: owner.proxy },
+                );
+                return null;
+              }
               return yield* ensureTailscaleServe({
                 localPort,
                 servePort: config.tailscaleServePort,
@@ -808,19 +834,36 @@ const layerMakeServer = Layer.unwrap(
             }),
             (configured) =>
               configured
-                ? disableTailscaleServe({ servePort: configured.servePort }).pipe(
-                    Effect.tap(() =>
-                      Effect.logInfo("Tailscale Serve disabled", {
-                        servePort: configured.servePort,
-                      }),
-                    ),
-                    Effect.catch((cause) =>
-                      Effect.logWarning("Failed to disable Tailscale Serve", {
-                        cause,
-                        servePort: configured.servePort,
-                      }),
-                    ),
-                  )
+                ? // Only take down a mapping that still points here: another
+                  // server may have taken the port since (Serve is machine-wide).
+                  readTailscaleServeProxy(configured.servePort)
+                    .pipe(
+                      Effect.flatMap((proxy) =>
+                        proxy !== null &&
+                        sameOrigin(proxy, `http://127.0.0.1:${configured.localPort}`)
+                          ? disableTailscaleServe({ servePort: configured.servePort }).pipe(
+                              Effect.as(true),
+                            )
+                          : Effect.succeed(false),
+                      ),
+                    )
+                    .pipe(
+                      Effect.tap((disabled) =>
+                        disabled
+                          ? Effect.logInfo("Tailscale Serve disabled", {
+                              servePort: configured.servePort,
+                            })
+                          : Effect.logInfo("Tailscale Serve now fronts another server; left on", {
+                              servePort: configured.servePort,
+                            }),
+                      ),
+                      Effect.catch((cause) =>
+                        Effect.logWarning("Failed to disable Tailscale Serve", {
+                          cause,
+                          servePort: configured.servePort,
+                        }),
+                      ),
+                    )
                 : Effect.void,
           ),
         )
