@@ -31,7 +31,14 @@ import { AppText as Text } from "../../components/AppText";
 import { MaterialButton } from "../../components/MaterialButton";
 import { type DecisionEntry, decisionEnvironment, useOpenDecisions } from "../../state/decisions";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { DecisionAudio, DecisionMedia, useDecisionMediaUrl } from "./DecisionMedia";
+import { DecisionImageViewer } from "./DecisionImageViewer";
+import {
+  DecisionAudio,
+  DecisionMedia,
+  OPTION_FRAME_STYLE,
+  useDecisionMediaResolver,
+  useDecisionMediaUrl,
+} from "./DecisionMedia";
 
 const UNDO_WINDOW_MS = 5_000;
 
@@ -308,50 +315,103 @@ function Chip({
   );
 }
 
+/**
+ * Pick options. As soon as one has a picture, every option shares one frame
+ * so tiles line up; an option without one shows its label in that frame.
+ * Pictures open full screen, where an option can be picked too.
+ */
+function PickOptions({ entry, draft, update }: BodyProps) {
+  const { item } = entry;
+  const resolve = useDecisionMediaResolver(entry.environmentId);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const mediaOf = (option: (typeof item.options)[number]) =>
+    option.media_idx === null ? null : (item.media[option.media_idx] ?? null);
+  const framed = item.options.some((option) => mediaOf(option) !== null);
+  const pictures = item.options.flatMap((option) => {
+    const uri = mediaOf(option)?.type === "image" ? resolve(mediaOf(option)) : null;
+    return uri ? [{ uri, label: option.label, optionId: option.id }] : [];
+  });
+  const pick = (id: string) =>
+    update({
+      optionIds:
+        item.max_choices === 1
+          ? [id]
+          : draft.optionIds.includes(id)
+            ? draft.optionIds.filter((value) => value !== id)
+            : [...draft.optionIds, id],
+    });
+  return (
+    <View className={framed ? "flex-row flex-wrap justify-between gap-y-3" : "gap-3"}>
+      {item.options.map((option) => {
+        const media = mediaOf(option);
+        const selected = draft.optionIds.includes(option.id);
+        const pictureIndex = pictures.findIndex((picture) => picture.optionId === option.id);
+        return (
+          <Pressable
+            key={option.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            onPress={() => pick(option.id)}
+            onLongPress={pictureIndex >= 0 ? () => setViewing(pictureIndex) : undefined}
+            style={framed ? { width: "48.5%" } : undefined}
+            className={
+              selected
+                ? "gap-2 rounded-xl border-2 border-primary p-2"
+                : "gap-2 rounded-xl border border-subtle-strong p-2"
+            }
+          >
+            {framed ? (
+              pictureIndex >= 0 ? (
+                <Pressable
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`Open ${option.label} full screen`}
+                  onPress={() => setViewing(pictureIndex)}
+                >
+                  <DecisionMedia environmentId={entry.environmentId} media={media!} framed />
+                </Pressable>
+              ) : media ? (
+                <DecisionMedia environmentId={entry.environmentId} media={media} />
+              ) : (
+                <View
+                  className="items-center justify-center bg-subtle p-3"
+                  style={OPTION_FRAME_STYLE}
+                >
+                  <Text className="text-center font-cz-medium text-foreground">{option.label}</Text>
+                </View>
+              )
+            ) : null}
+            {framed && !media ? null : (
+              <Text className="font-cz-medium text-foreground">{option.label}</Text>
+            )}
+            {option.recommended ? <Text className="text-xs text-primary">Recommended</Text> : null}
+            {option.reason ? (
+              <Text className="text-xs text-foreground-muted">{option.reason}</Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
+      {viewing !== null ? (
+        <DecisionImageViewer
+          images={pictures}
+          index={viewing}
+          pickedIds={draft.optionIds}
+          onPick={(id) => {
+            pick(id);
+            if (item.max_choices === 1) setViewing(null);
+          }}
+          onClose={() => setViewing(null)}
+        />
+      ) : null}
+    </View>
+  );
+}
+
 function DecisionBody(props: BodyProps) {
   const { entry, draft, update } = props;
   const { item } = entry;
   switch (item.kind) {
     case "pick":
-      return (
-        <View className="gap-3">
-          {item.options.map((option) => {
-            const media = option.media_idx === null ? null : item.media[option.media_idx];
-            const selected = draft.optionIds.includes(option.id);
-            return (
-              <Pressable
-                key={option.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() =>
-                  update({
-                    optionIds:
-                      item.max_choices === 1
-                        ? [option.id]
-                        : selected
-                          ? draft.optionIds.filter((id) => id !== option.id)
-                          : [...draft.optionIds, option.id],
-                  })
-                }
-                className={
-                  selected
-                    ? "gap-2 rounded-xl border-2 border-primary p-3"
-                    : "gap-2 rounded-xl border border-subtle-strong p-3"
-                }
-              >
-                {media ? <DecisionMedia environmentId={entry.environmentId} media={media} /> : null}
-                <Text className="font-cz-medium text-foreground">
-                  {option.label}
-                  {option.recommended ? "  · recommended" : ""}
-                </Text>
-                {option.reason ? (
-                  <Text className="text-xs text-foreground-muted">{option.reason}</Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      );
+      return <PickOptions {...props} />;
     case "rank":
       return (
         <View className="gap-2">
