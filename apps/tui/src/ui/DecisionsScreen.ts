@@ -10,7 +10,7 @@ import { age } from "../model/threadList.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { DecisionScreen } from "./DecisionScreen.ts";
 import { useNow, useViewport } from "./hooks.ts";
-import { useClick, useKeys } from "./input.ts";
+import { useClick, useKeys, useVimMotion } from "./input.ts";
 import { HostLoadLine, type HostResult, useHostLoads } from "./useHostLoads.ts";
 import { anyLoading } from "../model/hostLoad.ts";
 
@@ -63,7 +63,7 @@ export function DecisionsScreen(props: {
   const [open, setOpen] = useState<DecisionEntry | null>(null);
   const now = useNow(60_000);
   const { rows: height, columns } = useViewport();
-  const visible = Math.max(3, height - 5);
+  const visible = Math.max(3, height - 6);
   const selected = Math.min(cursor, Math.max(0, entries.length - 1));
   const top = Math.max(0, Math.min(selected - Math.floor(visible / 2), entries.length - visible));
   const openEntry = (entry: DecisionEntry) => {
@@ -71,11 +71,19 @@ export function DecisionsScreen(props: {
     props.onOpenChange(true);
   };
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
-      if (key.downArrow || input === "j") setCursor(Math.min(entries.length - 1, selected + 1));
-      else if (key.upArrow || input === "k") setCursor(Math.max(0, selected - 1));
-      else if (key.return && entries[selected]) openEntry(entries[selected]);
+      if (
+        vim(input, key, {
+          cursor: selected,
+          count: entries.length,
+          page: visible,
+          onMove: setCursor,
+        })
+      )
+        return;
+      if (key.return && entries[selected]) openEntry(entries[selected]);
     },
     { isActive: props.active && open === null },
   );
@@ -105,10 +113,22 @@ export function DecisionsScreen(props: {
       },
     });
   }
+  const total = hosts.reduce((sum, host) => sum + host.items.length, 0);
+  const machines = hosts.filter((host) => host.items.length > 0).length;
+  const summary = h(
+    Text,
+    { dimColor: true, wrap: "truncate" },
+    h(Text, total > 0 ? { color: "yellow", bold: true } : { bold: true }, `${total} open`),
+    total > 0 ? ` on ${machines} machine${machines === 1 ? "" : "s"}` : "",
+    props.scopeNames !== null && entries.length !== total
+      ? ` · ${entries.length} in this project · a all`
+      : "",
+  );
   if (entries.length === 0) {
     return h(
       Box,
       { flexDirection: "column" },
+      total > 0 ? summary : null,
       h(
         Text,
         { dimColor: true },
@@ -122,6 +142,7 @@ export function DecisionsScreen(props: {
   return h(
     Box,
     { flexDirection: "column" },
+    summary,
     h(
       Box,
       { ref: list, flexDirection: "column" },

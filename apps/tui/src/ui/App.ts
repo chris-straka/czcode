@@ -9,7 +9,7 @@ import { FleetScreen } from "./FleetScreen.ts";
 import { HostsScreen } from "./HostsScreen.ts";
 import { NewThreadScreen } from "./NewThreadScreen.ts";
 import { projectScope } from "../model/scope.ts";
-import { DecisionsScreen } from "./DecisionsScreen.ts";
+import { DecisionsScreen, openDecisionsAtom } from "./DecisionsScreen.ts";
 import { DiffScreen } from "./DiffScreen.ts";
 import { QueueScreen } from "./QueueScreen.ts";
 import { environmentShellsAtom, ThreadListScreen } from "./ThreadListScreen.ts";
@@ -47,6 +47,14 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
   const [allProjects, setAllProjects] = useState(false);
   const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
   const shells = useAtomValue(shellsAtom);
+  // Every machine's open decisions, as the desktop sidebar badge counts them.
+  const decisionsAtom = useMemo(() => openDecisionsAtom(atoms), [atoms]);
+  const openDecisionCount = useAtomValue(decisionsAtom).hosts.reduce(
+    (sum, host) => sum + host.items.length,
+    0,
+  );
+  const tabLabel = (name: Tab, index: number) =>
+    `${index + 1} ${name}${name === "Decisions" && openDecisionCount > 0 ? ` ${openDecisionCount}` : ""}`;
   const scope = useMemo(() => projectScope(shells, cwd), [shells, cwd]);
   const scopeKeys = allProjects || scope === null ? null : scope.keys;
   const [status, setStatusText] = useState("");
@@ -65,7 +73,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
     ({ column }) => {
       let start = 0;
       for (const [index, name] of TABS.entries()) {
-        const width = `${index + 1} ${name}`.length;
+        const width = tabLabel(name, index).length;
         if (column >= start && column < start + width) return setTab(name);
         start += width + 2;
       }
@@ -165,6 +173,9 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
                     Text,
                     name === tab ? { bold: true, color: "cyan" } : { dimColor: true },
                     `${index + 1} ${name}`,
+                    name === "Decisions" && openDecisionCount > 0
+                      ? h(Text, { color: "yellow", bold: true }, ` ${openDecisionCount}`)
+                      : null,
                   ),
                 ),
               ),
