@@ -20,6 +20,7 @@ other_hosts() {
 
 # online <host>: whether Tailscale sees it now.
 online() {
+  [ "$1" = "$(this_host)" ] && return 0
   tailscale status --json 2> /dev/null | jq -e --arg host "$1" \
     '[.Peer[] | select((.DNSName | split(".")[0]) == $host)][0].Online == true' > /dev/null
 }
