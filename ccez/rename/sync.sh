@@ -7,7 +7,7 @@
 #    upstream/main. Its parent is the previous snapshot, so the diff main
 #    merges is exactly upstream's new changes, already renamed.
 # 2. main merges upstream-cz. Paths main dropped (map.ts droppedPaths) stay
-#    dropped when upstream edited them.
+#    dropped when upstream edits them or adds files under them.
 # 3. The rename check runs on the result.
 # Conflicts stop the script with the merge in progress, for a human or agent
 # to resolve, then `git commit`.
@@ -40,10 +40,15 @@ fi
 git checkout --quiet main
 # .gitattributes marks fork-owned files merge=ours; the driver keeps main's copy.
 git config merge.ours.driver true
-if ! git merge --no-edit upstream-cz; then
-  dropped=$(node -e 'import("'"$here"'/map.ts").then(m => console.log(m.droppedPaths.join("\n")))')
-  for path in $dropped; do git rm -rq --ignore-unmatch -- "$path"; done
+# --no-commit even when clean: upstream's new files under a dropped path merge
+# in without a conflict and must come out before the merge is committed.
+merged=true
+git merge --no-commit --no-ff upstream-cz || merged=false
+dropped=$(node -e 'import("'"$here"'/map.ts").then(m => console.log(m.droppedPaths.join("\n")))')
+for path in $dropped; do git rm -rqf --ignore-unmatch -- "$path"; done
+if ! $merged || test -n "$(git diff --name-only --diff-filter=U)"; then
   echo "sync: merge stopped on conflicts; dropped paths re-removed. Resolve the rest, then git commit." >&2
   exit 1
 fi
+git commit --quiet --no-edit
 "$here/check"

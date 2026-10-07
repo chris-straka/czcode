@@ -121,8 +121,7 @@ How to ask:
 - **Review session:** one button that walks through every open decision
   full-screen, one after another, so ten minutes clears the queue.
 - The Threads list marks threads that have an open decision.
-- Push notifications and a daily digest can be turned on later (PLAN.md
-  optional phase).
+- No push notifications or daily digest (dropped from the plan 2026-10-05).
 
 ## After the owner answers
 
@@ -143,8 +142,8 @@ How to ask:
 T3 has no scheduler. nightshift's queue moves into the cz server, which
 already tracks each provider's quota and reset time:
 
-- **"Run at next reset"** on the send button: the thread is created now but
-  starts when the chosen provider's window resets (or when spare allowance
+- **"Run at next reset"** on the send button: the run waits in the queue and
+  becomes a thread when the chosen provider's window resets (or when spare allowance
   would expire unused).
 - The queue shows on T3's existing **Usage → Limits** page, next to each
   provider's reset countdown.

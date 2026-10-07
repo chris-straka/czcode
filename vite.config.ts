@@ -167,9 +167,11 @@ export default defineConfig({
       "czcode/no-inline-schema-compile": "warn",
       "czcode/no-manual-effect-runtime-in-tests": "error",
       "czcode/no-native-title-tooltip": "error",
+      "czcode/no-raw-mcp-registration": "error",
       "czcode/no-test-in-loop": "error",
       "czcode/no-unscoped-has": "error",
       "czcode/namespace-node-imports": "error",
+      "czcode/prefer-catch-tags": "error",
       "czcode/require-suppression-reason": "error",
     },
     overrides: [
@@ -177,6 +179,11 @@ export default defineConfig({
         // The one place that reads the host platform to seed the injected references.
         files: ["packages/shared/src/hostProcess.ts"],
         rules: { "czcode/no-global-process-runtime": "off" },
+      },
+      {
+        // The registration helpers that only accept handlers built by McpToolAccess.
+        files: ["apps/server/src/mcp/McpHttpServer.ts"],
+        rules: { "czcode/no-raw-mcp-registration": "off" },
       },
       {
         files: ["apps/web/src/**"],

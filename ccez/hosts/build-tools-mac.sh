@@ -91,6 +91,8 @@ formulae=(
   git-filter-repo shellcheck
   # Disk health (SMART)
   smartmontools
+  # Twitch API (market data for launchkit/scrapers); `twitch configure` needs the app's keys
+  twitchdev/twitch/twitch-cli
 )
 # Docker runs in a Colima VM owned by this account, not Docker Desktop.
 want docker && formulae+=(colima docker docker-compose docker-buildx)

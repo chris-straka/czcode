@@ -35,8 +35,8 @@ threads and settings carry over; the old directory is left untouched.
 - `vp run dev` runs the server and web app against a worktree-local `.cz`.
 - `ccez/PLAN.md` is the build plan; `ccez/DECISIONS.md` designs the
   Decisions tab.
-- The upstream project is merged in weekly, pre-renamed by the codemod in
-  `ccez/rename/` (see its README).
+- The upstream project is merged in when the owner asks, pre-renamed by the
+  codemod in `ccez/rename/` (see its README and AGENTS.md's Upstream section).
 
 ## License
 

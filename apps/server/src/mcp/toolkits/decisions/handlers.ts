@@ -5,6 +5,7 @@ import * as Path from "effect/Path";
 
 import * as DecisionService from "../../../decisions/DecisionService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import * as McpToolAccess from "../../McpToolAccess.ts";
 import { DecisionMediaReadError, DecisionsToolkit } from "./tools.ts";
 
 const make = Effect.gen(function* () {
@@ -12,8 +13,8 @@ const make = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
-  return DecisionsToolkit.of({
-    ask_owner: (input) =>
+  return {
+    ask_owner: McpToolAccess.writes((input) =>
       Effect.gen(function* () {
         const scope = yield* McpInvocationContext.McpInvocationContext;
         // A client caller (not an agent in a thread) has no thread to link.
@@ -24,7 +25,8 @@ const make = Effect.gen(function* () {
           created_by: threadId ? `thread/${threadId}` : "mcp",
         });
       }),
-    upload_decision_media: (input) =>
+    ),
+    upload_decision_media: McpToolAccess.writes((input) =>
       Effect.gen(function* () {
         const bytes = yield* fs
           .readFile(input.path)
@@ -41,12 +43,16 @@ const make = Effect.gen(function* () {
           bytes,
         );
       }),
-    wait_for_decision: (input) =>
+    ),
+    wait_for_decision: McpToolAccess.reads((input) =>
       decisions.wait(input.id, Duration.seconds(Math.min(Math.max(input.timeout_s ?? 60, 0), 300))),
-    get_decision: (input) => decisions.get(input.id),
-    decision_history: (input) => decisions.history(input).pipe(Effect.map((items) => ({ items }))),
-    withdraw_decision: (input) => decisions.withdraw(input.id),
-  });
+    ),
+    get_decision: McpToolAccess.reads((input) => decisions.get(input.id)),
+    decision_history: McpToolAccess.reads((input) =>
+      decisions.history(input).pipe(Effect.map((items) => ({ items }))),
+    ),
+    withdraw_decision: McpToolAccess.writes((input) => decisions.withdraw(input.id)),
+  } satisfies McpToolAccess.Handlers<typeof DecisionsToolkit.tools>;
 });
 
-export const DecisionsToolkitHandlersLive = DecisionsToolkit.toLayer(make);
+export const DecisionsToolkitHandlersLive = McpToolAccess.toLayer(DecisionsToolkit, make);

@@ -19,7 +19,7 @@ set -euo pipefail
 
 BLENDER_VERSION=5.2.1                         # same as the Mac
 NDK_VERSIONS="28.2.13676358 30.0.16138531"    # first one is the default (games/tools/build_android.sh)
-ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2"
+ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2 emulator system-images;android-36;google_apis;x86_64"
 JDK=21
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
@@ -63,14 +63,17 @@ if [ "${SKIP_APT:-0}" != 1 ]; then
     # Disk health (SMART) and hardware virtualization (Android emulator, VMs)
     smartmontools nvme-cli cpu-checker qemu-system-x86
   )
-  want docker && pkgs+=(docker.io docker-compose-v2 docker-buildx)
+  want docker && pkgs+=(docker.io docker-compose-v2 docker-buildx uidmap rootlesskit slirp4netns passt)
   want dotnet && pkgs+=(dotnet-sdk-10.0)
   sudo apt-get update -q
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq "${pkgs[@]}"
   if want docker; then
-    # Agents run Docker without sudo (takes effect at the next login).
-    id -nG "$USER" | grep -qw docker || sudo usermod -aG docker "$USER"
-    $in_wsl || sudo systemctl enable --now docker > /dev/null 2>&1 || true
+    # Rootless Docker (set up below): each user runs their own daemon, so
+    # agents with Docker access don't get root. Turn the system daemon off and
+    # leave the docker group, which is root-equivalent.
+    sudo systemctl disable --now docker.service docker.socket > /dev/null 2>&1 || true
+    ! id -nG "$USER" | grep -qw docker || sudo gpasswd -d "$USER" docker > /dev/null
+    sudo rm -f /etc/systemd/system/docker.socket.d/agent-acl.conf
   fi
   # /dev/kvm for the Android emulator and VMs (takes effect at the next login).
   if [ -e /dev/kvm ] && ! id -nG "$USER" | grep -qw kvm; then sudo usermod -aG kvm "$USER"; fi
@@ -90,6 +93,21 @@ fi
 # Ubuntu names fd "fdfind".
 have fd || ! have fdfind || ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
 ! have git-lfs || git lfs install --skip-repo > /dev/null
+
+if want docker && ! $in_wsl; then
+  step "Rootless Docker"
+  contrib=/usr/share/docker.io/contrib
+  for tool in dockerd-rootless.sh dockerd-rootless-setuptool.sh; do
+    [ -x "$contrib/$tool" ] && ln -sf "$contrib/$tool" "$HOME/.local/bin/$tool"
+  done
+  export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  if ! systemctl --user is-active -q docker 2> /dev/null; then
+    # --force: a system daemon still running (turned off above on a full run) is fine.
+    dockerd-rootless-setuptool.sh install --force > /dev/null
+  fi
+  systemctl --user enable -q docker 2> /dev/null || true
+  DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock" docker info --format "  rootless docker: {{.ServerVersion}} ({{.SecurityOptions}})" 2> /dev/null || echo "  rootless docker did not start; check: systemctl --user status docker"
+fi
 
 step "Rust"
 have rustup || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
@@ -148,6 +166,15 @@ if want k8s; then
   fi
 fi
 
+step "Twitch CLI"
+# Twitch API calls for launchkit/scrapers; `twitch configure` needs the app's keys.
+if ! have twitch; then
+  twitch_tag=$(curl -fsSL https://api.github.com/repos/twitchdev/twitch-cli/releases/latest | jq -r .tag_name)
+  twitch_dir="twitch-cli_${twitch_tag#v}_Linux_$([ "$arch" = amd64 ] && echo x86_64 || echo arm64)"
+  curl -fsSL "https://github.com/twitchdev/twitch-cli/releases/download/$twitch_tag/$twitch_dir.tar.gz" |
+    tar -xz -C "$HOME/.local/bin" --strip-components=1 "$twitch_dir/twitch"
+fi
+
 step "Kotlin compiler"
 if ! have kotlinc; then
   kotlin_tag=$(curl -fsSL https://api.github.com/repos/JetBrains/kotlin/releases/latest | jq -r .tag_name)
@@ -204,6 +231,7 @@ export JAVA_HOME="\${JAVA_HOME:-$java_home}"
 export ANDROID_HOME="\${ANDROID_HOME:-$ANDROID_HOME}"
 export ANDROID_NDK_HOME="\${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/$default_ndk}"
 export BUN_INSTALL="\${BUN_INSTALL:-$HOME/.bun}"
+export DOCKER_HOST="\${DOCKER_HOST:-unix:///run/user/$(id -u)/docker.sock}"
 [ -n "\${CZ_HOST_ENV:-}" ] || { export CZ_HOST_ENV=1; export PATH="$tool_path:\$PATH"; }
 ENV
 # systemd reads this one (no variable expansion there), via linux.sh's unit.
@@ -212,6 +240,7 @@ JAVA_HOME=$java_home
 ANDROID_HOME=$ANDROID_HOME
 ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$default_ndk
 BUN_INSTALL=$HOME/.bun
+DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 CARGO_BUILD_JOBS=2
 PATH=$tool_path:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV
@@ -229,7 +258,7 @@ fi
 
 step "Check"
 for t in cargo go java kotlinc mvn python3 uv node bun pnpm dotnet docker kubectl kind tilt \
-  clang mold sccache cmake ffmpeg magick blender sdkmanager adb cargo-ndk wrangler gltfpack typst rg fd jq; do
+  clang mold sccache cmake ffmpeg magick blender sdkmanager adb cargo-ndk wrangler gltfpack typst twitch rg fd jq; do
   if have "$t"; then printf '  ok  %s\n' "$t"; else printf '  --  %s\n' "$t"; fi
 done
 for v in $NDK_VERSIONS; do
