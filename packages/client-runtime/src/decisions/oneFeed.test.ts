@@ -1,0 +1,118 @@
+import type { DecisionItem, EnvironmentId } from "@cz/contracts";
+import { describe, expect, it } from "vite-plus/test";
+
+import {
+  buildOneFeed,
+  feedFolderLabel,
+  oneFeedBadgeCount,
+  shortMachineLabel,
+  shortModelLabel,
+} from "./oneFeed.ts";
+
+const here = "env-f" as EnvironmentId;
+const art = "env-art" as EnvironmentId;
+
+const thread = (
+  id: string,
+  overrides: Partial<Parameters<typeof buildOneFeed>[0]["threads"][number]> = {},
+) => ({
+  environmentId: here,
+  id,
+  projectId: "swe",
+  updatedAt: "2026-10-07T10:00:00Z",
+  settledAt: null,
+  archivedAt: null,
+  deletedAt: null,
+  hasPendingApprovals: false,
+  hasPendingUserInput: false,
+  lineage: { relationshipToParent: null },
+  ...overrides,
+});
+
+const decision = (id: string, overrides: Partial<DecisionItem> = {}, environmentId = here) => ({
+  environmentId,
+  item: {
+    id,
+    project: "games",
+    kind: "pick",
+    status: "open",
+    blocking: false,
+    priority: 0,
+    thread: null,
+    created_at: 1,
+    ...overrides,
+  } as DecisionItem,
+});
+
+const all = { machine: { type: "all" } } as const;
+
+describe("buildOneFeed", () => {
+  it("puts a thread's decision on its card, needs-you first, and keeps standalone decisions", () => {
+    const cards = buildOneFeed({
+      threads: [
+        thread("old", { updatedAt: "2026-10-07T09:00:00Z" }),
+        thread("asking", { updatedAt: "2026-10-07T08:00:00Z" }),
+        thread("new", { updatedAt: "2026-10-07T11:00:00Z" }),
+      ],
+      decisions: [decision("d1", { thread: "asking" }), decision("d2", { created_at: 2 })],
+      filter: all,
+    });
+    expect(
+      cards.map((card) => (card.kind === "thread" ? card.thread.id : card.decision.item.id)),
+    ).toEqual(["asking", "d2", "new", "old"]);
+    expect(cards[0]).toMatchObject({ kind: "thread", needsYou: true });
+  });
+
+  it("brings back a settled thread only while it has an open decision, and hides subagents", () => {
+    const cards = buildOneFeed({
+      threads: [
+        thread("settled", { settledAt: "2026-10-07T10:00:00Z" }),
+        thread("settled-asking", { settledAt: "2026-10-07T10:00:00Z" }),
+        thread("child", { lineage: { relationshipToParent: "subagent" } }),
+      ],
+      decisions: [decision("d1", { thread: "settled-asking" })],
+      filter: all,
+    });
+    expect(cards.map((card) => card.key)).toEqual([`thread\u0000${here}\u0000settled-asking`]);
+  });
+
+  it("follows the machine filter, and the badge counts what the filter shows", () => {
+    const input = {
+      threads: [thread("t", { environmentId: art })],
+      decisions: [
+        decision("d-here"),
+        decision("d-art", { thread: "t" }, art),
+        decision("d-art2", {}, art),
+      ],
+    };
+    const onlyHere = buildOneFeed({
+      ...input,
+      filter: { machine: { type: "one", environmentId: here } },
+    });
+    expect(oneFeedBadgeCount(onlyHere)).toBe(1);
+    expect(oneFeedBadgeCount(buildOneFeed({ ...input, filter: all }))).toBe(3);
+  });
+
+  it("narrows to decision projects and drops threads without one", () => {
+    const cards = buildOneFeed({
+      threads: [thread("quiet"), thread("asking")],
+      decisions: [
+        decision("d1", { thread: "asking", project: "hll" }),
+        decision("d2", { project: "courtroom" }),
+      ],
+      filter: { ...all, projects: new Set(["hll"]) },
+    });
+    expect(cards.map((card) => card.key)).toEqual([`thread\u0000${here}\u0000asking`]);
+    expect(oneFeedBadgeCount(cards)).toBe(1);
+  });
+});
+
+describe("card labels", () => {
+  it("names the folder and model briefly", () => {
+    expect(feedFolderLabel("SWE", "games/hll")).toBe("games/hll");
+    expect(feedFolderLabel("czcode", null)).toBe("czcode");
+    expect(shortModelLabel("Claude Opus 5.5")).toBe("Opus 5.5");
+    expect(shortModelLabel("GPT-5.5 Codex")).toBe("GPT-5.5 Codex");
+    expect(shortMachineLabel("f-ms-7917")).toBe("f");
+  });
+});

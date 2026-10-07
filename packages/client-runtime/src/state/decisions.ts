@@ -2,6 +2,7 @@ import type {
   DecisionAnswerInput,
   DecisionListQuery,
   DecisionMediaUploadQuery,
+  DecisionProjectBlurbInput,
 } from "@cz/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -50,6 +51,30 @@ export function createDecisionEnvironmentAtoms<R, E>(
   });
   return {
     list,
+    /** Project descriptions change rarely; the chips re-read them with the feed's slow cadence. */
+    projects: createEnvironmentQueryAtomFamily(runtime, {
+      label: "environment-data:decisions:projects",
+      staleTimeMs: 60_000,
+      refreshIntervalMs: 5 * 60_000,
+      execute: (_: "all") => withPrepared((client, prepared) => client.projects(prepared)),
+    }),
+    describeProject: createEnvironmentCommand(runtime, {
+      label: "environment-data:decisions:describe-project",
+      execute: (input: DecisionProjectBlurbInput) =>
+        withPrepared((client, prepared) => client.describeProject(prepared, input)),
+    }),
+    /**
+     * Feed card extras, keyed by the visible thread ids plus a version that
+     * changes when a run finishes, so a card re-reads its result only then.
+     */
+    threadDigests: createEnvironmentQueryAtomFamily(runtime, {
+      label: "environment-data:threads:digests",
+      staleTimeMs: Number.POSITIVE_INFINITY,
+      execute: (key: string) =>
+        withPrepared((client, prepared) =>
+          client.threadDigests(prepared, threadDigestIdsFromKey(key)),
+        ),
+    }),
     answer: createEnvironmentCommand(runtime, {
       label: "environment-data:decisions:answer",
       execute: (input: { readonly id: string; readonly answer: DecisionAnswerInput }) =>
@@ -66,4 +91,18 @@ export function createDecisionEnvironmentAtoms<R, E>(
         withPrepared((client, prepared) => client.upload(prepared, input.meta, input.bytes)),
     }),
   };
+}
+
+/**
+ * A stable query key for a page of thread digests: ids with the run each
+ * last finished, so the key only changes when a card's result can change.
+ */
+export function threadDigestKey(
+  threads: ReadonlyArray<{ readonly id: string; readonly version: string | null }>,
+): string {
+  return threads.map((thread) => `${thread.id}@${thread.version ?? ""}`).join("\n");
+}
+
+export function threadDigestIdsFromKey(key: string): ReadonlyArray<string> {
+  return key === "" ? [] : key.split("\n").map((entry) => entry.slice(0, entry.lastIndexOf("@")));
 }
