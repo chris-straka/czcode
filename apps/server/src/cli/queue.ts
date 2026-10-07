@@ -5,18 +5,20 @@
  *
  * @module QueueCli
  */
-import { ProviderInstanceId, type QueuedRun } from "@cz/contracts";
+import { CommandId, ProjectId, ProviderInstanceId, type QueuedRun } from "@cz/contracts";
 import * as Clock from "effect/Clock";
 import * as Console from "effect/Console";
+import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { Argument, Command, Flag } from "effect/cli";
 
 import { baseDirFlag } from "./config.ts";
-import { hostFlag, withServer } from "./serverClient.ts";
+import { hostFlag, type ServerAccess, type ServerClient, withServer } from "./serverClient.ts";
 
 export class QueueCliError extends Schema.TaggedError<QueueCliError>()("QueueCliError", {
   message: Schema.String,
@@ -42,13 +44,53 @@ const describeRun = (run: QueuedRun, now: number) => {
   return `${run.id}  ${when}  ${run.modelSelection.instanceId}/${run.modelSelection.model}  ${run.title}${run.threadId ? `  thread ${run.threadId}` : ""}${run.error ? `  (${run.error.split("\n")[0]})` : ""}`;
 };
 
+/**
+ * `--project` named a folder that isn't a project yet: add it, the way
+ * `cz project add` would, so tasks run in the folder they're about.
+ */
+export const addFolderProject = Effect.fn("QueueCli.addFolderProject")(function* (
+  client: ServerClient,
+  headers: ServerAccess["headers"],
+  flags: { readonly host: Option.Option<string> },
+  wanted: string,
+) {
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
+  const remote = Option.isSome(flags.host);
+  const workspaceRoot = remote ? wanted : path.resolve(wanted);
+  const isFolder = remote
+    ? path.isAbsolute(wanted)
+    : yield* fs.stat(workspaceRoot).pipe(
+        Effect.map((info) => info.type === "Directory"),
+        Effect.orElseSucceed(() => false),
+      );
+  if (!isFolder) return yield* fail(`No cz project or folder at ${wanted}.`);
+  const crypto = yield* Crypto.Crypto;
+  const uuid = crypto.randomUUIDv4.pipe(
+    Effect.mapError(() => fail("Could not make a project id.")),
+  );
+  const projectId = ProjectId.make(yield* uuid);
+  yield* client.projects.mutate({
+    headers,
+    payload: {
+      type: "project.create",
+      commandId: CommandId.make(yield* uuid),
+      projectId,
+      title: path.basename(workspaceRoot) || "project",
+      workspaceRoot,
+    },
+  } as Parameters<ServerClient["projects"]["mutate"]>[0]);
+  yield* Console.error(`Added ${workspaceRoot} as a cz project.`);
+  return projectId;
+});
+
 const addCommand = Command.make("add", {
   baseDir: baseDirFlag,
   host: hostFlag,
   json: jsonFlag,
   project: Flag.String("project").pipe(
     Flag.withDescription(
-      "Project path, id, or name (default: the current directory). With --host, a path on that machine.",
+      "Project path, id, or name (default: the current directory). A folder that isn't a project yet is added as one. With --host, a path on that machine.",
     ),
     Flag.optional,
   ),
@@ -103,14 +145,14 @@ const addCommand = Command.make("add", {
             ? live.find((candidate) => candidate.workspaceRoot === path.resolve(wanted))
             : undefined) ??
           live.find((candidate) => candidate.title === wanted);
-        if (!project) return yield* fail(`No cz project at ${wanted}. Add it with cz project add.`);
+        const projectId = project?.id ?? (yield* addFolderProject(client, headers, flags, wanted));
         const firstLine = flags.prompt.trim().split("\n")[0] ?? "";
         const run = yield* client.queue.enqueue({
           headers,
           payload: {
             title: Option.getOrElse(flags.title, () => firstLine.slice(0, 80)),
             prompt: flags.prompt,
-            projectId: project.id,
+            projectId,
             modelSelection: {
               instanceId: ProviderInstanceId.make(flags.model.slice(0, slash)),
               model: flags.model.slice(slash + 1),
