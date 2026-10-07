@@ -307,3 +307,27 @@ export class DecisionStorageError extends Schema.TaggedError<DecisionStorageErro
     return `Decision storage failed (${this.operation}).`;
   }
 }
+
+/**
+ * A line that jogs the owner's memory about a decision project, like
+ * "courtroom: trial adventure as a public defender". The owner's own text
+ * wins; otherwise it comes from the project folder's README.
+ */
+export const DecisionProjectBlurb = Schema.Struct({
+  project: Schema.String,
+  description: Schema.NullOr(Schema.String),
+  source: Schema.NullOr(Schema.Literals(["owner", "readme"])),
+});
+export type DecisionProjectBlurb = typeof DecisionProjectBlurb.Type;
+
+export const DecisionProjectBlurbList = Schema.Struct({
+  blurbs: Schema.Array(DecisionProjectBlurb),
+});
+export type DecisionProjectBlurbList = typeof DecisionProjectBlurbList.Type;
+
+/** Sets the owner's line for a project; null or empty text goes back to the README. */
+export const DecisionProjectBlurbInput = Schema.Struct({
+  project: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  description: Schema.NullOr(Schema.String.check(Schema.isMaxLength(200))),
+});
+export type DecisionProjectBlurbInput = typeof DecisionProjectBlurbInput.Type;

@@ -31,6 +31,7 @@ import {
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { signPayload, timingSafeEqualBase64Url } from "../auth/utils.ts";
 import * as DecisionService from "./DecisionService.ts";
+import * as ProjectBlurbService from "./ProjectBlurbService.ts";
 
 export const DECISION_MEDIA_ROUTE_PREFIX = "/api/decision-media";
 const SIGNING_SECRET_NAME = "decision-media-signing-key";
@@ -69,6 +70,7 @@ export const decisionsHttpApiLayer = HttpApiBuilder.group(
   "decisions",
   Effect.fnUntraced(function* (handlers) {
     const decisions = yield* DecisionService.DecisionService;
+    const blurbs = yield* ProjectBlurbService.ProjectBlurbService;
     const signed = (entries: ReadonlyArray<DecisionItemWithAnswer>) =>
       withMediaUrls(entries).pipe(
         Effect.catch((cause) => failEnvironmentInternal("internal_error", cause)),
@@ -89,6 +91,21 @@ export const decisionsHttpApiLayer = HttpApiBuilder.group(
           yield* annotateEnvironmentRequest(args.endpoint.name);
           yield* requireEnvironmentScope(AuthOrchestrationReadScope);
           return { items: yield* signed(yield* decisions.history(args.query)) };
+        }),
+      )
+      .handle("projects", (args) =>
+        Effect.gen(function* () {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          const open = yield* decisions.list({ status: "open" });
+          return { blurbs: yield* blurbs.blurbs(open.map((entry) => entry.item.project)) };
+        }),
+      )
+      .handle("describeProject", (args) =>
+        Effect.gen(function* () {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationOperateScope);
+          return yield* blurbs.describe(args.payload);
         }),
       )
       .handle("get", (args) =>
