@@ -24,6 +24,8 @@ import { StatusContext, useCommand } from "./command.ts";
 import { useNow, useViewport } from "./hooks.ts";
 import { useClick, useKeys } from "./input.ts";
 import { Picker } from "./Picker.ts";
+import { HostLoadLine, useHostLoads } from "./useHostLoads.ts";
+import { anyLoading, hostLoadSummary } from "../model/hostLoad.ts";
 import { TextInput } from "./TextInput.ts";
 
 export interface ThreadListProps {
@@ -193,7 +195,17 @@ export function ThreadListScreen({
     return () => clearTimeout(timer);
   }, []);
   const { rows: height, columns } = useViewport();
-  const footerLines = mode.kind === "browse" || mode.kind === "search" ? 1 : 3;
+  const loads = useHostLoads(
+    atoms,
+    shells.map((shell) => ({
+      environmentId: shell.environmentId,
+      label: shell.label,
+      hasValue: shell.snapshot !== null,
+      failed: false,
+    })),
+  );
+  const loadLine = hostLoadSummary(loads) !== null ? 1 : 0;
+  const footerLines = (mode.kind === "browse" || mode.kind === "search" ? 1 : 3) + loadLine;
   const visible = Math.max(3, height - 4 - footerLines);
   const selected = Math.min(cursor, Math.max(0, items.length - 1));
   const top = Math.max(0, Math.min(selected - Math.floor(visible / 2), items.length - visible));
@@ -431,7 +443,13 @@ export function ThreadListScreen({
       ? h(
           Text,
           { dimColor: true },
-          query ? "Nothing matches." : archived ? "Nothing archived." : "No threads yet.",
+          query
+            ? "Nothing matches."
+            : anyLoading(loads)
+              ? "Loading threads…"
+              : archived
+                ? "Nothing archived."
+                : "No threads yet.",
         )
       : h(
           Box,
@@ -496,5 +514,11 @@ export function ThreadListScreen({
             );
           }),
         );
-  return h(Box, { flexDirection: "column" }, body, h(Box, { marginTop: 1 }, footer));
+  return h(
+    Box,
+    { flexDirection: "column" },
+    body,
+    h(HostLoadLine, { hosts: loads }),
+    h(Box, { marginTop: 1 }, footer),
+  );
 }

@@ -11,6 +11,8 @@ import type { TuiAtoms } from "../state/atoms.ts";
 import { useCommand } from "./command.ts";
 import { useNow } from "./hooks.ts";
 import { useKeys } from "./input.ts";
+import { HostLoadLine, type HostResult, useHostLoads } from "./useHostLoads.ts";
+import { anyLoading } from "../model/hostLoad.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -25,12 +27,18 @@ function queueRowsAtom(atoms: TuiAtoms, now: number) {
   return Atom.make((get) => {
     const catalog = get(atoms.catalog.catalogValueAtom);
     const rows: Array<QueueRow> = [];
+    const results: Array<HostResult> = [];
     for (const [environmentId, entry] of catalog.entries) {
       if (!entry.enabled) continue;
-      const runs = Option.getOrElse(
-        AsyncResult.value(get(atoms.queue.list({ environmentId, input: null }))),
-        (): ReadonlyArray<QueuedRun> => [],
-      );
+      const result = get(atoms.queue.list({ environmentId, input: null }));
+      const value = Option.getOrNull(AsyncResult.value(result));
+      results.push({
+        environmentId,
+        label: entry.target.label,
+        hasValue: value !== null,
+        failed: result._tag === "Failure",
+      });
+      const runs: ReadonlyArray<QueuedRun> = value ?? [];
       for (const run of runs) {
         if (
           run.status === "queued" ||
@@ -40,7 +48,7 @@ function queueRowsAtom(atoms: TuiAtoms, now: number) {
         }
       }
     }
-    return rows.sort((left, right) => left.run.dueAt - right.run.dueAt);
+    return { rows: rows.sort((left, right) => left.run.dueAt - right.run.dueAt), results };
   });
 }
 
@@ -63,7 +71,8 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
     () => queueRowsAtom(atoms, Math.floor(now / 60_000) * 60_000),
     [atoms, now],
   );
-  const rows = useAtomValue(rowsAtom);
+  const { rows, results } = useAtomValue(rowsAtom);
+  const loads = useHostLoads(atoms, results);
   const [cursor, setCursor] = useState(0);
   const cancel = useCommand(atoms.queue.cancel);
   const runNow = useCommand(atoms.queue.runNow);
@@ -135,7 +144,13 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
     limits.length > 0 ? limits : h(Text, { dimColor: true }, "No provider reports limits."),
     h(Box, { marginTop: 1 }, h(Text, { bold: true }, "Queued for the next reset")),
     rows.length === 0
-      ? h(Text, { dimColor: true }, "Nothing queued. (Run at next reset: ctrl+r on a new thread.)")
+      ? h(
+          Text,
+          { dimColor: true },
+          anyLoading(loads)
+            ? "Loading the queue…"
+            : "Nothing queued. (Run at next reset: ctrl+r on a new thread.)",
+        )
       : rows.map((row, index) =>
           h(
             Box,
@@ -159,5 +174,6 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
           selected.run.status === "failed" ? "x dismiss" : "r run now · x cancel",
         )
       : null,
+    h(HostLoadLine, { hosts: loads }),
   );
 }

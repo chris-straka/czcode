@@ -11,6 +11,8 @@ import type { TuiAtoms } from "../state/atoms.ts";
 import { DecisionScreen } from "./DecisionScreen.ts";
 import { useNow, useViewport } from "./hooks.ts";
 import { useClick, useKeys } from "./input.ts";
+import { HostLoadLine, type HostResult, useHostLoads } from "./useHostLoads.ts";
+import { anyLoading } from "../model/hostLoad.ts";
 
 interface HostDecisions {
   readonly environmentId: EnvironmentId;
@@ -23,15 +25,16 @@ export function openDecisionsAtom(atoms: TuiAtoms) {
   return Atom.make((get) => {
     const catalog = get(atoms.catalog.catalogValueAtom);
     const hosts: Array<HostDecisions> = [];
-    let pending = false;
+    const results: Array<HostResult> = [];
     for (const [environmentId, entry] of catalog.entries) {
       if (!entry.enabled) continue;
       const result = get(atoms.decisions.list({ environmentId, input: { status: "open" } }));
       const items = Option.getOrNull(AsyncResult.value(result));
-      if (items === null) pending ||= result._tag !== "Failure";
-      else hosts.push({ environmentId, label: entry.target.label, items });
+      const label = entry.target.label;
+      results.push({ environmentId, label, hasValue: items !== null, failed: result._tag === "Failure" });
+      if (items !== null) hosts.push({ environmentId, label, items });
     }
-    return { hosts, pending };
+    return { hosts, results };
   });
 }
 
@@ -44,7 +47,8 @@ export function DecisionsScreen(props: {
   readonly onOpenChange: (open: boolean) => void;
 }) {
   const feedAtom = useMemo(() => openDecisionsAtom(props.atoms), [props.atoms]);
-  const { hosts, pending } = useAtomValue(feedAtom);
+  const { hosts, results } = useAtomValue(feedAtom);
+  const loads = useHostLoads(props.atoms, results);
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
   const entries = useMemo(
     () => decisionFeed(hosts, props.scopeNames).filter((entry) => !answered.has(entry.item.id)),
@@ -54,7 +58,7 @@ export function DecisionsScreen(props: {
   const [open, setOpen] = useState<DecisionEntry | null>(null);
   const now = useNow(60_000);
   const { rows: height, columns } = useViewport();
-  const visible = Math.max(3, height - 4);
+  const visible = Math.max(3, height - 5);
   const selected = Math.min(cursor, Math.max(0, entries.length - 1));
   const top = Math.max(0, Math.min(selected - Math.floor(visible / 2), entries.length - visible));
   const openEntry = (entry: DecisionEntry) => {
@@ -97,14 +101,26 @@ export function DecisionsScreen(props: {
     });
   }
   if (entries.length === 0) {
-    return h(Text, { dimColor: true }, pending ? "Loading decisions…" : "Nothing waiting on you.");
+    return h(
+      Box,
+      { flexDirection: "column" },
+      h(
+        Text,
+        { dimColor: true },
+        anyLoading(loads) ? "Loading decisions…" : "Nothing waiting on you.",
+      ),
+      h(HostLoadLine, { hosts: loads }),
+    );
   }
   const tagWidth = 7;
   const projectWidth = Math.min(14, Math.floor(columns / 5));
   return h(
     Box,
-    { ref: list, flexDirection: "column" },
-    entries.slice(top, top + visible).map((entry, offset) => {
+    { flexDirection: "column" },
+    h(
+      Box,
+      { ref: list, flexDirection: "column" },
+      entries.slice(top, top + visible).map((entry, offset) => {
       const index = top + offset;
       const focused = index === selected;
       return h(
@@ -137,5 +153,7 @@ export function DecisionsScreen(props: {
         ),
       );
     }),
+    ),
+    h(HostLoadLine, { hosts: loads }),
   );
 }
