@@ -6,13 +6,22 @@
  * @module state/decisions
  */
 import { useAtomValue } from "@effect/atom-react";
+import {
+  buildOneFeed,
+  type OneFeedFilter,
+  waitingOnOtherDevice,
+} from "@cz/client-runtime/decisions/oneFeed";
+import { useMemo } from "react";
 import { compareFeedItems } from "@cz/client-runtime/decisions/feed";
 import { createDecisionEnvironmentAtoms } from "@cz/client-runtime/state/decisions";
-import type { DecisionItemWithAnswer, EnvironmentId } from "@cz/contracts";
+import type { DecisionItemWithAnswer, DecisionProjectBlurb, EnvironmentId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 
 import { connectionAtomRuntime } from "../connection/runtime";
+import { resolveMachineFilter, useFeedFilterStore } from "../feedFilterStore";
+import { useMediaQuery } from "../hooks/useMediaQuery";
+import { usePrimaryEnvironmentId } from "./environments";
 import { environmentPresentations } from "./presentation";
 
 /** Decisions on each connected environment. */
@@ -81,4 +90,94 @@ const threadOpenDecisionCount = Atom.family((key: string) =>
 /** How many open decisions a thread has asked (the sidebar marks those threads). */
 export function useThreadOpenDecisionCount(environmentId: EnvironmentId, threadId: string): number {
   return useAtomValue(threadOpenDecisionCount(`${environmentId}:${threadId}`));
+}
+
+const answeredFeedAtom = Atom.make((get): DecisionFeed => {
+  const presentations = get(environmentPresentations.presentationsAtom);
+  const entries: DecisionEntry[] = [];
+  const unreachable: string[] = [];
+  let isPending = false;
+  for (const [environmentId, presentation] of presentations) {
+    const label = presentation.entry.target.label;
+    const result = get(
+      decisionEnvironment.list({ environmentId, input: { status: "answered", limit: 50 } }),
+    );
+    const items = Option.getOrNull(AsyncResult.value(result));
+    if (items === null) {
+      if (result._tag === "Failure") unreachable.push(label);
+      else isPending = true;
+      continue;
+    }
+    for (const entry of items) entries.push({ ...entry, environmentId, environmentLabel: label });
+  }
+  entries.sort((a, b) => (b.item.answered_at ?? 0) - (a.item.answered_at ?? 0));
+  return { entries, isPending: isPending && entries.length === 0, unreachable };
+}).pipe(Atom.withLabel("web-decisions:answered-feed"));
+
+/** Recently answered decisions on every host, newest first (the Answered view). */
+export function useAnsweredDecisions(): DecisionFeed {
+  return useAtomValue(answeredFeedAtom);
+}
+
+const projectBlurbsAtom = Atom.make((get): ReadonlyMap<string, DecisionProjectBlurb> => {
+  const blurbs = new Map<string, DecisionProjectBlurb>();
+  for (const [environmentId] of get(environmentPresentations.presentationsAtom)) {
+    const result = get(decisionEnvironment.projects({ environmentId, input: "all" }));
+    for (const blurb of Option.getOrNull(AsyncResult.value(result)) ?? []) {
+      const known = blurbs.get(blurb.project);
+      // The owner's own line beats a README's, whichever host has it.
+      if (blurb.description !== null && (!known?.description || blurb.source === "owner")) {
+        blurbs.set(blurb.project, blurb);
+      } else if (!known) {
+        blurbs.set(blurb.project, blurb);
+      }
+    }
+  }
+  return blurbs;
+}).pipe(Atom.withLabel("web-decisions:project-blurbs"));
+
+/** One line per decision project to jog the owner's memory. */
+export function useProjectBlurbs(): ReadonlyMap<string, DecisionProjectBlurb> {
+  return useAtomValue(projectBlurbsAtom);
+}
+
+/**
+ * The feed filter in effect: machine (this one by default), chips, and this
+ * device's kind. Pages and badges read it so their counts agree.
+ */
+export function useFeedFilter(): OneFeedFilter {
+  const machine = useFeedFilterStore((state) => state.machine);
+  const projects = useFeedFilterStore((state) => state.projects);
+  const kinds = useFeedFilterStore((state) => state.kinds);
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const phone = useMediaQuery("(pointer: coarse) and (max-width: 640px)");
+  return useMemo(
+    () => ({
+      machine: resolveMachineFilter(machine, primaryEnvironmentId),
+      projects: new Set(projects),
+      kinds: new Set(kinds),
+      device: phone ? "phone" : "desktop",
+    }),
+    [machine, projects, kinds, primaryEnvironmentId, phone],
+  );
+}
+
+/** Open decisions the feed filter shows, in feed order, plus those waiting on the other device. */
+export function useFilteredOpenDecisions(): {
+  readonly entries: readonly DecisionEntry[];
+  readonly elsewhere: number;
+  readonly filter: OneFeedFilter;
+} {
+  const feed = useOpenDecisions();
+  const filter = useFeedFilter();
+  return useMemo(() => {
+    const cards = buildOneFeed({ threads: [], decisions: feed.entries, filter });
+    return {
+      entries: cards.flatMap((card) =>
+        card.kind === "decision" ? [card.decision] : card.decisions,
+      ),
+      elsewhere: waitingOnOtherDevice(feed.entries, filter),
+      filter,
+    };
+  }, [feed.entries, filter]);
 }

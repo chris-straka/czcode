@@ -58,6 +58,15 @@ export interface OneFeedFilter {
   readonly device?: FeedDevice;
   /** Decision projects to keep; empty keeps all. Threads stay unless they have none of them. */
   readonly projects?: ReadonlySet<string>;
+  /** Decision kinds to keep; empty keeps all. */
+  readonly kinds?: ReadonlySet<string>;
+}
+
+function chipsMatch(filter: OneFeedFilter, item: DecisionItem): boolean {
+  return (
+    (!filter.projects?.size || filter.projects.has(item.project)) &&
+    (!filter.kinds?.size || filter.kinds.has(item.kind))
+  );
 }
 
 export function machineMatches(filter: MachineFilter, environmentId: EnvironmentId): boolean {
@@ -86,7 +95,7 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
         entry.item.status === "open" &&
         machineMatches(filter.machine, entry.environmentId) &&
         (filter.device === undefined || isForDevice(entry.item, filter.device)) &&
-        (!filter.projects?.size || filter.projects.has(entry.item.project)),
+        chipsMatch(filter, entry.item),
     )
     .toSorted((a, b) => compareFeedItems(a.item, b.item, projectOrder));
 
@@ -134,7 +143,7 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
     const threadDecisions = asked.get(key) ?? [];
     const waiting = thread.hasPendingApprovals || thread.hasPendingUserInput;
     if (threadDecisions.length === 0 && thread.settledAt !== null) continue;
-    if (filter.projects?.size && threadDecisions.length === 0) continue;
+    if ((filter.projects?.size || filter.kinds?.size) && threadDecisions.length === 0) continue;
     const card = {
       kind: "thread",
       key: `thread\u0000${key}`,
@@ -212,7 +221,7 @@ export function waitingOnOtherDevice(
     (entry) =>
       entry.item.status === "open" &&
       machineMatches(filter.machine, entry.environmentId) &&
-      (!filter.projects?.size || filter.projects.has(entry.item.project)) &&
+      chipsMatch(filter, entry.item) &&
       !isForDevice(entry.item, device),
   ).length;
 }

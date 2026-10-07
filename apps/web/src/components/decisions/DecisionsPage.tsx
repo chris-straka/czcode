@@ -1,19 +1,33 @@
-import { useSearch } from "@tanstack/react-router";
-import { filterChips, filterFeed } from "@cz/client-runtime/decisions/feed";
-import type { DecisionAnswerInput, DecisionKind, DecisionMediaRef } from "@cz/contracts";
-import { CheckIcon, InboxIcon, PlayIcon, UndoIcon } from "lucide-react";
+import { Link, useSearch } from "@tanstack/react-router";
+import { filterChips } from "@cz/client-runtime/decisions/feed";
+import { buildOneFeed } from "@cz/client-runtime/decisions/oneFeed";
+import type { DecisionAnswerInput, DecisionMediaRef, DecisionProjectBlurb } from "@cz/contracts";
+import { CheckIcon, InboxIcon, PencilIcon, PlayIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
-import { type DecisionEntry, decisionEnvironment, useOpenDecisions } from "~/state/decisions";
+import { useFeedFilterStore } from "~/feedFilterStore";
+import {
+  type DecisionEntry,
+  type DecisionFeed,
+  decisionEnvironment,
+  useAnsweredDecisions,
+  useFilteredOpenDecisions,
+  useOpenDecisions,
+  useProjectBlurbs,
+} from "~/state/decisions";
+import { usePrimaryEnvironmentId } from "~/state/environments";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
+import { Input } from "../ui/input";
 import { SidebarInset } from "../ui/sidebar";
 import { Skeleton } from "../ui/skeleton";
+import { toastManager } from "../ui/toast";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { DecisionMedia } from "./DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "./DecisionView";
@@ -40,17 +54,21 @@ function ageLabel(createdAt: number, now: number): string {
 
 export function DecisionsPage() {
   const feed = useOpenDecisions();
+  const filtered = useFilteredOpenDecisions();
+  const answered = useAnsweredDecisions();
+  const blurbs = useProjectBlurbs();
   const answerCommand = useAtomCommand(decisionEnvironment.answer, "answer decision");
   const uploadCommand = useAtomCommand(decisionEnvironment.upload, "upload decision media");
-  const [projects, setProjects] = useState<string[]>([]);
-  const [kinds, setKinds] = useState<string[]>([]);
+  const projects = useFeedFilterStore((state) => state.projects);
+  const kinds = useFeedFilterStore((state) => state.kinds);
+  const setProjects = useFeedFilterStore((state) => state.setProjects);
+  const setKinds = useFeedFilterStore((state) => state.setKinds);
+  const [tab, setTab] = useState<"open" | "answered">("open");
   const search = useSearch({ from: "/_chat/decisions" });
   const [openKey, setOpenKey] = useState<string | null>(search.open ?? null);
   const [session, setSession] = useState(false);
   const [pending, setPending] = useState<ReadonlyMap<string, PendingAnswer>>(new Map());
-  const [sent, setSent] = useState<ReadonlyMap<string, { entry: DecisionEntry; summary: string }>>(
-    new Map(),
-  );
+  const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const pendingRef = useRef(pending);
   useEffect(() => {
     pendingRef.current = pending;
@@ -61,20 +79,27 @@ export function DecisionsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const chips = useMemo(() => filterChips(feed.entries.map((entry) => entry.item)), [feed.entries]);
-  const visible = useMemo(() => {
-    const items = new Set(
-      filterFeed(
-        feed.entries.map((entry) => entry.item),
-        { projects: new Set(projects), kinds: new Set(kinds as DecisionKind[]) },
+  // Chips come from what this machine filter and device could show, so a
+  // chip never leads to an empty feed.
+  const chips = useMemo(() => {
+    const reachable = buildOneFeed({
+      threads: [],
+      decisions: feed.entries,
+      filter: {
+        machine: filtered.filter.machine,
+        ...(filtered.filter.device ? { device: filtered.filter.device } : {}),
+      },
+    }).flatMap((card) => (card.kind === "decision" ? [card.decision.item] : []));
+    return filterChips(reachable);
+  }, [feed.entries, filtered.filter.machine, filtered.filter.device]);
+  // Answered items stay hidden until the next refresh drops them from the feed.
+  const visible = useMemo(
+    () =>
+      filtered.entries.filter(
+        (entry) => !pending.has(entryKey(entry)) && !sent.has(entryKey(entry)),
       ),
-    );
-    // Answered items stay hidden until the next refresh drops them from the feed.
-    return feed.entries.filter(
-      (entry) =>
-        items.has(entry.item) && !pending.has(entryKey(entry)) && !sent.has(entryKey(entry)),
-    );
-  }, [feed.entries, projects, kinds, pending, sent]);
+    [filtered.entries, pending, sent],
+  );
 
   const send = useCallback(
     async (key: string) => {
@@ -89,14 +114,7 @@ export function DecisionsPage() {
         environmentId: item.entry.environmentId,
         input: { id: item.entry.item.id, answer: item.answer },
       });
-      if (result._tag === "Success") {
-        setSent((current) =>
-          new Map(current).set(key, {
-            entry: item.entry,
-            summary: answerSummary(item.entry.item, item.answer),
-          }),
-        );
-      }
+      if (result._tag === "Success") setSent((current) => new Set(current).add(key));
     },
     [answerCommand],
   );
@@ -108,21 +126,8 @@ export function DecisionsPage() {
     [],
   );
 
-  const answer = (entry: DecisionEntry, value: DecisionAnswerInput) => {
-    const key = entryKey(entry);
-    const timer = setTimeout(() => void send(key), UNDO_WINDOW_MS);
-    setPending((current) => new Map(current).set(key, { entry, answer: value, timer }));
-    if (session) {
-      const next = visible.find((candidate) => entryKey(candidate) !== key);
-      setOpenKey(next ? entryKey(next) : null);
-      if (!next) setSession(false);
-    } else {
-      setOpenKey(null);
-    }
-  };
-
   const undo = (key: string) => {
-    const item = pending.get(key);
+    const item = pendingRef.current.get(key);
     if (!item) return;
     clearTimeout(item.timer);
     setPending((current) => {
@@ -130,6 +135,26 @@ export function DecisionsPage() {
       next.delete(key);
       return next;
     });
+  };
+
+  const answer = (entry: DecisionEntry, value: DecisionAnswerInput) => {
+    const key = entryKey(entry);
+    const timer = setTimeout(() => void send(key), UNDO_WINDOW_MS);
+    setPending((current) => new Map(current).set(key, { entry, answer: value, timer }));
+    toastManager.add({
+      type: "success",
+      title: entry.item.title || entry.item.question,
+      description: answerSummary(entry.item, value),
+      timeout: UNDO_WINDOW_MS,
+      actionProps: { children: "Undo", onClick: () => undo(key) },
+    });
+    if (session) {
+      const next = visible.find((candidate) => entryKey(candidate) !== key);
+      setOpenKey(next ? entryKey(next) : null);
+      if (!next) setSession(false);
+    } else {
+      setOpenKey(null);
+    }
   };
 
   const opened = openKey === null ? null : visible.find((entry) => entryKey(entry) === openKey);
@@ -142,6 +167,10 @@ export function DecisionsPage() {
         return result._tag === "Success" ? (result.value as DecisionMediaRef) : null;
       }
     : null;
+  const selectedBlurbs = projects.map((project) => ({
+    project,
+    description: blurbs.get(project)?.description ?? null,
+  }));
 
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
@@ -176,16 +205,26 @@ export function DecisionsPage() {
           <>
             <WorkspacePageHeader electron={isElectron} className="border-b border-border">
               <div className="flex w-full items-center gap-2">
-                <span className="text-sm font-medium text-foreground">Decisions</span>
-                {visible.length > 0 ? (
-                  <Badge variant="secondary" size="sm">
-                    {visible.length}
-                  </Badge>
-                ) : null}
+                <ToggleGroup
+                  value={[tab]}
+                  onValueChange={(value) => setTab((value[0] as "open" | "answered") ?? "open")}
+                >
+                  <Toggle size="sm" value="open">
+                    Open
+                    {visible.length > 0 ? (
+                      <Badge variant="secondary" size="sm">
+                        {visible.length}
+                      </Badge>
+                    ) : null}
+                  </Toggle>
+                  <Toggle size="sm" value="answered">
+                    Answered
+                  </Toggle>
+                </ToggleGroup>
                 <div className="ml-auto">
                   <Button
                     size="sm"
-                    disabled={visible.length === 0}
+                    disabled={tab !== "open" || visible.length === 0}
                     onClick={() => {
                       setSession(true);
                       setOpenKey(visible[0] ? entryKey(visible[0]) : null);
@@ -197,53 +236,29 @@ export function DecisionsPage() {
                 </div>
               </div>
             </WorkspacePageHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-4">
-                {chips.projects.length + chips.kinds.length > 1 ? (
-                  <div className="flex flex-wrap gap-2" aria-label="Filters">
-                    <ToggleGroup
-                      multiple
-                      value={projects}
-                      onValueChange={(value) => setProjects(value as string[])}
-                    >
-                      {chips.projects.map((project) => (
-                        <Toggle key={project} size="sm" value={project}>
-                          {project}
-                        </Toggle>
-                      ))}
-                    </ToggleGroup>
-                    <ToggleGroup
-                      multiple
-                      value={kinds}
-                      onValueChange={(value) => setKinds(value as string[])}
-                    >
-                      {chips.kinds.map((kind) => (
-                        <Toggle key={kind} size="sm" value={kind}>
-                          {kind}
-                        </Toggle>
-                      ))}
-                    </ToggleGroup>
-                  </div>
+            {/* The page never scrolls sideways; only the chip row does. */}
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+              <div className="mx-auto w-full max-w-3xl min-w-0 space-y-3 px-4 py-4">
+                {tab === "open" && chips.projects.length + chips.kinds.length > 1 ? (
+                  <ChipRow
+                    projects={chips.projects}
+                    kinds={chips.kinds}
+                    selectedProjects={projects}
+                    selectedKinds={kinds}
+                    blurbs={blurbs}
+                    onProjects={setProjects}
+                    onKinds={setKinds}
+                  />
                 ) : null}
+                {tab === "open"
+                  ? selectedBlurbs.map(({ project, description }) => (
+                      <ProjectBlurbLine key={project} project={project} description={description} />
+                    ))
+                  : null}
 
-                {[...pending.entries()].map(([key, item]) => (
-                  <div
-                    key={key}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm"
-                    data-decision-pending
-                  >
-                    <CheckIcon className="size-4 text-success-foreground" />
-                    <span className="min-w-0 flex-1 truncate">
-                      {item.entry.item.title}: {answerSummary(item.entry.item, item.answer)}
-                    </span>
-                    <Button size="xs" variant="ghost" onClick={() => undo(key)}>
-                      <UndoIcon />
-                      Undo
-                    </Button>
-                  </div>
-                ))}
-
-                {feed.isPending ? (
+                {tab === "answered" ? (
+                  <AnsweredList feed={answered} now={now} />
+                ) : feed.isPending ? (
                   <>
                     <Skeleton className="h-28 w-full" />
                     <Skeleton className="h-28 w-full" />
@@ -278,16 +293,12 @@ export function DecisionsPage() {
                   ))
                 )}
 
-                {[...sent.values()].length > 0 ? (
-                  <div className="space-y-1 pt-2 text-xs text-muted-foreground">
-                    {[...sent.values()].map(({ entry, summary }) => (
-                      <div key={entryKey(entry)}>
-                        Answered {entry.item.title}: {summary}
-                      </div>
-                    ))}
-                  </div>
+                {tab === "open" && filtered.elsewhere > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {filtered.elsewhere} waiting on your{" "}
+                    {filtered.filter.device === "phone" ? "desktop" : "phone"}
+                  </p>
                 ) : null}
-
                 {feed.unreachable.length > 0 ? (
                   <p className="text-xs text-muted-foreground">
                     Couldn't reach {feed.unreachable.join(", ")}; their decisions show up when
@@ -301,6 +312,196 @@ export function DecisionsPage() {
       </div>
     </SidebarInset>
   );
+}
+
+/**
+ * Project and kind chips in one row that scrolls on its own, with fading
+ * edges, inside the card column. Each project chip's tooltip says what the
+ * project is.
+ */
+function ChipRow(props: {
+  readonly projects: readonly string[];
+  readonly kinds: readonly string[];
+  readonly selectedProjects: readonly string[];
+  readonly selectedKinds: readonly string[];
+  readonly blurbs: ReadonlyMap<string, DecisionProjectBlurb>;
+  readonly onProjects: (projects: string[]) => void;
+  readonly onKinds: (kinds: string[]) => void;
+}) {
+  return (
+    <div
+      aria-label="Filters"
+      className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <ToggleGroup
+        multiple
+        className="shrink-0"
+        value={[...props.selectedProjects]}
+        onValueChange={(value) => props.onProjects(value as string[])}
+      >
+        {props.projects.map((project) => {
+          const description = props.blurbs.get(project)?.description;
+          return description ? (
+            <Tooltip key={project}>
+              <TooltipTrigger render={<Toggle size="sm" value={project} />}>
+                {project}
+              </TooltipTrigger>
+              <TooltipPopup side="bottom" className="max-w-xs">
+                {description}
+              </TooltipPopup>
+            </Tooltip>
+          ) : (
+            <Toggle key={project} size="sm" value={project}>
+              {project}
+            </Toggle>
+          );
+        })}
+      </ToggleGroup>
+      <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />
+      <ToggleGroup
+        multiple
+        className="shrink-0"
+        value={[...props.selectedKinds]}
+        onValueChange={(value) => props.onKinds(value as string[])}
+      >
+        {props.kinds.map((kind) => (
+          <Toggle key={kind} size="sm" value={kind}>
+            {kind}
+          </Toggle>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+}
+
+/** "courtroom: trial adventure…" under the chips, with the owner's own line editable. */
+function ProjectBlurbLine({
+  project,
+  description,
+}: {
+  readonly project: string;
+  readonly description: string | null;
+}) {
+  const environmentId = usePrimaryEnvironmentId();
+  const describe = useAtomCommand(decisionEnvironment.describeProject, "describe project");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(description ?? "");
+  const save = async () => {
+    setEditing(false);
+    if (environmentId === null || draft.trim() === (description ?? "")) return;
+    await describe({ environmentId, input: { project, description: draft.trim() || null } });
+  };
+  return editing ? (
+    <Input
+      autoFocus
+      size="sm"
+      aria-label={`What ${project} is`}
+      value={draft}
+      maxLength={200}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => void save()}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") void save();
+        if (event.key === "Escape") setEditing(false);
+      }}
+    />
+  ) : (
+    <p className="group flex items-start gap-1.5 text-sm text-muted-foreground">
+      <span>
+        <span className="font-medium text-foreground">{project}</span>
+        {description ? `: ${description}` : ": no description yet"}
+      </span>
+      <Button
+        size="icon-xs"
+        variant="ghost"
+        aria-label={`Edit what ${project} is`}
+        onClick={() => {
+          setDraft(description ?? "");
+          setEditing(true);
+        }}
+      >
+        <PencilIcon />
+      </Button>
+    </p>
+  );
+}
+
+/** Answered decisions: what was asked, the choice with its pictures, and the note. */
+function AnsweredList({ feed, now }: { readonly feed: DecisionFeed; readonly now: number }) {
+  if (feed.isPending) return <Skeleton className="h-28 w-full" />;
+  if (feed.entries.length === 0) {
+    return (
+      <Empty className="min-h-64">
+        <EmptyHeader>
+          <EmptyTitle>No answers yet</EmptyTitle>
+          <EmptyDescription>Decisions you answer show up here.</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
+  return feed.entries.map((entry) => {
+    const { item, answer } = entry;
+    const chosen = item.options.filter((option) => answer?.option_ids?.includes(option.id));
+    const pictures = chosen.flatMap((option) => {
+      const media = option.media_idx === null ? undefined : item.media[option.media_idx];
+      return media?.type === "image" ? [media] : [];
+    });
+    return (
+      <article
+        key={entryKey(entry)}
+        className="space-y-2 rounded-lg border border-border bg-card p-4"
+        data-decision-answered={item.kind}
+      >
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Badge variant="secondary" size="sm">
+            {item.kind}
+          </Badge>
+          <span className="truncate">
+            {item.project} · {entry.environmentLabel}
+          </span>
+          <span className="ml-auto shrink-0">
+            {item.answered_at ? ageLabel(item.answered_at, now) : null}
+          </span>
+        </div>
+        <h2 className="font-medium text-foreground">{item.title || item.question}</h2>
+        {pictures.length > 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            {pictures.map((media) => (
+              <DecisionMedia
+                key={media.key}
+                environmentId={entry.environmentId}
+                media={media}
+                framed
+              />
+            ))}
+          </div>
+        ) : null}
+        {answer ? (
+          <p className="text-sm text-foreground">
+            <CheckIcon className="me-1 inline size-3.5 text-success-foreground" />
+            {answerSummary(item, answer)}
+          </p>
+        ) : null}
+        {answer?.comment ? (
+          <p className="text-sm text-muted-foreground">“{answer.comment}”</p>
+        ) : null}
+        {item.thread ? (
+          <Button
+            size="xs"
+            variant="outline"
+            render={
+              <Link
+                to="/$environmentId/$threadId"
+                params={{ environmentId: entry.environmentId, threadId: item.thread }}
+              />
+            }
+          >
+            Open thread
+          </Button>
+        ) : null}
+      </article>
+    );
+  });
 }
 
 /** A feed card shaped by its kind, so many decisions never need opening. */
