@@ -361,6 +361,8 @@ export function DecisionView({
                   variant={
                     verdict.value === "reject" || verdict.value === "never" ? "outline" : "default"
                   }
+                  disabled={unseen !== null}
+                  title={unseen ?? undefined}
                   onClick={() => submit({ choice: verdict.value })}
                 >
                   {verdict.label}
@@ -403,7 +405,7 @@ export function DecisionView({
                 None of these, try again
               </Button>
             ) : null}
-            {problem && !verdicts && item.kind !== "timeline" ? (
+            {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
               <span className="text-xs text-muted-foreground">{problem}</span>
             ) : null}
             <span className="ms-auto hidden text-2xs text-muted-foreground sm:inline">

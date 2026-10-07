@@ -211,7 +211,10 @@ export function DecisionMedia({
             preload="metadata"
             src={url}
             onPlay={() => engage(media.key)}
-            onSeeked={() => engage(media.key)}
+            onTimeUpdate={(event) => {
+              // Scrubbing moves the playhead; a load can report a seek without one.
+              if (event.currentTarget.currentTime > 0.5) engage(media.key);
+            }}
             className="size-full object-contain"
           />
         ) : (
@@ -242,7 +245,10 @@ export function DecisionMedia({
           preload="none"
           src={url}
           onPlay={() => engage(media.key)}
-          onSeeked={() => engage(media.key)}
+          onTimeUpdate={(event) => {
+            // Scrubbing moves the playhead; a load can report a seek without one.
+            if (event.currentTarget.currentTime > 0.5) engage(media.key);
+          }}
           className={cn("w-full", className)}
         />
       );
@@ -253,7 +259,10 @@ export function DecisionMedia({
           preload="metadata"
           src={url}
           onPlay={() => engage(media.key)}
-          onSeeked={() => engage(media.key)}
+          onTimeUpdate={(event) => {
+            // Scrubbing moves the playhead; a load can report a seek without one.
+            if (event.currentTarget.currentTime > 0.5) engage(media.key);
+          }}
           className={cn("w-full rounded-md bg-black", compact ? "h-24" : "max-h-[70vh]", className)}
         />
       );
