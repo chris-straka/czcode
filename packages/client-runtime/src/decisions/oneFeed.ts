@@ -49,8 +49,13 @@ export type MachineFilter =
   | { readonly type: "all" }
   | { readonly type: "one"; readonly environmentId: EnvironmentId };
 
+/** The kind of device this client runs on, for decisions aimed at one. */
+export type FeedDevice = "phone" | "desktop";
+
 export interface OneFeedFilter {
   readonly machine: MachineFilter;
+  /** Hides decisions aimed at the other kind of device; omitted shows all. */
+  readonly device?: FeedDevice;
   /** Decision projects to keep; empty keeps all. Threads stay unless they have none of them. */
   readonly projects?: ReadonlySet<string>;
 }
@@ -80,6 +85,7 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
       (entry) =>
         entry.item.status === "open" &&
         machineMatches(filter.machine, entry.environmentId) &&
+        (filter.device === undefined || isForDevice(entry.item, filter.device)) &&
         (!filter.projects?.size || filter.projects.has(entry.item.project)),
     )
     .toSorted((a, b) => compareFeedItems(a.item, b.item, projectOrder));
@@ -181,4 +187,32 @@ export function shortModelLabel(displayName: string): string {
 /** A machine's short name for card headers: "f-ms-7917" reads as "f". */
 export function shortMachineLabel(label: string): string {
   return label.split(/[-.\s]/)[0] || label;
+}
+
+/** True when a decision can be acted on from this kind of device. */
+export function isForDevice(
+  item: Pick<DecisionItem, "target_device">,
+  device: FeedDevice,
+): boolean {
+  const target = item.target_device ?? "any";
+  return target === "any" || target === device;
+}
+
+/**
+ * Open decisions the filter hides because they're aimed at another device,
+ * for one quiet line such as "3 waiting on your phone".
+ */
+export function waitingOnOtherDevice(
+  decisions: ReadonlyArray<OneFeedDecision>,
+  filter: OneFeedFilter,
+): number {
+  if (filter.device === undefined) return 0;
+  const device = filter.device;
+  return decisions.filter(
+    (entry) =>
+      entry.item.status === "open" &&
+      machineMatches(filter.machine, entry.environmentId) &&
+      (!filter.projects?.size || filter.projects.has(entry.item.project)) &&
+      !isForDevice(entry.item, device),
+  ).length;
 }
