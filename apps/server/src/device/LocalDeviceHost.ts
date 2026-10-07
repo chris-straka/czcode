@@ -103,21 +103,11 @@ interface RunningHost {
 
 const platformReason = Effect.fn("LocalDeviceHost.platformReason")(function* (
   platform: DevicePlatform,
-): Effect.fn.Return<
-  string | null,
-  never,
-  FileSystem.FileSystem | Path.Path | ProcessRunner.ProcessRunner
-> {
+): Effect.fn.Return<string | null, never, FileSystem.FileSystem | Path.Path> {
   const hostPlatform = yield* HostProcessPlatform;
   if (platform === "ios") {
     if (hostPlatform !== "darwin") return "iOS Simulators need macOS with Xcode.";
     if (!(yield* isCommandAvailable("xcrun"))) return "Xcode command line tools were not found.";
-    // Command Line Tools alone ship xcrun without simctl; only full Xcode runs simulators.
-    const simctl = yield* ProcessRunner.ProcessRunner.use((runner) =>
-      runner.run({ command: "xcrun", args: ["simctl", "help"], timeout: "10 seconds" }),
-    ).pipe(Effect.option);
-    if (simctl._tag === "None" || simctl.value.code !== 0)
-      return "iOS Simulators need full Xcode; xcrun simctl is not available.";
     return null;
   }
   const sdk = yield* androidSdk;
@@ -254,10 +244,21 @@ export const make = Effect.fn("LocalDeviceHost.make")(function* () {
     platformReason(platform).pipe(
       Effect.provideService(FileSystem.FileSystem, fs),
       Effect.provideService(Path.Path, path),
-      Effect.provideService(ProcessRunner.ProcessRunner, runner),
     );
-  // Xcode doesn't come and go while the server runs, so probe simctl once.
-  const iosReason = yield* Effect.cached(reasonFor("ios"));
+  // Command Line Tools alone ship xcrun without simctl; only full Xcode runs
+  // simulators. Xcode doesn't come and go while the server runs, so probe once.
+  const iosReason = yield* Effect.cached(
+    Effect.gen(function* () {
+      const reason = yield* reasonFor("ios");
+      if (reason !== null) return reason;
+      const simctl = yield* runner
+        .run({ command: "xcrun", args: ["simctl", "help"], timeout: "10 seconds" })
+        .pipe(Effect.option);
+      return Option.isSome(simctl) && simctl.value.code === 0
+        ? null
+        : "iOS Simulators need full Xcode; xcrun simctl is not available.";
+    }),
+  );
 
   const platformAvailability = Effect.fn("LocalDeviceHost.platformAvailability")(function* (
     platform: DevicePlatform,
