@@ -70,7 +70,8 @@ if [ "$target" != "$active_sha" ] && [ "$target" != "$(release_sha "$slot")" ]; 
     rm -rf "$slot" && git -C "$repo" worktree add -q --detach "$slot" "$target"
   fi || { echo "Couldn't check out $(short "$target") in $slot." && exit 1; }
   if ! (cd "$slot" && nice -n 10 vp i && nice -n 10 vp run --filter @cz/web --filter cz build); then
-    echo "Build of $(short "$target") failed; cz stays on $(short "${active_sha:-the checkout build}")."
+    if [ -n "$active_sha" ]; then now_on=$(short "$active_sha"); else now_on="the build it runs now"; fi
+    echo "Build of $(short "$target") failed; cz stays on $now_on."
     exit 1
   fi
   echo "$target" > "$slot/.cz-release"
