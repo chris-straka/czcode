@@ -1,5 +1,9 @@
 # Set up a computer as a cz agent host
 
+How upstream's author runs his own fleet, and how this setup compares:
+[../docs/upstream-fleet.md](../docs/upstream-fleet.md). Read it before changing
+how hosts work.
+
 Linux and Windows PCs use `linux.sh` (below). Macs use `mac.sh`
 ([A Mac](#a-mac)).
 
