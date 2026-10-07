@@ -10,7 +10,9 @@
 # for the owner instead. One exception: a pnpm-lock.yaml that is the only
 # change is `vp i` churn, so it's restored before fast-forwarding.
 # Also lists checkouts under ~/SWE and ~/ResumeProjects that repos.txt
-# doesn't know, since those exist on this machine only.
+# doesn't know, since those exist on this machine only. Every repo in
+# repos.txt becomes a cz project here, so threads can run on any host and
+# clients show one project per repo across machines (grouped by git origin).
 #
 # Exit status: 0 all current, 2 something needs the owner, 1 clones or
 # fetches failed.
@@ -92,8 +94,22 @@ while read -r git_dir; do
 done < <(find SWE ResumeProjects -maxdepth 5 -name .git -type d \
   -not -path '*/node_modules/*' -not -path '*/.repos/*' -not -path '*/.cache/*' 2> /dev/null | LC_ALL=C sort)
 
+# Register the checkouts as cz projects, once each (cz refuses duplicates).
+registered="$HOME/.local/state/cz-host/projects-registered"
+mkdir -p "$(dirname "$registered")" && touch "$registered"
+added=0
+while read -r path; do
+  if [ ! -d "$path/.git" ] || grep -qxF "$path" "$registered"; then continue; fi
+  if out=$(cz project add --title "${path#*/}" "$HOME/$path" 2>&1) || grep -q 'already exists' <<< "$out"; then
+    echo "$path" >> "$registered"
+    grep -q 'already exists' <<< "$out" || added=$((added + 1))
+  else
+    note "$path" "couldn't add as a cz project: $(tail -1 <<< "$out")"
+  fi
+done < <(grep -v '^#' "$manifest" | awk 'NF {print $1}')
+
 for line in "${attention[@]}"; do echo "attention: $line"; done
-summary="$total repos: $cloned cloned, $forwarded fast-forwarded"
+summary="$total repos: $cloned cloned, $forwarded fast-forwarded, $added added as cz projects"
 [ "$restored" -eq 0 ] || summary+=", $restored pnpm-lock churn restored"
 summary+=", ${#attention[@]} need attention"
 [ "$failed" -eq 0 ] || summary+=", $failed failed"
