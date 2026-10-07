@@ -117,7 +117,10 @@ busy_reason() {
   systemctl --user is-active -q "$unit" || return 0
   local threads queue soon_ms soon_iso db="$HOME/.cz/userdata/statev2.sqlite" n
   threads=$(cz thread list --all --json 2> /dev/null) || {
-    echo "cz isn't answering"
+    # A server from before `cz thread` (v0.0.46) can't say which threads are
+    # working; call it idle only when it has no agent processes at all.
+    n=$(pgrep -c -P "$(systemctl --user show -p MainPID --value "$unit")" -f 'claude|codex|opencode|cursor-agent|grok' || true)
+    [ "${n:-0}" -eq 0 ] || echo "$n agent process(es) under an older cz"
     return
   }
   n=$(jq '[.[] | select(.busy // .running)] | length' <<< "$threads")
