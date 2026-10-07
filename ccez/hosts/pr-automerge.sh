@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Merges the owner's open pull requests across every repo they own, so nobody
 # has to approve a PR (owner rule, ~/SWE/AGENTS.md). Runs from a timer on one
-# host (install-pr-automerge.sh); uses that host's `gh` login.
+# host (the pr-automerge host job, host-jobs.sh); uses that host's `gh` login.
 #
 #   pr-automerge.sh            # merge what's ready
 #   pr-automerge.sh --dry-run  # only say what it would do
@@ -14,10 +14,15 @@
 # A PR with no checks in a repo that has CI workflows waits: CI hasn't
 # reported yet (or isn't running), and that is not the same as "no CI".
 # Squash merge (falling back to a merge commit), then delete the branch.
+# A Dependabot PR with conflicts gets one "@dependabot rebase" comment; it
+# isn't repeated while that comment stands, so a rebase Dependabot can't do
+# waits for a person.
 set -uo pipefail
 dry=false
 [ "${1:-}" = --dry-run ] && dry=true
 me=$(gh api user --jq .login) || exit 1
+out=$(mktemp)
+trap 'rm -f "$out"' EXIT
 
 gh search prs --owner "$me" --state open --archived=false --limit 200 \
   --json repository,number,author,isDraft \
@@ -28,10 +33,22 @@ gh search prs --owner "$me" --state open --archived=false --limit 200 \
       app/dependabot | dependabot*) need_checks=true ;;
       *) continue ;;
     esac
-    pr=$(gh pr view "$number" --repo "$repo" --json mergeable,statusCheckRollup,title) || continue
+    pr=$(gh pr view "$number" --repo "$repo" --json mergeable,statusCheckRollup,title,comments) || continue
     title=$(jq -r .title <<< "$pr")
+    if $need_checks && [ "$(jq -r .mergeable <<< "$pr")" = CONFLICTING ]; then
+      if jq -e --arg me "$me" 'any(.comments[]; .author.login == $me and (.body | test("^@dependabot rebase")))' <<< "$pr" > /dev/null; then
+        echo "skip $repo#$number (conflicting; already asked Dependabot to rebase): $title"
+      elif $dry; then
+        echo "would ask Dependabot to rebase $repo#$number (conflicting): $title"
+      elif gh pr comment "$number" --repo "$repo" --body "@dependabot rebase" > /dev/null; then
+        echo "asked Dependabot to rebase $repo#$number (conflicting): $title"
+      else
+        echo "FAILED to comment on $repo#$number: $title" >&2
+      fi
+      continue
+    fi
     [ "$(jq -r .mergeable <<< "$pr")" = MERGEABLE ] || {
-      echo "skip $repo#$number ($(jq -r .mergeable <<< "$pr" | tr A-Z a-z)): $title"
+      echo "skip $repo#$number ($(jq -r .mergeable <<< "$pr" | tr '[:upper:]' '[:lower:]')): $title"
       continue
     }
     # Checks: CheckRun entries carry status+conclusion, StatusContext entries carry state.
@@ -66,4 +83,7 @@ gh search prs --owner "$me" --state open --archived=false --limit 200 \
     else
       echo "FAILED to merge $repo#$number: $title" >&2
     fi
-  done
+  done 2>&1 | tee "$out"
+count() { grep -c "^$1" "$out"; }
+echo "$(count merged) merged, $(count asked) rebases asked for, $(count wait) waiting, $(count skip) skipped, $(count FAILED) failed"
+[ "$(count FAILED)" -eq 0 ]
