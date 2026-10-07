@@ -23,3 +23,7 @@ Two choices that look like misses but are deliberate:
   splitting them needs context the rules don't have.
 - `packages/shared/src/legacyNames.ts` keeps the old names on purpose: it
   reads `T3CODE_*` env vars, `~/.t3`, and `t3.json` once, to migrate them.
+
+CI: the rules also map upstream's Blacksmith runner labels to GitHub-hosted
+runners. Workflows that need upstream-only secrets are disabled on the fork
+by `ccez/ci/disable-upstream-workflows.sh`; rerun it if a sync adds another.
