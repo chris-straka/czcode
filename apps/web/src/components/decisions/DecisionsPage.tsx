@@ -158,6 +158,11 @@ export function DecisionsPage() {
                     const next = visible[index + 1] ?? visible[0];
                     setOpenKey(next ? entryKey(next) : null);
                   },
+                  onPrevious: () => {
+                    const index = visible.indexOf(opened);
+                    const previous = visible[index - 1] ?? visible.at(-1);
+                    setOpenKey(previous ? entryKey(previous) : null);
+                  },
                 }
               : {})}
             onSubmit={(value) => answer(opened, value)}
