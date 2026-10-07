@@ -39,6 +39,10 @@
       "types": "./src/proposedPlan.ts",
       "default": "./src/proposedPlan.ts"
     },
+    "./fleet": {
+      "types": "./src/fleet.ts",
+      "default": "./src/fleet.ts"
+    },
     "./user-message": {
       "types": "./src/userMessage.ts",
       "default": "./src/userMessage.ts"
