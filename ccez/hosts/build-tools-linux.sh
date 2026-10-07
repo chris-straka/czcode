@@ -148,6 +148,15 @@ if want k8s; then
   fi
 fi
 
+step "Twitch CLI"
+# Twitch API calls for launchkit/scrapers; `twitch configure` needs the app's keys.
+if ! have twitch; then
+  twitch_tag=$(curl -fsSL https://api.github.com/repos/twitchdev/twitch-cli/releases/latest | jq -r .tag_name)
+  twitch_dir="twitch-cli_${twitch_tag#v}_Linux_$([ "$arch" = amd64 ] && echo x86_64 || echo arm64)"
+  curl -fsSL "https://github.com/twitchdev/twitch-cli/releases/download/$twitch_tag/$twitch_dir.tar.gz" |
+    tar -xz -C "$HOME/.local/bin" --strip-components=1 "$twitch_dir/twitch"
+fi
+
 step "Kotlin compiler"
 if ! have kotlinc; then
   kotlin_tag=$(curl -fsSL https://api.github.com/repos/JetBrains/kotlin/releases/latest | jq -r .tag_name)
@@ -229,7 +238,7 @@ fi
 
 step "Check"
 for t in cargo go java kotlinc mvn python3 uv node bun pnpm dotnet docker kubectl kind tilt \
-  clang mold sccache cmake ffmpeg magick blender sdkmanager adb cargo-ndk wrangler gltfpack typst rg fd jq; do
+  clang mold sccache cmake ffmpeg magick blender sdkmanager adb cargo-ndk wrangler gltfpack typst twitch rg fd jq; do
   if have "$t"; then printf '  ok  %s\n' "$t"; else printf '  --  %s\n' "$t"; fi
 done
 for v in $NDK_VERSIONS; do
