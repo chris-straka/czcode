@@ -1,3 +1,5 @@
+// @effect-diagnostics nodeBuiltinImport:off - Effect's FileSystem has no statfs, which disk free space needs.
+import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import type { HostResourcesSnapshot } from "@cz/contracts";
 import { HostProcessPlatform } from "@cz/shared/hostProcess";
@@ -8,6 +10,26 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
+
+import {
+  parseDarwinSwapUsage,
+  parseLinuxDiskMounts,
+  parseProcSwaps,
+  parseZramMemoryBytes,
+  swapFromDevices,
+} from "./hostCapacity.ts";
+
+/** Total and free bytes of the filesystem holding `mount`, or null when it can't be read. */
+const statDisk = (mount: string) =>
+  Effect.tryPromise(() => NodeFSP.statfs(mount)).pipe(
+    Effect.map((stat) => ({
+      mount,
+      totalBytes: stat.blocks * stat.bsize,
+      freeBytes: stat.bavail * stat.bsize,
+    })),
+    Effect.timeout("1 second"),
+    Effect.orElseSucceed(() => null),
+  );
 
 export class HostResources extends Context.Service<
   HostResources,
@@ -72,7 +94,48 @@ const make = Effect.fn("makeHostResources")(function* () {
         );
       availableMemoryBytes = darwinAvailableMemory(output) ?? availableMemoryBytes;
     }
+    const readText = (path: string) => fs.readFileString(path).pipe(Effect.orElseSucceed(() => ""));
+    const runText = (command: string, args: ReadonlyArray<string>) =>
+      spawner
+        .string(ChildProcess.make(command, [...args], { stdin: "ignore", stderr: "ignore" }))
+        .pipe(
+          Effect.timeout("1 second"),
+          Effect.orElseSucceed(() => ""),
+        );
+    let swap: HostResourcesSnapshot["swap"];
+    let mounts: Array<string> = [];
+    if (platform === "linux") {
+      const devices = yield* Effect.forEach(
+        parseProcSwaps(yield* readText("/proc/swaps")),
+        (device) =>
+          device.kind === "zram"
+            ? readText(`/sys/block/${device.name.split("/").pop()}/mm_stat`).pipe(
+                Effect.map((stat) => {
+                  const memoryBytes = parseZramMemoryBytes(stat);
+                  return memoryBytes === null ? device : { ...device, memoryBytes };
+                }),
+              )
+            : Effect.succeed(device),
+      );
+      swap = swapFromDevices(devices);
+      mounts = parseLinuxDiskMounts(yield* readText("/proc/self/mounts"));
+    } else if (platform === "darwin") {
+      swap =
+        parseDarwinSwapUsage(yield* runText("/usr/sbin/sysctl", ["vm.swapusage"])) ?? undefined;
+      // The sealed system volume reports the shared APFS container; Data is where files land.
+      const external = yield* fs.readDirectory("/Volumes").pipe(Effect.orElseSucceed(() => []));
+      mounts = ["/System/Volumes/Data", ...external.map((name) => `/Volumes/${name}`)];
+    } else if (platform === "win32") {
+      mounts = "CDEFGHIJ".split("").map((letter) => `${letter}:\\`);
+    }
+    const disks = (yield* Effect.forEach(mounts, statDisk, { concurrency: 4 })).filter(
+      (disk): disk is NonNullable<typeof disk> => disk !== null && disk.totalBytes > 0,
+    );
+    const loadAverage = platform === "win32" ? undefined : NodeOS.loadavg();
     return {
+      ...(loadAverage ? { loadAverage } : {}),
+      ...(swap ? { swap } : {}),
+      disks,
       sampledAt: DateTime.toEpochMillis(yield* DateTime.now),
       cpuUtilization,
       cpuCount: cpu.count,
