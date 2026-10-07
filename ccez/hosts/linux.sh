@@ -11,7 +11,11 @@
 # repo and kept running as a background service on the tailnet, the build
 # tools in build-tools-linux.sh (Rust, Go, Java, Android, Blender, Docker...),
 # and the Claude, Codex, and OpenCode logins (each prints a link or code to open on any
-# device). Safe to re-run: finished steps are skipped, and re-running updates cz.
+# device). Safe to re-run: finished steps are skipped, and re-running updates
+# cz once no agent is working (cz-update.sh). It also installs the host jobs
+# (host-jobs.sh): health check, userdata backup, repo sync and cz update,
+# nightly. CZ_HOST_PR_AUTOMERGE=1 adds the PR auto-merge job; turn it on for
+# one host only.
 #
 # On WSL it also turns on systemd, keeps WSL running after you log in to
 # Windows, and stops Windows from sleeping while plugged in.
@@ -46,7 +50,7 @@ fi
 
 step "Base tools"
 sudo apt-get update -qq
-sudo apt-get install -y -qq git curl ca-certificates build-essential python3 unzip jq > /dev/null
+sudo apt-get install -y -qq git curl ca-certificates build-essential python3 unzip jq sqlite3 rsync > /dev/null
 if ! have gh; then
   curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
     sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg status=none
@@ -84,19 +88,15 @@ tailscale_name=$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//'
 
 step "cz (built from $REPO_URL)"
 if [ -d "$CHECKOUT/.git" ]; then
-  git -C "$CHECKOUT" pull --ff-only
+  git -C "$CHECKOUT" pull --ff-only || echo "Left $CHECKOUT as it is; cz builds from origin/main."
 else
   mkdir -p "$(dirname "$CHECKOUT")"
   git clone "$REPO_URL" "$CHECKOUT"
 fi
-(cd "$CHECKOUT" && vp i && vp run --filter @cz/web --filter cz build)
-mkdir -p "$HOME/.local/bin"
-cat > "$HOME/.local/bin/cz" << SHIM
-#!/usr/bin/env bash
-# The cz CLI from $CHECKOUT (ccez/hosts/linux.sh). Update by re-running that script.
-exec /usr/bin/node "$CHECKOUT/apps/server/dist/bin.mjs" "\$@"
-SHIM
-chmod +x "$HOME/.local/bin/cz"
+# cz runs from its own release checkout (~/.local/lib/cz-host/cz/current), not
+# $CHECKOUT, so agents' work there can't break it. This builds origin/main;
+# ~/.local/bin/cz runs it.
+bash "$CHECKOUT/ccez/hosts/cz-update.sh" --no-restart
 
 if [ "${CZ_HOST_TOOLS:-1}" = 1 ]; then
   step "Build tools: Rust, Go, Java, Android, Blender, Docker and more (CZ_HOST_TOOLS=0 skips)"
@@ -153,20 +153,24 @@ UNITFILE
 sudo loginctl enable-linger "$USER"
 systemctl --user daemon-reload
 systemctl --user enable "$UNIT" > /dev/null
-# Settings are edited only while cz is stopped, so it can't write over them.
 # Codex uses this machine's own `codex login` ("existing"); the welcome wizard
 # can otherwise pick "managed", which needs a second sign-in. New threads
-# default to Claude Opus.
-systemctl --user stop "$UNIT" 2> /dev/null || true
+# default to Claude Opus. Settings are edited only while cz is stopped, so it
+# can't write over them, and only when they need it, so a re-run doesn't cut
+# off running agents.
 settings="${CZ_HOME:-$HOME/.cz}/userdata/settings.json"
 mkdir -p "$(dirname "$settings")"
 [ -s "$settings" ] || echo '{}' > "$settings"
-jq '
+settings_filter='
   .providerInstances.codex //= {driver: "codex", enabled: true, config: {binaryPath: "codex", homePath: "", shadowHomePath: "", launchArgs: "", customModels: []}}
   | .providerInstances.codex.config.setupMode = "existing"
   | .defaultModelSelection //= {instanceId: "claudeAgent", model: "claude-opus-5-5", options: [{id: "effort", value: "high"}]}
-' "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
-systemctl --user restart "$UNIT"
+'
+if ! systemctl --user is-active -q "$UNIT" || [ "$(jq -S "$settings_filter" "$settings")" != "$(jq -S . "$settings")" ]; then
+  systemctl --user stop "$UNIT" 2> /dev/null || true
+  jq "$settings_filter" "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
+  systemctl --user restart "$UNIT"
+fi
 
 if $in_wsl; then
   step "Keep WSL running after you log in to Windows"
@@ -344,6 +348,12 @@ if ! $in_wsl && [ -n "$wired" ] &&
   fi
 fi
 
+step "Host jobs: health check, userdata backup, repo sync, cz update"
+bash "$HOME/.local/lib/cz-host/cz/current/ccez/hosts/host-jobs.sh"
+# On a re-run, the update job restarts cz into the new build (and the unit
+# changes above) once no agent is working.
+systemctl --user start --no-block cz-job-update.service
+
 step "Pair your phone and desktop"
 systemctl --user --no-pager --lines=0 status "$UNIT" | head -3
 cz pair --tailscale || echo "Pairing failed; check: journalctl --user -u $UNIT"
@@ -353,7 +363,8 @@ Done. This host is $tailscale_name.
 Hardware: $(nproc) cores, $(free -g | awk '/^Mem:/ {print $2}') GB memory, $(df -h --output=avail "$HOME" | tail -1 | tr -d ' ') free disk.
 GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2> /dev/null || lspci 2> /dev/null | sed -n 's/.*\(VGA\|3D\) [^:]*: //p' | head -1 || echo "none found")
 - Open the pairing link above on each device that should use this host.
-- Copy ~/SWE/AGENTS.md from the Mac to the same path here, and clone your
-  projects under ~/SWE with the same git origins.
-- To update cz later, run this script again.
+- Copy ~/SWE/AGENTS.md from the Mac to the same path here. The sync job
+  clones the projects in ccez/hosts/repos.txt tonight; to start now:
+  systemctl --user start --no-block cz-job-sync.service
+- cz updates itself nightly when idle. Run this script again for new tools.
 DONE
