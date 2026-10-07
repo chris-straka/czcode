@@ -10,12 +10,12 @@ import type { HostsModule, PairedHost } from "@cz/tui/api";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
-import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { Flag, GlobalFlag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import * as NodeOS from "node:os";
+import { czConfigDir } from "@cz/shared/configDir";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
@@ -43,12 +43,8 @@ export const hostFlag = Flag.String("host").pipe(
   Flag.optional,
 );
 
-/** `$XDG_CONFIG_HOME/czcode/tui`, else `~/.config/czcode/tui`: the terminal's saved connections. */
-export const tuiConfigDir = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const base = process.env.XDG_CONFIG_HOME?.trim() || path.join(NodeOS.homedir(), ".config");
-  return path.join(base, "czcode", "tui");
-});
+/** Where this computer's shared machine list lives (see `@cz/shared/configDir`). */
+export const machineListDir = Effect.sync(() => czConfigDir());
 
 // Loaded lazily, and typed by its own entry, so client-runtime stays out of
 // `cz serve` and of the server's type program.
@@ -68,7 +64,7 @@ export function findHost(hosts: ReadonlyArray<PairedHost>, wanted: string): Pair
 
 const remoteAccess = (wanted: string) =>
   Effect.gen(function* () {
-    const configDir = yield* tuiConfigDir;
+    const configDir = yield* machineListDir;
     const hosts = yield* Effect.tryPromise({
       try: async () => (await loadHosts()).listHosts(configDir),
       catch: (cause) =>

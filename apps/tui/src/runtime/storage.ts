@@ -28,7 +28,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
-import * as CatalogFile from "./catalogFile.ts";
+import * as CatalogFile from "@cz/client-runtime/platform/catalog-file";
 
 type TargetOperation =
   | "list-targets"
@@ -44,7 +44,7 @@ const targetError = (operation: TargetOperation) => (error: ConnectionTransientE
 export const connectionStorageLayer = (configDir: string) =>
   Layer.effectContext(
     Effect.gen(function* () {
-      const catalog = yield* CatalogFile.make(configDir);
+      const catalog = yield* CatalogFile.openInConfigDir(configDir);
       const githubRoutingPermissions = yield* makeGitHubRoutingPermissions({
         read: catalog.read.pipe(Effect.map((document) => document.githubRoutingPermissions ?? [])),
         write: (githubRoutingPermissions) =>
@@ -59,6 +59,7 @@ export const connectionStorageLayer = (configDir: string) =>
           Effect.map((document) => document.disabledEnvironmentIds),
           Effect.mapError(targetError("list-disabled-targets")),
         ),
+        changes: catalog.changes,
       });
       const registrationStore = Persistence.ConnectionRegistrationStore.of({
         register: (registration, routes) =>
@@ -90,7 +91,11 @@ export const connectionStorageLayer = (configDir: string) =>
         put: (profile) =>
           catalog.update((document) => ({
             ...document,
-            profiles: replaceCatalogValue(document.profiles, (value) => value.connectionId, profile),
+            profiles: replaceCatalogValue(
+              document.profiles,
+              (value) => value.connectionId,
+              profile,
+            ),
           })),
         remove: (connectionId) =>
           catalog.update((document) => ({

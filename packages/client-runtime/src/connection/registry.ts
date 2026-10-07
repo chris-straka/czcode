@@ -228,41 +228,46 @@ export const make = Effect.gen(function* () {
         : Option.none();
     return { target, profile } satisfies ConnectionRoute;
   });
-  const persistedRoutesByEnvironment = new Map<EnvironmentId, Array<ConnectionTarget>>();
-  for (const target of persistedTargets) {
-    const routes = persistedRoutesByEnvironment.get(target.environmentId) ?? [];
-    routes.push(target);
-    persistedRoutesByEnvironment.set(target.environmentId, routes);
-  }
+  const groupByEnvironment = (targets: ReadonlyArray<ConnectionTarget>) => {
+    const grouped = new Map<EnvironmentId, Array<ConnectionTarget>>();
+    for (const target of targets) {
+      const routes = grouped.get(target.environmentId) ?? [];
+      routes.push(target);
+      grouped.set(target.environmentId, routes);
+    }
+    return grouped;
+  };
+  const loadCatalogEntry = Effect.fn("EnvironmentRegistry.loadCatalogEntry")(function* (
+    environmentId: EnvironmentId,
+    targets: ReadonlyArray<ConnectionTarget>,
+    disabled: ReadonlySet<EnvironmentId>,
+  ) {
+    const loaded = yield* Effect.forEach(targets, loadRoute, { concurrency: "unbounded" });
+    // A learned route without its profile has no address to reach; it is
+    // learned again on the next connection. A paired route keeps its slot
+    // so its missing profile still surfaces as a connection error.
+    const seen = new Set<string>();
+    const usable = loaded.filter((route) => {
+      const id = connectionRouteId(route.target);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return !(id.startsWith("learned:") && Option.isNone(route.profile));
+    });
+    const routes = usable.length > 0 ? usable : loaded.slice(0, 1);
+    const first = routes[0]!;
+    return entryWithRoutes(
+      { target: first.target, profile: first.profile, enabled: !disabled.has(environmentId) },
+      routes,
+    );
+  });
+  const persistedRoutesByEnvironment = groupByEnvironment(persistedTargets);
   const initialEntries = new Map(
     yield* Effect.forEach(
       persistedRoutesByEnvironment,
-      Effect.fn("EnvironmentRegistry.loadCatalogEntry")(function* ([environmentId, targets]) {
-        const loaded = yield* Effect.forEach(targets, loadRoute, { concurrency: "unbounded" });
-        // A learned route without its profile has no address to reach; it is
-        // learned again on the next connection. A paired route keeps its slot
-        // so its missing profile still surfaces as a connection error.
-        const seen = new Set<string>();
-        const usable = loaded.filter((route) => {
-          const id = connectionRouteId(route.target);
-          if (seen.has(id)) return false;
-          seen.add(id);
-          return !(id.startsWith("learned:") && Option.isNone(route.profile));
-        });
-        const routes = usable.length > 0 ? usable : loaded.slice(0, 1);
-        const first = routes[0]!;
-        return [
-          environmentId,
-          entryWithRoutes(
-            {
-              target: first.target,
-              profile: first.profile,
-              enabled: !disabledEnvironmentIds.has(environmentId),
-            },
-            routes,
-          ),
-        ] as const;
-      }),
+      ([environmentId, targets]) =>
+        loadCatalogEntry(environmentId, targets, disabledEnvironmentIds).pipe(
+          Effect.map((entry) => [environmentId, entry] as const),
+        ),
       { concurrency: "unbounded" },
     ),
   );
@@ -489,6 +494,18 @@ export const make = Effect.gen(function* () {
         discard: true,
       },
     );
+    if (storage.changes !== undefined) {
+      yield* storage.changes.pipe(
+        Stream.runForEach(() =>
+          reloadFromStorage.pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("Could not reload the saved machine list.", { error }),
+            ),
+          ),
+        ),
+        Effect.forkIn(registryScope),
+      );
+    }
   }).pipe(Effect.withSpan("EnvironmentRegistry.start"));
 
   const installEntryLocked = Effect.fn("EnvironmentRegistry.installEntryLocked")(function* (
@@ -859,6 +876,56 @@ export const make = Effect.gen(function* () {
       }
     }
   });
+
+  /**
+   * Applies a change another app on this computer made to the shared saved
+   * list: machines it added appear, ones it removed go, and changed routes or
+   * on/off states restart that machine's connection. Nothing is written back.
+   */
+  const reloadFromStorage = Effect.gen(function* () {
+    const saved = groupByEnvironment(yield* storage.list);
+    const disabled = new Set(yield* storage.listDisabled);
+    const platformIds = yield* Ref.get(platformEnvironmentIds);
+    for (const environmentId of yield* Ref.get(persistedEnvironmentIds)) {
+      if (saved.has(environmentId) || platformIds.has(environmentId)) continue;
+      yield* withLeaseLock(
+        environmentId,
+        Effect.gen(function* () {
+          yield* Ref.update(persistedEnvironmentIds, (current) => {
+            const next = new Set(current);
+            next.delete(environmentId);
+            return next;
+          });
+          yield* closeServiceScope(environmentId);
+          yield* SubscriptionRef.update(entries, (current) => {
+            const next = new Map(current);
+            next.delete(environmentId);
+            return next;
+          });
+        }),
+      );
+    }
+    for (const [environmentId, targets] of saved) {
+      if (platformIds.has(environmentId)) continue;
+      yield* withLeaseLock(
+        environmentId,
+        Effect.gen(function* () {
+          const loaded = yield* loadCatalogEntry(environmentId, targets, disabled);
+          const previous = (yield* SubscriptionRef.get(entries)).get(environmentId);
+          // Keep a known compatibility verdict while the addresses stay the same.
+          const entry =
+            previous !== undefined &&
+            gitHubRoutingConnectionKey(previous) === gitHubRoutingConnectionKey(loaded)
+              ? { ...loaded, ...unsupportedState(previous), enabled: loaded.enabled }
+              : loaded;
+          yield* Ref.update(persistedEnvironmentIds, (current) =>
+            new Set(current).add(environmentId),
+          );
+          yield* installEntryLocked(entry, { retainEquivalentRuntime: true });
+        }),
+      );
+    }
+  }).pipe(Effect.withSpan("EnvironmentRegistry.reloadFromStorage"));
 
   const remove = Effect.fn("EnvironmentRegistry.remove")(function* (environmentId: EnvironmentId) {
     return yield* withLeaseLock(environmentId, removeLocked(environmentId));

@@ -14,7 +14,7 @@ export interface LocalServer {
 
 export interface RunTuiOptions {
   readonly local: LocalServer | null;
-  /** Saved connections live here (mode 600). */
+  /** czcode's config directory; the computer's shared machine list lives here (mode 600). */
   readonly configDir: string;
   readonly appVersion: string;
   /** Where `cz tui` was started: the list opens scoped to the project containing it. */

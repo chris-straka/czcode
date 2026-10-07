@@ -319,6 +319,10 @@
       "types": "./src/httpReadiness.ts",
       "import": "./src/httpReadiness.ts"
     },
+    "./configDir": {
+      "types": "./src/configDir.ts",
+      "import": "./src/configDir.ts"
+    },
     "./devHome": {
       "types": "./src/devHome.ts",
       "import": "./src/devHome.ts"

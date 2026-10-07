@@ -13,6 +13,7 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Scheduler from "effect/Scheduler";
@@ -200,9 +201,11 @@ const makeHarness = Effect.fn("TestEnvironmentRegistry.makeHarness")(function* (
   const storedDisabled = yield* Ref.make<ReadonlySet<EnvironmentId>>(
     new Set(options?.initialDisabled ?? []),
   );
+  const storeChanges = yield* Queue.unbounded<void>();
   const targetStore = Persistence.ConnectionTargetStore.of({
     list: Ref.get(storedTargets),
     listDisabled: Ref.get(storedDisabled).pipe(Effect.map((ids) => [...ids])),
+    changes: Stream.fromQueue(storeChanges),
   });
   const registrationStore = Persistence.ConnectionRegistrationStore.of({
     register: (registration, routes) =>
@@ -453,6 +456,8 @@ const makeHarness = Effect.fn("TestEnvironmentRegistry.makeHarness")(function* (
   return {
     layer,
     storedTargets,
+    /** Another app on the computer changed the saved list. */
+    storeChanged: Queue.offer(storeChanges, undefined),
     shellCache,
     cacheClears,
     ownedDataClears,
@@ -732,6 +737,45 @@ describe("EnvironmentRegistry", () => {
         );
         expect(yield* Ref.get(harness.sessions)).toHaveLength(1);
       }).pipe(Effect.provide(harness.layer));
+    }),
+  );
+
+  it.effect("follows machines another app on the computer added or removed", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness([TARGET]);
+
+      yield* Effect.gen(function* () {
+        const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+        yield* registry.start;
+        yield* awaitConnectionState(
+          registry,
+          TARGET.environmentId,
+          (state) => state.phase === "connected",
+        );
+
+        yield* Ref.set(harness.storedTargets, [SECOND_TARGET]);
+        yield* harness.storeChanged;
+        yield* Stream.concat(
+          Stream.fromEffect(SubscriptionRef.get(registry.entries)),
+          SubscriptionRef.changes(registry.entries),
+        ).pipe(
+          Stream.filter(
+            (entries) =>
+              entries.has(SECOND_TARGET.environmentId) && !entries.has(TARGET.environmentId),
+          ),
+          Stream.take(1),
+          Stream.runDrain,
+        );
+        yield* awaitConnectionState(
+          registry,
+          SECOND_TARGET.environmentId,
+          (state) => state.phase === "connected",
+        );
+        const ids = [...(yield* SubscriptionRef.get(registry.entries)).keys()];
+        expect(ids).toEqual([SECOND_TARGET.environmentId]);
+        // Following another app's change never writes the list back.
+        expect(yield* Ref.get(harness.storedTargets)).toEqual([SECOND_TARGET]);
+      }).pipe(Effect.provide(harness.layer), Effect.scoped);
     }),
   );
 

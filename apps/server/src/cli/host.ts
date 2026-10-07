@@ -10,7 +10,7 @@ import * as Schema from "effect/Schema";
 import { Argument, Command } from "effect/cli";
 
 import packageJson from "../../package.json" with { type: "json" };
-import { loadHosts, tuiConfigDir } from "./serverClient.ts";
+import { loadHosts, machineListDir } from "./serverClient.ts";
 
 export class HostCliError extends Schema.TaggedError<HostCliError>()("HostCliError", {
   message: Schema.String,
@@ -20,7 +20,7 @@ const listCommand = Command.make("list").pipe(
   Command.withDescription("Paired machines and their addresses."),
   Command.withHandler(() =>
     Effect.gen(function* () {
-      const configDir = yield* tuiConfigDir;
+      const configDir = yield* machineListDir;
       const hosts = yield* Effect.tryPromise({
         try: async () => (await loadHosts()).listHosts(configDir),
         catch: (cause) =>
@@ -45,7 +45,7 @@ const addCommand = Command.make("add", {
   Command.withDescription("Pair with another machine, for the TUI and --host."),
   Command.withHandler((flags) =>
     Effect.gen(function* () {
-      const configDir = yield* tuiConfigDir;
+      const configDir = yield* machineListDir;
       const paired = yield* Effect.tryPromise({
         try: async () =>
           (await loadHosts()).pairHost({

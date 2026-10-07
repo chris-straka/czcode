@@ -11,7 +11,7 @@ import * as Effect from "effect/Effect";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 
 import type { HostsModule, PairedHost } from "./api.ts";
-import * as CatalogFile from "./runtime/catalogFile.ts";
+import * as CatalogFile from "@cz/client-runtime/platform/catalog-file";
 import { makeTuiConnectionLayer } from "./runtime/connection.ts";
 
 export type { PairedHost } from "./api.ts";
@@ -19,7 +19,7 @@ export type { PairedHost } from "./api.ts";
 export const listHosts: HostsModule["listHosts"] = (configDir) =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const catalog = yield* (yield* CatalogFile.make(configDir)).read;
+      const catalog = yield* (yield* CatalogFile.openInConfigDir(configDir)).read;
       const tokens = new Map(
         catalog.credentials.map((entry) => [entry.connectionId, entry.credential.token]),
       );

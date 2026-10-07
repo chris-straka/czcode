@@ -20,7 +20,7 @@ import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerConfig from "../config.ts";
 import { readPersistedServerRuntimeState } from "../serverRuntimeState.ts";
 import { baseDirFlag, resolveCliAuthConfig } from "./config.ts";
-import { tuiConfigDir } from "./serverClient.ts";
+import { machineListDir } from "./serverClient.ts";
 
 export class TuiCliError extends Schema.TaggedError<TuiCliError>()("TuiCliError", {
   message: Schema.String,
@@ -42,7 +42,7 @@ export const tuiCommand = Command.make("tui", { baseDir: baseDirFlag }).pipe(
     Effect.gen(function* () {
       const logLevel = yield* GlobalFlag.LogLevel;
       const config = yield* resolveCliAuthConfig({ baseDir: flags.baseDir }, logLevel);
-      const configDir = yield* tuiConfigDir;
+      const configDir = yield* machineListDir;
       const { runTui } = yield* Effect.promise(loadTui);
       yield* Effect.gen(function* () {
         const runtimeState = yield* readPersistedServerRuntimeState(config.serverRuntimeStatePath);

@@ -10,6 +10,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import type * as Stream from "effect/Stream";
 
 import type { ConnectionRegistration } from "../connection/catalog.ts";
 import type { ConnectionTarget, PersistedConnectionTarget } from "../connection/model.ts";
@@ -47,6 +48,11 @@ export class ConnectionTargetStore extends Context.Service<
     readonly list: Effect.Effect<ReadonlyArray<ConnectionTarget>, ConnectionPersistenceError>;
     /** Saved environments the user switched off. See `ConnectionRegistrationStore.setEnabled`. */
     readonly listDisabled: Effect.Effect<ReadonlyArray<EnvironmentId>, ConnectionPersistenceError>;
+    /**
+     * Emits when another process changed the saved list, for stores shared by
+     * several apps on one computer. The registry then reloads from `list`.
+     */
+    readonly changes?: Stream.Stream<void>;
   }
 >()("@cz/client-runtime/platform/persistence/ConnectionTargetStore") {}
 
