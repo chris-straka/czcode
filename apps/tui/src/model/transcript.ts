@@ -16,34 +16,55 @@ export interface TranscriptLine {
 
 const firstLine = (text: string) => text.split("\n").find((line) => line.trim() !== "") ?? "";
 
-/** One item's lines, or none for items the terminal doesn't show. */
+/** The last `count` non-empty lines of tool output, indented under the tool's line. */
+function outputTail(output: string | undefined, count: number): Array<Omit<TranscriptLine, "key">> {
+  const lines = (output ?? "").split("\n").filter((line) => line.trim() !== "");
+  const tail = lines.slice(-count);
+  return [
+    ...(lines.length > count ? [{ tone: "dim" as const, text: `  … ${lines.length - count} more lines` }] : []),
+    ...tail.map((line) => ({ tone: "dim" as const, text: `  ${line}` })),
+  ];
+}
+
+const VERBOSE_OUTPUT_LINES = 8;
+
+/**
+ * One item's lines, or none for items the terminal doesn't show. `verbose`
+ * adds what the desktop shows when a tool row is expanded: command output,
+ * the full command, edits, and finished reasoning.
+ */
 export function itemLines(
   item: OrchestrationV2TurnItem,
+  options: { readonly verbose?: boolean } = {},
 ): ReadonlyArray<Omit<TranscriptLine, "key">> {
+  const verbose = options.verbose ?? false;
   switch (item.type) {
     case "user_message":
       return [{ tone: "user", text: `› ${item.text}` }];
     case "assistant_message":
       return [{ tone: "assistant", text: item.text + (item.streaming ? " ▍" : "") }];
     case "reasoning":
+      if (verbose && item.text.trim() !== "") return [{ tone: "dim", text: `∴ ${item.text.trim()}` }];
       return item.streaming ? [{ tone: "dim", text: "thinking…" }] : [];
     case "proposed_plan":
       return [{ tone: "assistant", text: `Plan:\n${item.markdown}` }];
     case "command_execution": {
       const failed = item.outputIndicatesFailure || (item.exitCode ?? 0) !== 0;
-      return [
-        {
-          tone: failed ? "error" : "tool",
-          text: `$ ${firstLine(item.input)}${failed ? `  (exit ${item.exitCode ?? "?"})` : ""}`,
-        },
-      ];
+      const head = {
+        tone: failed ? ("error" as const) : ("tool" as const),
+        text: `$ ${verbose ? item.input.trim() : firstLine(item.input)}${failed ? `  (exit ${item.exitCode ?? "?"})` : ""}`,
+      };
+      return verbose ? [head, ...outputTail(item.output, VERBOSE_OUTPUT_LINES)] : [head];
     }
     case "file_change": {
       const counts =
         item.additions !== undefined || item.deletions !== undefined
           ? ` +${item.additions ?? 0} -${item.deletions ?? 0}`
           : "";
-      return [{ tone: "tool", text: `✎ ${item.fileName}${counts}` }];
+      const head = { tone: "tool" as const, text: `✎ ${item.fileName}${counts}` };
+      return verbose && item.diffStr
+        ? [head, ...outputTail(item.diffStr, VERBOSE_OUTPUT_LINES * 2)]
+        : [head];
     }
     case "file_search":
       return [{ tone: "tool", text: `⌕ ${item.pattern ?? item.title ?? "search"}` }];
@@ -95,8 +116,9 @@ export function hasActiveRun(projection: {
 
 export function transcriptLines(
   items: ReadonlyArray<OrchestrationV2ProjectedTurnItem>,
+  options: { readonly verbose?: boolean } = {},
 ): ReadonlyArray<TranscriptLine> {
   return items.flatMap(({ item }) =>
-    itemLines(item).map((line, index) => ({ ...line, key: `${item.id}:${index}` })),
+    itemLines(item, options).map((line, index) => ({ ...line, key: `${item.id}:${index}` })),
   );
 }

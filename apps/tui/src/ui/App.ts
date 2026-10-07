@@ -108,6 +108,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       active: true,
       onBack: back,
       onDiff: (toTurnCount: number) => setOverlay({ ...overlay, kind: "diff", toTurnCount }),
+      onOpenThread: openThread,
     });
   } else if (overlay.kind === "new-thread") {
     body = h(NewThreadScreen, {
