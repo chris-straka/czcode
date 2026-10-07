@@ -41,7 +41,6 @@ import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
   ThreadListV2PendingRow,
   ThreadListV2Row,
-  ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
   ThreadListV2WorkingShelfHeader,
@@ -462,13 +461,15 @@ export function HomeScreen(props: HomeScreenProps) {
     lastSettledResetKeyRef.current = settledResetKey;
     setSettledVisibleCount(THREAD_LIST_V2_SETTLED_INITIAL_COUNT);
   }
+  // Finished threads always show as rows; there's no Settled section to fold.
+  const settledShelfExpanded = true;
   const showMoreSettled = useCallback(
     () => setSettledVisibleCount((count) => count + THREAD_LIST_V2_SETTLED_PAGE_COUNT),
     [],
   );
   const {
     loaded: shelfPreferencesLoaded,
-    settledShelfExpanded,
+    settledShelfExpanded: _settledShelfPreference,
     snoozedShelfExpanded,
     workingShelfEnabled,
     workingShelfExpanded,
@@ -714,16 +715,8 @@ export function HomeScreen(props: HomeScreenProps) {
           />
         );
       }
-      if (item.type === "v2-settled-shelf") {
-        return (
-          <ThreadListV2SettledShelfHeader
-            count={item.count}
-            disabled={item.disabled}
-            expanded={item.expanded}
-            onToggle={toggleSettledShelf}
-          />
-        );
-      }
+      // Finished threads continue the list without a "Settled" header.
+      if (item.type === "v2-settled-shelf") return null;
       const thread = item.item.thread;
       return (
         <ThreadListV2Row
@@ -765,7 +758,9 @@ export function HomeScreen(props: HomeScreenProps) {
           onRenameThread={handleRenameThread}
           onRegenerateThreadTitle={handleRegenerateThreadTitle}
           titleRegenerationSupported={titleRegenerationEnvironmentIds.has(thread.environmentId)}
-          settlementSupported={settlementEnvironmentIds.has(thread.environmentId)}
+          // No settling in the one feed: finished threads are plain rows and
+          // Archive is the way out.
+          settlementSupported={false}
           onSettleThread={handleSettleThread}
           snoozeSupported={snoozeEnvironmentIds.has(thread.environmentId)}
           pinningSupported={pinningEnvironmentIds.has(thread.environmentId)}

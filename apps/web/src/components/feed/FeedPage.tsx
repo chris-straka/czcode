@@ -4,11 +4,7 @@ import {
   VERDICT_BUTTONS,
 } from "@cz/client-runtime/decisions/draft";
 import { filterChips } from "@cz/client-runtime/decisions/feed";
-import {
-  buildOneFeed,
-  feedFolderLabel,
-  machineMatches,
-} from "@cz/client-runtime/decisions/oneFeed";
+import { buildOneFeed, feedFolderLabel } from "@cz/client-runtime/decisions/oneFeed";
 import type { EnvironmentThreadShell } from "@cz/client-runtime/state/models";
 import type { DecisionAnswerInput, DecisionMediaRef, DecisionProjectBlurb } from "@cz/contracts";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -66,6 +62,8 @@ function ageLabel(createdAt: number, now: number): string {
 
 /** How many thread digests (result excerpt, folder) the feed reads at once. */
 const DIGEST_PAGE = 60;
+/** Thread rows shown at first and per "Show more"; the list can run to hundreds. */
+const ROW_PAGE = 40;
 
 /**
  * The one feed (layout A): a slim top bar, then one column. Threads and
@@ -90,7 +88,7 @@ export function FeedPage() {
   const setProjects = useFeedFilterStore((state) => state.setProjects);
   const setKinds = useFeedFilterStore((state) => state.setKinds);
   const [tab, setTab] = useState<"open" | "answered">("open");
-  const [showSettled, setShowSettled] = useState(false);
+  const [rowLimit, setRowLimit] = useState(ROW_PAGE);
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
   });
@@ -153,39 +151,10 @@ export function FeedPage() {
   );
   const needsYou = cards.filter((card) => card.needsYou);
   const rest = cards.filter((card) => !card.needsYou);
-  const settled = useMemo(
-    () =>
-      showSettled
-        ? threads
-            .filter(
-              (thread) =>
-                thread.settledAt !== null &&
-                thread.archivedAt === null &&
-                thread.deletedAt === null &&
-                thread.lineage.relationshipToParent !== "subagent" &&
-                machineMatches(filtered.filter.machine, thread.environmentId),
-            )
-            .toSorted((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-            .slice(0, 50)
-        : [],
-    [showSettled, threads, filtered.filter.machine],
-  );
-  const settledCount = useMemo(
-    () =>
-      threads.filter(
-        (thread) =>
-          thread.settledAt !== null &&
-          thread.archivedAt === null &&
-          thread.deletedAt === null &&
-          thread.lineage.relationshipToParent !== "subagent" &&
-          machineMatches(filtered.filter.machine, thread.environmentId),
-      ).length,
-    [threads, filtered.filter.machine],
-  );
-  const shownThreads = [
-    ...cards.flatMap((card) => (card.kind === "thread" ? [card.thread] : [])),
-    ...settled,
-  ].slice(0, DIGEST_PAGE);
+  const rows = rest.slice(0, rowLimit);
+  const shownThreads = [...needsYou, ...rows]
+    .flatMap((card) => (card.kind === "thread" ? [card.thread] : []))
+    .slice(0, DIGEST_PAGE);
   const digests = useThreadDigests(shownThreads);
 
   // Decisions in feed order, for Review all and the modal's position.
@@ -394,7 +363,7 @@ export function FeedPage() {
                     Threads
                   </h2>
                   <div className="overflow-hidden rounded-lg border border-border bg-card">
-                    {rest.flatMap((card) =>
+                    {rows.flatMap((card) =>
                       card.kind === "thread"
                         ? [
                             <FeedThreadRow
@@ -409,27 +378,15 @@ export function FeedPage() {
                   </div>
                 </>
               ) : null}
-              {settledCount > 0 ? (
+              {rest.length > rowLimit ? (
                 <Button
                   size="sm"
                   variant="ghost"
                   className="w-full justify-start"
-                  onClick={() => setShowSettled((value) => !value)}
+                  onClick={() => setRowLimit((limit) => limit + ROW_PAGE)}
                 >
-                  {showSettled ? "Hide settled" : `Settled (${settledCount})`}
+                  Show {Math.min(ROW_PAGE, rest.length - rowLimit)} more
                 </Button>
-              ) : null}
-              {settled.length > 0 ? (
-                <div className="overflow-hidden rounded-lg border border-border bg-card">
-                  {settled.map((thread) => (
-                    <FeedThreadRow
-                      key={`${thread.environmentId}:${thread.id}`}
-                      thread={thread}
-                      {...threadPlacement(thread)}
-                      status={feedThreadStatus(thread, false)}
-                    />
-                  ))}
-                </div>
               ) : null}
             </>
           )}

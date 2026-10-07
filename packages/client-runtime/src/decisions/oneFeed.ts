@@ -78,8 +78,8 @@ const threadKey = (environmentId: string, threadId: string) => `${environmentId}
 /**
  * Builds the feed: needs-you cards first (decision order, then threads
  * waiting on approvals or input, newest first), then the rest newest first.
- * Settled, archived, deleted, and subagent threads stay out; a settled
- * thread with an open decision comes back, since it needs the owner.
+ * Archived, deleted, and subagent threads stay out. Settling isn't shown:
+ * a finished thread is simply a row, and Archive is the way out.
  */
 export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>(input: {
   readonly threads: ReadonlyArray<T>;
@@ -142,7 +142,6 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
   for (const [key, thread] of threadsByKey) {
     const threadDecisions = asked.get(key) ?? [];
     const waiting = thread.hasPendingApprovals || thread.hasPendingUserInput;
-    if (threadDecisions.length === 0 && thread.settledAt !== null) continue;
     if ((filter.projects?.size || filter.kinds?.size) && threadDecisions.length === 0) continue;
     const card = {
       kind: "thread",

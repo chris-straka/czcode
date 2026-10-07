@@ -65,17 +65,16 @@ describe("buildOneFeed", () => {
     expect(cards[0]).toMatchObject({ kind: "thread", needsYou: true });
   });
 
-  it("brings back a settled thread only while it has an open decision, and hides subagents", () => {
+  it("shows settled threads as ordinary rows and hides subagents", () => {
     const cards = buildOneFeed({
       threads: [
         thread("settled", { settledAt: "2026-10-07T10:00:00Z" }),
-        thread("settled-asking", { settledAt: "2026-10-07T10:00:00Z" }),
         thread("child", { lineage: { relationshipToParent: "subagent" } }),
       ],
-      decisions: [decision("d1", { thread: "settled-asking" })],
+      decisions: [],
       filter: all,
     });
-    expect(cards.map((card) => card.key)).toEqual([`thread\u0000${here}\u0000settled-asking`]);
+    expect(cards).toEqual([expect.objectContaining({ kind: "thread", needsYou: false })]);
   });
 
   it("follows the machine filter, and the badge counts what the filter shows", () => {
