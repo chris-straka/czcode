@@ -2,7 +2,8 @@
 # Everything an agent host needs to build the factory's projects, roughly
 # matching the Mac (`z`): Rust, Go, Java/Kotlin, Android SDK + NDK, C/C++,
 # Python, Node/bun, .NET, Docker, Kubernetes tools, Bevy's system libraries,
-# Blender, media tools, and an NVIDIA driver when the GPU is recent enough.
+# Blender, media tools, an NVIDIA driver when the GPU is recent enough, and
+# an Android emulator for agents (android-emulator.sh).
 # linux.sh runs this for you; run it alone to add tools to an existing host:
 #
 #   bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh
@@ -220,6 +221,12 @@ if want android && [ "$arch" = amd64 ]; then
   # Google's Android CLI: `android init` installs its skill for Claude, Codex and OpenCode.
   android_cli="$ANDROID_HOME/cmdline-tools/latest/bin/android"
   [ ! -x "$android_cli" ] || "$android_cli" init > /dev/null
+  # The emulator agents test on (android-emulator.sh): GPU-backed on hosts
+  # tagged `emulator` in hosts.txt, software-rendered elsewhere. Made once.
+  if [ ! -f "$HOME/.android/avd/cz.avd/config.ini" ]; then
+    bash "$(dirname "$0")/android-emulator.sh" setup ||
+      echo "Emulator not set up yet; after logging in again, run android-emulator.sh setup."
+  fi
 fi
 
 step "Environment for shells and the cz service"
