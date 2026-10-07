@@ -22,7 +22,7 @@ const lineColor = (line: string) =>
             ? { bold: true, color: "yellow" }
             : {};
 
-/** Everything the thread changed, from the host (works for threads on any machine). */
+/** What the thread changed, one turn at a time or all together, from the host (works for threads on any machine). */
 export function DiffScreen(props: {
   readonly atoms: TuiAtoms;
   readonly environmentId: EnvironmentId;
@@ -31,14 +31,27 @@ export function DiffScreen(props: {
   readonly active: boolean;
   readonly onBack: () => void;
 }) {
+  // Opens on the latest turn, like the desktop's diff panel; `a` shows the whole thread.
+  const [turn, setTurn] = useState(props.toTurnCount);
+  const [whole, setWhole] = useState(false);
   const result = useAtomValue(
-    props.atoms.orchestration.fullThreadDiff({
-      environmentId: props.environmentId,
-      input: { threadId: props.threadId, toTurnCount: props.toTurnCount },
-    }),
+    whole
+      ? props.atoms.orchestration.fullThreadDiff({
+          environmentId: props.environmentId,
+          input: { threadId: props.threadId, toTurnCount: props.toTurnCount },
+        })
+      : props.atoms.orchestration.turnDiff({
+          environmentId: props.environmentId,
+          input: { threadId: props.threadId, fromTurnCount: turn - 1, toTurnCount: turn },
+        }),
   );
   const { rows: height, columns } = useViewport();
   const [top, setTop] = useState(0);
+  const showTurn = (next: number) => {
+    setWhole(false);
+    setTurn(Math.max(1, Math.min(props.toTurnCount, next)));
+    setTop(0);
+  };
   const diff = Option.getOrNull(AsyncResult.value(result))?.diff ?? null;
   const lines = useMemo(() => (diff ?? "").split("\n"), [diff]);
   const visible = Math.max(3, height - 3);
@@ -47,6 +60,12 @@ export function DiffScreen(props: {
   useKeys(
     (input, key) => {
       if (key.escape || input === "d") return props.onBack();
+      if (input === "h" || key.leftArrow) return showTurn(turn - 1);
+      if (input === "l" || key.rightArrow) return showTurn(turn + 1);
+      if (input === "a") {
+        setWhole(!whole);
+        return setTop(0);
+      }
       if (input === "j" || key.downArrow) setTop(Math.min(maxTop, top + 1));
       else if (input === "k" || key.upArrow) setTop(Math.max(0, top - 1));
       else if (key.pageDown || (key.ctrl && input === "f") || input === " ")
@@ -74,7 +93,10 @@ export function DiffScreen(props: {
       result._tag === "Failure" ? "Couldn't load the diff." : "Loading diff…",
     );
   }
-  if (diff.trim() === "") return h(Text, { dimColor: true }, "No changes. (esc back)");
+  const scopeLabel = whole ? "all turns" : `turn ${turn}/${props.toTurnCount}`;
+  const keys = `h/l turn · a ${whole ? "one turn" : "all turns"}`;
+  if (diff.trim() === "")
+    return h(Text, { dimColor: true }, `No changes in ${scopeLabel}. ${keys} · esc back`);
   return h(
     Box,
     { flexDirection: "column" },
@@ -94,7 +116,7 @@ export function DiffScreen(props: {
     h(
       Text,
       { dimColor: true },
-      `${top + 1}-${Math.min(lines.length, top + visible)}/${lines.length} · ]/[ file · space/pgdn · esc back`,
+      `${scopeLabel} · ${top + 1}-${Math.min(lines.length, top + visible)}/${lines.length} · ]/[ file · ${keys} · esc back`,
     ),
   );
 }
