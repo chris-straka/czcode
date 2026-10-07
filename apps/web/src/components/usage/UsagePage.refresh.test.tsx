@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: (atom: unknown) =>
     atom === "keybindings" ? DEFAULT_RESOLVED_KEYBINDINGS : state.presentations,
+  // The reset queue section refreshes its list; these tests don't exercise it.
+  useAtomRefresh: () => () => {},
 }));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
