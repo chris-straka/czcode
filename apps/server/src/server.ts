@@ -87,6 +87,7 @@ import * as HostWakeService from "./hostWake/HostWakeService.ts";
 import { hostWakeHttpApiLayer, hostWakeInfoRouteLayer } from "./hostWake/http.ts";
 import * as MobileReleaseService from "./mobileRelease/MobileReleaseService.ts";
 import { decisionMediaRouteLayer, decisionsHttpApiLayer } from "./decisions/http.ts";
+import * as ProjectBlurbService from "./decisions/ProjectBlurbService.ts";
 import { hasCloudPublicConfig } from "./cloud/publicConfig.ts";
 import * as ServerSettings from "./serverSettings.ts";
 import * as ProjectEnrichmentService from "./project/ProjectEnrichmentService.ts";
@@ -688,7 +689,7 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(OrchestrationHttp.layer),
       Layer.provide(PullRequestHttp.layer),
       Layer.provide(ProjectHttp.layer),
-      Layer.provide(decisionsHttpApiLayer),
+      Layer.provide(decisionsHttpApiLayer.pipe(Layer.provide(ProjectBlurbService.layer))),
       Layer.provide(queueHttpApiLayer),
       Layer.provide(mobileReleaseHttpApiLayer),
       Layer.provide(hostWakeHttpApiLayer),

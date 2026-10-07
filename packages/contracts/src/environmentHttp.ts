@@ -67,6 +67,9 @@ import {
   DecisionMediaRef,
   DecisionMediaUploadQuery,
   DecisionNotFoundError,
+  DecisionProjectBlurb,
+  DecisionProjectBlurbInput,
+  DecisionProjectBlurbList,
   DecisionStorageError,
   DecisionSubmitInput,
   DecisionWaitQuery,
@@ -784,6 +787,21 @@ class EnvironmentDecisionsHttpApi extends HttpApiGroup.make("decisions")
       query: DecisionListQuery,
       success: DecisionListResult,
       error: DecisionReadErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.get("projects", "/api/decisions/projects", {
+      headers: OptionalBearerHeaders,
+      success: DecisionProjectBlurbList,
+      error: DecisionReadErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("describeProject", "/api/decisions/projects", {
+      headers: OptionalBearerHeaders,
+      payload: DecisionProjectBlurbInput,
+      success: DecisionProjectBlurb,
+      error: DecisionWriteErrors,
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
