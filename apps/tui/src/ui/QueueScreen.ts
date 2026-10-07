@@ -1,11 +1,11 @@
-import { useAtomValue } from "@effect/atom-react";
+import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import type { EnvironmentId, QueuedRun } from "@cz/contracts";
 import { formatResetsIn, providersWithLimits, remainingPercent } from "@cz/shared/usageLimits";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { Box, Text } from "ink";
-import { createElement as h, useMemo, useState, type ReactNode } from "react";
+import { createElement as h, useContext, useMemo, useState, type ReactNode } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useCommand } from "./command.ts";
@@ -68,15 +68,25 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
   const cancel = useCommand(atoms.queue.cancel);
   const runNow = useCommand(atoms.queue.runNow);
   const selected = rows[Math.min(cursor, Math.max(0, rows.length - 1))];
+  const registry = useContext(RegistryContext);
+  const refresh = (environmentId: EnvironmentId) =>
+    registry.refresh(atoms.queue.list({ environmentId, input: null }));
 
   useKeys(
     (input, key) => {
       if (key.downArrow || input === "j") setCursor(Math.min(rows.length - 1, cursor + 1));
       else if (key.upArrow || input === "k") setCursor(Math.max(0, cursor - 1));
       else if (selected?.run.status === "queued" && input === "r") {
-        void runNow({ environmentId: selected.environmentId, input: { id: selected.run.id } });
-      } else if (selected?.run.status === "queued" && input === "x") {
-        void cancel({ environmentId: selected.environmentId, input: { id: selected.run.id } });
+        const { environmentId } = selected;
+        void runNow({ environmentId, input: { id: selected.run.id } }).then(() =>
+          refresh(environmentId),
+        );
+      } else if (selected && input === "x") {
+        // Cancels a waiting run; dismisses one that failed to start.
+        const { environmentId } = selected;
+        void cancel({ environmentId, input: { id: selected.run.id } }).then(() =>
+          refresh(environmentId),
+        );
       }
     },
     { isActive: props.active },
@@ -142,6 +152,12 @@ export function QueueScreen(props: { readonly atoms: TuiAtoms; readonly active: 
             ),
           ),
         ),
-    rows.length > 0 ? h(Text, { dimColor: true }, "r run now · x cancel") : null,
+    selected
+      ? h(
+          Text,
+          { dimColor: true },
+          selected.run.status === "failed" ? "x dismiss" : "r run now · x cancel",
+        )
+      : null,
   );
 }

@@ -37,7 +37,14 @@ const TestLayer = ResetQueueService.serviceLayer.pipe(
         getProviders: Effect.sync(() => [
           {
             instanceId,
+            driver: "claude",
+            enabled: true,
             usageLimits: { checkedAt: at(NIGHT), windows },
+          } as unknown as ServerProvider,
+          {
+            instanceId: ProviderInstanceId.make("codexWork"),
+            driver: "codex",
+            enabled: true,
           } as unknown as ServerProvider,
         ]),
       }),
@@ -164,6 +171,32 @@ it.layer(TestLayer)("ResetQueueService", (it) => {
 
       const missing = yield* queue.cancel("nope").pipe(Effect.flip);
       assert.equal(missing._tag, "QueuedRunNotFoundError");
+
+      // A failed run is dismissed with cancel and leaves the queue for good.
+      const dismissed = yield* queue.cancel(unknown.id);
+      assert.equal(dismissed.status, "cancelled");
+      assert.equal(yield* queue.startDue, 0);
+    }),
+  );
+
+  it.effect("takes a driver name for its instance and refuses a provider the host lacks", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(NIGHT);
+      windows = [];
+      const queue = yield* ResetQueueService.ResetQueueService;
+
+      const byDriver = yield* queue.enqueue(
+        task("by-driver", { modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" } }),
+      );
+      assert.equal(byDriver.modelSelection.instanceId, "codexWork");
+
+      const unknown = yield* queue
+        .enqueue(
+          task("nowhere", { modelSelection: { instanceId: ProviderInstanceId.make("grok"), model: "grok-5" } }),
+        )
+        .pipe(Effect.flip);
+      assert.equal(unknown._tag, "QueuedRunError");
+      assert.include(unknown.message, "claude, codexWork");
     }),
   );
 
