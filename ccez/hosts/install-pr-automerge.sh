@@ -15,7 +15,7 @@ Description=Merge the owner's green pull requests across their repos (ccez/hosts
 [Service]
 Type=oneshot
 Environment=PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=$here/pr-automerge.sh
+ExecStart=/usr/bin/env bash $here/pr-automerge.sh
 UNIT
 cat > "$HOME/.config/systemd/user/pr-automerge.timer" << 'UNIT'
 [Unit]
