@@ -41,6 +41,7 @@ if [ "${SKIP_APT:-0}" != 1 ]; then
     build-essential pkg-config git curl wget ca-certificates gnupg clang lld
     mold llvm lldb gdb valgrind libclang-dev cmake ninja-build ccache nasm
     sccache mingw-w64 libssl-dev libsqlite3-dev libpq-dev zlib1g-dev
+    libsecret-1-dev # keyring access (czcode secret-store tests)
     protobuf-compiler protobuf-compiler-grpc libgrpc++-dev qtbase5-dev
     # Bevy and headless rendering (Vulkan on the CPU via lavapipe)
     libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev libx11-dev

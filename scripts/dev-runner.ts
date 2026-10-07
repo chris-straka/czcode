@@ -329,6 +329,14 @@ export function createDevRunnerEnv({
     // (serviceLauncherClient.ts resolveStartup).
     delete output.CZ_SERVICE_LAUNCHER_CONTEXT;
     delete output.CZ_BOOT_SERVICE_UNIT;
+    // Host-role settings from the agent host's service unit (ccez/hosts/linux.sh,
+    // mac.sh) leak the same way. Inherited, a dev server took over the host's
+    // Tailscale Serve route (every paired client then reached the dev server
+    // instead of the real one) and would put the whole host to sleep once its
+    // own empty state looked idle. `--share` maps its own tailnet port.
+    delete output.CZ_TAILSCALE_SERVE;
+    delete output.CZ_TAILSCALE_SERVE_PORT;
+    delete output.CZ_SLEEP_WHEN_IDLE_MINUTES;
 
     if (!isDesktopMode) {
       output.CZ_PORT = String(serverPort);

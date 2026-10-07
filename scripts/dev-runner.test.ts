@@ -263,13 +263,16 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
       }),
     );
 
-    it.effect("strips inherited service-launcher context", () =>
+    it.effect("strips inherited service-launcher and host-role settings", () =>
       Effect.gen(function* () {
         const env = yield* createDevRunnerEnv({
           mode: "dev",
           baseEnv: {
             CZ_SERVICE_LAUNCHER_CONTEXT: '{"childVersion":"9.9.9"}',
             CZ_BOOT_SERVICE_UNIT: "czcode.service",
+            CZ_TAILSCALE_SERVE: "1",
+            CZ_TAILSCALE_SERVE_PORT: "443",
+            CZ_SLEEP_WHEN_IDLE_MINUTES: "30",
           },
           serverOffset: 0,
           webOffset: 0,
@@ -284,6 +287,9 @@ it.layer(NodeServices.layer)("dev-runner", (it) => {
 
         assert.equal(env.CZ_SERVICE_LAUNCHER_CONTEXT, undefined);
         assert.equal(env.CZ_BOOT_SERVICE_UNIT, undefined);
+        assert.equal(env.CZ_TAILSCALE_SERVE, undefined);
+        assert.equal(env.CZ_TAILSCALE_SERVE_PORT, undefined);
+        assert.equal(env.CZ_SLEEP_WHEN_IDLE_MINUTES, undefined);
       }),
     );
 
