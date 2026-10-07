@@ -4,6 +4,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildOneFeed,
   feedFolderLabel,
+  waitingOnOtherDevice,
   oneFeedBadgeCount,
   shortMachineLabel,
   shortModelLabel,
@@ -104,6 +105,22 @@ describe("buildOneFeed", () => {
     });
     expect(cards.map((card) => card.key)).toEqual([`thread\u0000${here}\u0000asking`]);
     expect(oneFeedBadgeCount(cards)).toBe(1);
+  });
+});
+
+describe("device targeting", () => {
+  it("keeps phone playtests off the desktop and counts them for one quiet line", () => {
+    const decisions = [
+      decision("play", { kind: "playtest", target_device: "phone" }),
+      decision("pick"),
+    ];
+    const filter = { ...all, device: "desktop" } as const;
+    const cards = buildOneFeed({ threads: [], decisions, filter });
+    expect(cards.map((card) => card.key)).toEqual([`decision\u0000${here}\u0000pick`]);
+    expect(waitingOnOtherDevice(decisions, filter)).toBe(1);
+    expect(
+      buildOneFeed({ threads: [], decisions, filter: { ...all, device: "phone" } }),
+    ).toHaveLength(2);
   });
 });
 
