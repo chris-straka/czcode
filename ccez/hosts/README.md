@@ -1,5 +1,8 @@
 # Set up a computer as a cz agent host
 
+Every machine, its role, and an agent's runbook for setting up a new one:
+[FLEET.md](FLEET.md).
+
 How upstream's author runs his own fleet, and how this setup compares:
 [../docs/upstream-fleet.md](../docs/upstream-fleet.md). Read it before changing
 how hosts work.

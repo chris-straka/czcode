@@ -65,11 +65,11 @@ owner's one Claude account and run agents at the same time.
 |                      | Theo                         | Us (`ccez/hosts`)                                                                                              |
 | -------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Setting up a machine | Fleet doc + an agent         | `linux.sh` / `mac.sh` scripts (an agent can run them)                                                          |
-| Machine inventory    | In the fleet repo            | `~/SWE/FACTORY.md` §5; no agent-facing fleet doc yet                                                           |
+| Machine inventory    | In the fleet repo            | [`ccez/hosts/FLEET.md`](../hosts/FLEET.md): machines and an agent runbook for a new box                        |
 | Networking           | Tailscale (+ T3 Connect)     | Tailscale only (Connect removed)                                                                               |
-| Projects             | Repos, grouped by git origin | Often queued against `~/SWE`; register real repos instead                                                      |
+| Projects             | Repos, grouped by git origin | Every repo in `repos.txt` is a cz project on every host (the sync job)                                         |
 | Parallel work        | Linux boxes; Macs 1-2 tasks  | Linux hosts; the Mac stays free by day                                                                         |
-| Agent filesystem     | Separate XFS + VDO drive     | OS drive, ext4                                                                                                 |
+| Agent filesystem     | Separate XFS + VDO drive     | Planned on art's `/data` (FLEET.md); OS drive, ext4 today                                                      |
 | Extra we need        |                              | Sleep/Wake-on-LAN, per-agent memory scopes, repo sync, health checks, backups: our machines are mixed home PCs |
 
 Open follow-ups live with the hosts work (`ccez/hosts/README.md`).
