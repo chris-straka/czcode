@@ -21,6 +21,7 @@ import {
   DecisionNotFoundError,
   DecisionStorageError,
   type DecisionSubmitInput,
+  type DecisionTargetDevice,
 } from "@cz/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -219,6 +220,16 @@ function defaultAnswer(item: DecisionItem, now: number): DecisionAnswer {
   };
 }
 
+/** A playtest that ships an app build is played on the phone; the rest fit anywhere. */
+export function defaultTargetDevice(
+  input: Pick<DecisionSubmitInput, "kind" | "media">,
+): DecisionTargetDevice {
+  const hasBuild = (input.media ?? []).some(
+    (ref) => ref.type === "apk" || /\.(apk|aab|ipa)$/i.test(ref.name),
+  );
+  return input.kind === "playtest" && hasBuild ? "phone" : "any";
+}
+
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const fs = yield* FileSystem.FileSystem;
@@ -348,6 +359,7 @@ const make = Effect.gen(function* () {
         expires_at: input.expires_at ?? null,
         cost_note: input.cost_note ?? null,
         resume: input.resume ?? null,
+        target_device: input.target_device ?? defaultTargetDevice(input),
         status: "open",
         created_at: now,
         updated_at: now,
