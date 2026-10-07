@@ -63,14 +63,17 @@ if [ "${SKIP_APT:-0}" != 1 ]; then
     # Disk health (SMART) and hardware virtualization (Android emulator, VMs)
     smartmontools nvme-cli cpu-checker qemu-system-x86
   )
-  want docker && pkgs+=(docker.io docker-compose-v2 docker-buildx)
+  want docker && pkgs+=(docker.io docker-compose-v2 docker-buildx uidmap rootlesskit slirp4netns passt)
   want dotnet && pkgs+=(dotnet-sdk-10.0)
   sudo apt-get update -q
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq "${pkgs[@]}"
   if want docker; then
-    # Agents run Docker without sudo (takes effect at the next login).
-    id -nG "$USER" | grep -qw docker || sudo usermod -aG docker "$USER"
-    $in_wsl || sudo systemctl enable --now docker > /dev/null 2>&1 || true
+    # Rootless Docker (set up below): each user runs their own daemon, so
+    # agents with Docker access don't get root. Turn the system daemon off and
+    # leave the docker group, which is root-equivalent.
+    sudo systemctl disable --now docker.service docker.socket > /dev/null 2>&1 || true
+    ! id -nG "$USER" | grep -qw docker || sudo gpasswd -d "$USER" docker > /dev/null
+    sudo rm -f /etc/systemd/system/docker.socket.d/agent-acl.conf
   fi
   # /dev/kvm for the Android emulator and VMs (takes effect at the next login).
   if [ -e /dev/kvm ] && ! id -nG "$USER" | grep -qw kvm; then sudo usermod -aG kvm "$USER"; fi
@@ -90,6 +93,21 @@ fi
 # Ubuntu names fd "fdfind".
 have fd || ! have fdfind || ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
 ! have git-lfs || git lfs install --skip-repo > /dev/null
+
+if want docker && ! $in_wsl; then
+  step "Rootless Docker"
+  contrib=/usr/share/docker.io/contrib
+  for tool in dockerd-rootless.sh dockerd-rootless-setuptool.sh; do
+    [ -x "$contrib/$tool" ] && ln -sf "$contrib/$tool" "$HOME/.local/bin/$tool"
+  done
+  export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  if ! systemctl --user is-active -q docker 2> /dev/null; then
+    # --force: a system daemon still running (turned off above on a full run) is fine.
+    dockerd-rootless-setuptool.sh install --force > /dev/null
+  fi
+  systemctl --user enable -q docker 2> /dev/null || true
+  DOCKER_HOST="unix://$XDG_RUNTIME_DIR/docker.sock" docker info --format "  rootless docker: {{.ServerVersion}} ({{.SecurityOptions}})" 2> /dev/null || echo "  rootless docker did not start; check: systemctl --user status docker"
+fi
 
 step "Rust"
 have rustup || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
@@ -213,6 +231,7 @@ export JAVA_HOME="\${JAVA_HOME:-$java_home}"
 export ANDROID_HOME="\${ANDROID_HOME:-$ANDROID_HOME}"
 export ANDROID_NDK_HOME="\${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/$default_ndk}"
 export BUN_INSTALL="\${BUN_INSTALL:-$HOME/.bun}"
+export DOCKER_HOST="\${DOCKER_HOST:-unix:///run/user/$(id -u)/docker.sock}"
 [ -n "\${CZ_HOST_ENV:-}" ] || { export CZ_HOST_ENV=1; export PATH="$tool_path:\$PATH"; }
 ENV
 # systemd reads this one (no variable expansion there), via linux.sh's unit.
@@ -221,6 +240,7 @@ JAVA_HOME=$java_home
 ANDROID_HOME=$ANDROID_HOME
 ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$default_ndk
 BUN_INSTALL=$HOME/.bun
+DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 CARGO_BUILD_JOBS=2
 PATH=$tool_path:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV

@@ -81,6 +81,13 @@ fs.inotify.max_user_instances = 1024
 CONF
 sysctl -q --system
 
+step "Resource controls for rootless Docker"
+# Let each user's systemd manage CPU, memory, I/O and process limits, so rootless
+# Docker containers (and per-agent scopes) can set them.
+mkdir -p /etc/systemd/system/user@.service.d
+printf '[Service]\nDelegate=cpu cpuset io memory pids\n' > /etc/systemd/system/user@.service.d/delegate.conf
+systemctl daemon-reload
+
 step "Log size caps"
 mkdir -p /etc/systemd/journald.conf.d
 printf '[Journal]\nSystemMaxUse=1G\n' > /etc/systemd/journald.conf.d/cz-host.conf
