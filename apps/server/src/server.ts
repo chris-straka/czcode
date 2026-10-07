@@ -81,6 +81,7 @@ import * as AgentScopesService from "./agentScopes/AgentScopesService.ts";
 import * as HostSleepService from "./hostSleep/HostSleepService.ts";
 import { queueHttpApiLayer } from "./resetQueue/http.ts";
 import { threadsHttpApiLayer } from "./threadControl/http.ts";
+import * as ThreadDigestService from "./threadControl/ThreadDigestService.ts";
 import { mobileReleaseApkRouteLayer, mobileReleaseHttpApiLayer } from "./mobileRelease/http.ts";
 import * as HostWakeService from "./hostWake/HostWakeService.ts";
 import { hostWakeHttpApiLayer, hostWakeInfoRouteLayer } from "./hostWake/http.ts";
@@ -691,7 +692,12 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(queueHttpApiLayer),
       Layer.provide(mobileReleaseHttpApiLayer),
       Layer.provide(hostWakeHttpApiLayer),
-      Layer.provide(threadsHttpApiLayer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+      Layer.provide(
+        threadsHttpApiLayer.pipe(
+          Layer.provide(ThreadDigestService.layer),
+          Layer.provide(ProjectionStoreV2.layer),
+        ),
+      ),
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
       Layer.provide(WebhookRoute.layer.pipe(Layer.provide(RelayDeliveryProof.layer))),
       Layer.provide(AuthHttp.layerAuthenticatedAuth),

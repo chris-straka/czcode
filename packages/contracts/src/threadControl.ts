@@ -40,3 +40,31 @@ export class ThreadControlNotFoundError extends Schema.TaggedError<ThreadControl
   { message: Schema.String },
   { httpApiStatus: 404 },
 ) {}
+
+/** At most this many threads per digest request; the feed asks for visible cards. */
+export const THREAD_DIGEST_MAX_THREADS = 100;
+
+export const ThreadDigestInput = Schema.Struct({
+  threadIds: Schema.Array(Schema.String).check(Schema.isMaxLength(THREAD_DIGEST_MAX_THREADS)),
+});
+export type ThreadDigestInput = typeof ThreadDigestInput.Type;
+
+/**
+ * What a feed card shows for a thread beyond its shell: the latest result
+ * and the folder it worked in. Kept out of shells, which stay free of
+ * message bodies so they hydrate and stream cheaply.
+ */
+export const ThreadDigest = Schema.Struct({
+  threadId: Schema.String,
+  /** The start of the latest finished agent message, as plain text. */
+  excerpt: Schema.NullOr(Schema.String),
+  /**
+   * The folder under the project root the thread worked in, like
+   * "games/hll", when that isn't the project itself.
+   */
+  workingSubpath: Schema.NullOr(Schema.String),
+});
+export type ThreadDigest = typeof ThreadDigest.Type;
+
+export const ThreadDigestResult = Schema.Struct({ digests: Schema.Array(ThreadDigest) });
+export type ThreadDigestResult = typeof ThreadDigestResult.Type;
