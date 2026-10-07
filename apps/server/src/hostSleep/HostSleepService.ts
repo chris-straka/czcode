@@ -4,11 +4,13 @@
  * sets CZ_SLEEP_WHEN_IDLE_MINUTES on wired Linux hosts, along with Wake-on-LAN
  * and the root helper `cz-host-sleep` this runs through sudo. Another cz
  * server on the LAN wakes it on demand (WakeService); its own RTC alarm wakes
- * it for the next queued run or scheduled task.
+ * it for the next queued run or scheduled task, and at the daily times in
+ * CZ_HOST_WAKE_TIMES, when the host's nightly jobs run.
  *
- * Busy means a turn running or about to start, a logged-in user who isn't
- * idle (Tailscale SSH included), or a CPU load from work cz doesn't track,
- * such as a training run left in the background.
+ * Busy means a turn running or about to start, a host job running (a
+ * `cz-job-*` user service), a logged-in user who isn't idle (Tailscale SSH
+ * included), or a CPU load from work cz doesn't track, such as a training
+ * run left in the background.
  *
  * @module HostSleepService
  */
@@ -31,7 +33,9 @@ import * as ResetQueueService from "../resetQueue/ResetQueueService.ts";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
 import {
   activeUserSessions,
+  nextDailyWakeAt,
   nextWakeAt,
+  runningHostJobs,
   shouldSleep,
   threadKeepsAwake,
   WAKE_LEAD_MS,
@@ -43,6 +47,7 @@ const BUSY_LOAD = 1;
 const HELPER = "/usr/local/sbin/cz-host-sleep";
 
 const idleMinutesConfig = Config.Int("CZ_SLEEP_WHEN_IDLE_MINUTES").pipe(Config.option);
+const wakeTimesConfig = Config.String("CZ_HOST_WAKE_TIMES").pipe(Config.option);
 
 /** The sleep log, one JSON line per sleep or wake, read by `cz sleep`. */
 export const sleepLogPath = (stateDir: string, path: Path.Path) =>
@@ -55,6 +60,11 @@ const run = Effect.gen(function* () {
   );
   if (idleMinutes <= 0 || process.platform !== "linux") return;
   const idleMs = idleMinutes * 60 * 1000;
+  const wakeTimes = Option.getOrElse(
+    yield* wakeTimesConfig.pipe(Effect.orElseSucceed(() => Option.none<string>())),
+    () => "",
+  );
+  const timeZone = DateTime.zoneMakeLocal();
 
   const config = yield* ServerConfig.ServerConfig;
   const fs = yield* FileSystem.FileSystem;
@@ -75,6 +85,18 @@ const run = Effect.gen(function* () {
     const shells = yield* projections.getShellSnapshot();
     if (shells.threads.some((thread) => threadKeepsAwake(thread, now))) return "agent work";
     if ((NodeOS.loadavg()[0] ?? 0) >= BUSY_LOAD) return "CPU load";
+    // No user manager (a container, say) means no host jobs either.
+    const jobs = yield* processes
+      .run({
+        command: "systemctl",
+        args: ["--user", "list-units", "--state=activating", "--plain", "--no-legend", "cz-job-*"],
+        timeout: "10 seconds",
+      })
+      .pipe(
+        Effect.map((result) => result.stdout),
+        Effect.orElseSucceed(() => ""),
+      );
+    if (runningHostJobs(jobs).length > 0) return "a host job";
     const sessions = yield* processes.run({
       command: "loginctl",
       args: ["list-sessions", "--no-legend"],
@@ -87,7 +109,12 @@ const run = Effect.gen(function* () {
   const wakeTime = Effect.gen(function* () {
     const queued = yield* queue.list;
     const tasks = yield* scheduledTasks.list();
-    return nextWakeAt({ queuedRuns: queued, scheduledTasks: tasks.tasks });
+    const now = yield* Clock.currentTimeMillis;
+    const times = [
+      nextWakeAt({ queuedRuns: queued, scheduledTasks: tasks.tasks }),
+      nextDailyWakeAt(wakeTimes, now, timeZone),
+    ].filter((time) => time !== null);
+    return times.length === 0 ? null : Math.min(...times);
   });
 
   let idleSince = yield* Clock.currentTimeMillis;
