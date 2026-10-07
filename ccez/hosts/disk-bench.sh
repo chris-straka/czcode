@@ -14,9 +14,14 @@ dir=${1:?usage: disk-bench.sh <folder on the drive to test>}
 work="$dir/cz-disk-bench.$$"
 # shellcheck disable=SC1091
 . "$HOME/.config/vite-plus/env"
+export PATH="$HOME/.cargo/bin:$PATH"
 mkdir -p "$work"
 trap 'rm -rf "$work"' EXIT
-seconds() { local start=$EPOCHREALTIME; "$@" > /dev/null 2>&1; echo "$EPOCHREALTIME - $start" | bc; }
+seconds() {
+  local start=$EPOCHREALTIME
+  "$@" > "$work/last.log" 2>&1 || { tail -5 "$work/last.log" >&2 && return 1; }
+  echo "$EPOCHREALTIME - $start" | bc
+}
 
 git clone -q --depth 1 "file://$HOME/SWE/czcode" "$work/czcode"
 cd "$work/czcode"
