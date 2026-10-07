@@ -16,6 +16,7 @@ const workspaceFiles = [
   "apps/server/package.json",
   "apps/desktop/package.json",
   "apps/web/package.json",
+  "apps/tui/package.json",
   "apps/mobile/package.json",
   "apps/mobile/modules/cz-markdown-text/package.json",
   "apps/mobile/modules/cz-review-diff/package.json",
