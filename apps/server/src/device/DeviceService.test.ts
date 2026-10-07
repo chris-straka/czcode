@@ -739,3 +739,60 @@ it.effect("failed manual installation leaves lifecycle state unchanged and can b
     expect(agentStarts).toEqual([]);
   }).pipe(Effect.scoped),
 );
+
+it.effect("hides the hub's simctl failure on hosts without iOS but keeps other errors", () =>
+  Effect.gen(function* () {
+    const ready: DeviceHost.DeviceHostReady = {
+      nodePath: process.execPath,
+      hub: { origin: "http://device.test" },
+      helpers: { serveSimAxSettings: null, serveSimCli: null },
+      run: () => Effect.succeed({ code: 0, stdout: "", stderr: "" }),
+    };
+    const host: DeviceHost.DeviceHost["Service"] = {
+      id: LOCAL_DEVICE_HOST_ID,
+      summary: Effect.succeed({
+        id: LOCAL_DEVICE_HOST_ID,
+        kind: "local",
+        label: "Mac without Xcode",
+        platforms: [
+          { platform: "ios", available: false, reason: "no simctl" },
+          { platform: "android", available: true },
+        ],
+        hubInstalled: true,
+        agentDeviceInstalled: false,
+      }),
+      platformAvailability: (platform) =>
+        Effect.succeed(
+          platform === "ios"
+            ? { platform, available: false, reason: "no simctl" }
+            : { platform, available: true },
+        ),
+      ensureReady: () => Effect.succeed(ready),
+      ensureAgentReady: () => Effect.die("Agent access is not used in this test"),
+      current: Effect.succeed(ready),
+      stopAgent: Effect.void,
+      stop: Effect.void,
+    };
+    const http = HttpClient.make((request) =>
+      Effect.sync(() =>
+        HttpClientResponse.fromWeb(
+          request,
+          Response.json({
+            emulators: [],
+            simulators: [],
+            errors: [
+              { message: "[apple-utils] Failed to run `xcrun simctl list devices --json`:" },
+              { message: "adb server version mismatch" },
+            ],
+          }),
+        ),
+      ),
+    );
+    const service = yield* DeviceService.makeWithHosts(new Map([[host.id, host]])).pipe(
+      Effect.provide(NodeCrypto.layer),
+      Effect.provideService(HttpClient.HttpClient, http),
+    );
+    yield* service.list;
+    expect((yield* service.state).hostStatusDetail).toBe("adb server version mismatch");
+  }).pipe(Effect.provide(ServerSettings.layerTest({ enableDeviceSupport: true })), Effect.scoped),
+);
