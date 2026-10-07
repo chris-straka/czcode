@@ -19,7 +19,7 @@ set -euo pipefail
 
 BLENDER_VERSION=5.2.1                         # same as the Mac
 NDK_VERSIONS="28.2.13676358 30.0.16138531"    # first one is the default (games/tools/build_android.sh)
-ANDROID_PACKAGES="platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2"
+ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2"
 JDK=21
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
@@ -189,6 +189,9 @@ if want android && [ "$arch" = amd64 ]; then
   for v in $NDK_VERSIONS; do ndk_pkgs+=("ndk;$v"); done
   # shellcheck disable=SC2086 # package list splits on spaces on purpose
   "$sdkm" --install $ANDROID_PACKAGES "${ndk_pkgs[@]}" > /dev/null
+  # Google's Android CLI: `android init` installs its skill for Claude, Codex and OpenCode.
+  android_cli="$ANDROID_HOME/cmdline-tools/latest/bin/android"
+  [ ! -x "$android_cli" ] || "$android_cli" init > /dev/null
 fi
 
 step "Environment for shells and the cz service"
