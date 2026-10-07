@@ -98,6 +98,52 @@ export function wakeHostFromUrl(url: string | null): string | null {
 }
 
 /**
+ * How a wake went: sent through one environment; never tried, because no
+ * other environment is connected to send it; or tried and refused by each
+ * (one isn't on the host's network, another failed outright).
+ */
+export type WakeAttempt<Id> =
+  | { readonly kind: "sent"; readonly through: Id }
+  | { readonly kind: "nothing-to-send-through" }
+  | {
+      readonly kind: "failed";
+      readonly attempts: ReadonlyArray<{
+        readonly through: Id;
+        /** off-network: that server doesn't know the host or isn't on its LAN. */
+        readonly reason: "off-network" | "error";
+        readonly message?: string;
+      }>;
+    };
+
+/** Asks each connected environment in turn to wake `host`, stopping at the first that sent it. */
+export async function attemptWake<Id>(input: {
+  readonly host: string;
+  readonly through: ReadonlyArray<Id>;
+  readonly wake: (environmentId: Id, host: string) => Promise<WakeHostResult | null>;
+}): Promise<WakeAttempt<Id>> {
+  if (input.through.length === 0) return { kind: "nothing-to-send-through" };
+  const attempts: Array<{
+    through: Id;
+    reason: "off-network" | "error";
+    message?: string;
+  }> = [];
+  for (const environmentId of input.through) {
+    try {
+      const result = await input.wake(environmentId, input.host);
+      if (result?.sent) return { kind: "sent", through: environmentId };
+      attempts.push({ through: environmentId, reason: result === null ? "error" : "off-network" });
+    } catch (error) {
+      attempts.push({
+        through: environmentId,
+        reason: "error",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return { kind: "failed", attempts };
+}
+
+/**
  * Asks each connected environment in turn to wake `host`, stopping at the
  * first that sent the packet. Returns that environment's id, or null.
  */
@@ -106,9 +152,6 @@ export async function wakeHostThroughAny<Id>(input: {
   readonly through: ReadonlyArray<Id>;
   readonly wake: (environmentId: Id, host: string) => Promise<WakeHostResult | null>;
 }): Promise<Id | null> {
-  for (const environmentId of input.through) {
-    const result = await input.wake(environmentId, input.host).catch(() => null);
-    if (result?.sent) return environmentId;
-  }
-  return null;
+  const attempt = await attemptWake(input);
+  return attempt.kind === "sent" ? attempt.through : null;
 }

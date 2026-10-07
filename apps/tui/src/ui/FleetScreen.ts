@@ -22,7 +22,7 @@ import {
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext, useCommand } from "./command.ts";
 import { useNow, useViewport } from "./hooks.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 import { useWakeHost } from "./useWakeHost.ts";
 
 /** How often host readings refresh while the tab is open (the server caches 5 s). */
@@ -147,12 +147,11 @@ export function FleetScreen(props: {
   const selected = Math.min(cursor, Math.max(0, rows.length - 1));
   const current = rows[selected];
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
-      if (key.downArrow || input === "j") return setCursor(Math.min(rows.length - 1, selected + 1));
-      if (key.upArrow || input === "k") return setCursor(Math.max(0, selected - 1));
-      if (input === "g") return setCursor(0);
-      if (input === "G") return setCursor(Math.max(0, rows.length - 1));
+      if (vim(input, key, { cursor: selected, count: rows.length, page: 10, onMove: setCursor }))
+        return;
       if (!current) return;
       if (key.return && current.kind === "agent") {
         return props.onOpen(current.machine.environmentId, current.agent.threadId);
@@ -168,8 +167,8 @@ export function FleetScreen(props: {
         const { machine } = current;
         if (machine.state === "awake") return setStatus(`${machine.label} is awake.`);
         setStatus(`Waking ${machine.label}…`);
-        void wakeHost(machine.environmentId).then((message) =>
-          setStatus(message ?? `${machine.label} has no address to wake by.`),
+        void wakeHost(machine.environmentId, { userInitiated: true }).then(
+          (message) => message && setStatus(message),
         );
       }
     },
