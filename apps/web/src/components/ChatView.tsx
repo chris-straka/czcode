@@ -212,7 +212,7 @@ import {
   buildPlanImplementationThreadTitle,
   buildPlanImplementationPrompt,
   resolvePlanFollowUpSubmission,
-} from "../proposedPlan";
+} from "@cz/client-runtime/proposed-plan";
 import {
   DEFAULT_INTERACTION_MODE,
   DEFAULT_THREAD_TERMINAL_ID,

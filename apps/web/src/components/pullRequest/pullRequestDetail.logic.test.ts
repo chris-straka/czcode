@@ -1,4 +1,4 @@
-import { resolvePlanFollowUpSubmission } from "../../proposedPlan";
+import { resolvePlanFollowUpSubmission } from "@cz/client-runtime/proposed-plan";
 import { serializeLegacyContextMessage } from "@cz/shared/composerContextLegacySend";
 import {
   ProjectId,

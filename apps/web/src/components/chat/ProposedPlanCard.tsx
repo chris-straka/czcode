@@ -11,7 +11,7 @@ import {
   normalizePlanMarkdownForExport,
   proposedPlanTitle,
   stripDisplayedPlanMarkdown,
-} from "../../proposedPlan";
+} from "@cz/client-runtime/proposed-plan";
 import ChatMarkdown from "../ChatMarkdown";
 import { EllipsisIcon } from "lucide-react";
 import { Button } from "../ui/button";

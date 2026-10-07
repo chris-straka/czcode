@@ -1082,7 +1082,7 @@ import {
   ShieldIcon,
   XIcon,
 } from "lucide-react";
-import { proposedPlanTitle } from "../../proposedPlan";
+import { proposedPlanTitle } from "@cz/client-runtime/proposed-plan";
 import { hasProviderSetup } from "./ProviderStatusBanner";
 import {
   applyProviderInstanceSettings,

@@ -35,6 +35,10 @@
       "types": "./src/pendingUserInput.ts",
       "default": "./src/pendingUserInput.ts"
     },
+    "./proposed-plan": {
+      "types": "./src/proposedPlan.ts",
+      "default": "./src/proposedPlan.ts"
+    },
     "./user-message": {
       "types": "./src/userMessage.ts",
       "default": "./src/userMessage.ts"
