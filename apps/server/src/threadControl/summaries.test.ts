@@ -28,12 +28,19 @@ describe("thread summaries", () => {
         thread("gone", { deletedAt: at("2026-10-06T00:00:00Z") }),
       ],
       [{ id: "p1" as never, title: "ResumeProjects" as never }],
+      0,
     );
     expect(rows.map((row) => row.threadId)).toEqual(["busy", "new", "old"]);
     expect(rows[0]).toMatchObject({
       running: true,
+      busy: true,
       projectTitle: "ResumeProjects",
       model: "claudeAgent/claude-opus-5-5",
     });
+  });
+
+  it("marks a finished turn with background tasks still going as busy", () => {
+    const [row] = threadSummaries([thread("bg", { pendingBackgroundTasks: [{}] as never })], [], 0);
+    expect(row).toMatchObject({ running: false, busy: true });
   });
 });

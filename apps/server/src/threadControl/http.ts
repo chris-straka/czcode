@@ -12,6 +12,7 @@ import {
   ThreadControlNotFoundError,
   ThreadId,
 } from "@cz/contracts";
+import * as Clock from "effect/Clock";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
@@ -45,7 +46,11 @@ export const threadsHttpApiLayer = HttpApiBuilder.group(
             const archived = yield* projections.getShellSnapshot({ location: "archive" });
             const snapshot = yield* projects.snapshot;
             return {
-              threads: threadSummaries([...active.threads, ...archived.threads], snapshot.projects),
+              threads: threadSummaries(
+                [...active.threads, ...archived.threads],
+                snapshot.projects,
+                yield* Clock.currentTimeMillis,
+              ),
             };
           }).pipe(Effect.catch((cause) => failEnvironmentInternal("internal_error", cause)));
         }),

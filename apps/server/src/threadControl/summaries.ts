@@ -6,10 +6,13 @@
 import type { OrchestrationV2ThreadShell, Project, ThreadControlSummary } from "@cz/contracts";
 import * as DateTime from "effect/DateTime";
 
+import { threadKeepsAwake } from "../hostSleep/idle.ts";
+
 /** Live threads, running first, then most recently updated. */
 export function threadSummaries(
   threads: ReadonlyArray<OrchestrationV2ThreadShell>,
   projects: ReadonlyArray<Pick<Project, "id" | "title">>,
+  now: number,
 ): Array<ThreadControlSummary> {
   const projectTitles = new Map(projects.map((project) => [project.id, project.title]));
   return threads
@@ -21,6 +24,7 @@ export function threadSummaries(
       title: thread.title,
       model: `${thread.modelSelection.instanceId}/${thread.modelSelection.model}`,
       running: thread.activeRunId !== null,
+      busy: threadKeepsAwake(thread, now),
       archived: thread.archivedAt !== null,
       updatedAt: DateTime.formatIso(thread.updatedAt),
     }))
