@@ -23,7 +23,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 import { HostResources, readCpu } from "./HostResources.ts";
 
-export const SAMPLE_INTERVAL_MS = 60_000;
+const SAMPLE_INTERVAL_MS = 60_000;
 /** The Usage page's longest range is 90 days. */
 export const RETENTION_MS = 91 * 24 * 60 * 60_000;
 
@@ -73,7 +73,7 @@ export interface HostLoadBucketRow {
 const clampFraction = (value: number) => Math.min(1, Math.max(0, value));
 
 /** Lays SQL bucket rows onto `count` slots and folds them into the range summary. */
-export function assembleHostLoad(
+function assembleHostLoad(
   rows: ReadonlyArray<HostLoadBucketRow>,
   count: number,
 ): { readonly summary: HostLoadStats | null; readonly buckets: Array<HostLoadStats | null> } {
