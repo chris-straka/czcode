@@ -1,7 +1,13 @@
-import { EnvironmentId, type ExecutionEnvironmentDescriptor } from "@cz/contracts";
-import { describe, expect, it } from "vite-plus/test";
+// @effect-diagnostics nodeBuiltinImport:off - the probe needs a real socket that stalls or refuses.
+import * as NodeHttp from "node:http";
+import type * as NodeNet from "node:net";
 
-import { decideServePortOwner } from "./tailscaleServeOwnership.ts";
+import { EnvironmentId, type ExecutionEnvironmentDescriptor } from "@cz/contracts";
+import { describe, expect, it } from "@effect/vitest";
+import * as Effect from "effect/Effect";
+import { FetchHttpClient } from "effect/http";
+
+import { decideServePortOwner, probeEnvironmentDescriptor } from "./tailscaleServeOwnership.ts";
 
 const HOST = EnvironmentId.make("host-env");
 const DEV = EnvironmentId.make("dev-env");
@@ -41,6 +47,12 @@ describe("decideServePortOwner", () => {
     ).toEqual({ _tag: "ours" });
   });
 
+  it("leaves a host too busy to answer the probe alone", () => {
+    expect(
+      decideServePortOwner({ ...dev, proxy: "http://127.0.0.1:3773", probe: { _tag: "busy" } }),
+    ).toEqual({ _tag: "occupied", proxy: "http://127.0.0.1:3773" });
+  });
+
   it("never overwrites a service that isn't cz", () => {
     expect(
       decideServePortOwner({
@@ -50,4 +62,47 @@ describe("decideServePortOwner", () => {
       }),
     ).toEqual({ _tag: "occupied", proxy: "http://127.0.0.1:8080" });
   });
+});
+
+describe("probeEnvironmentDescriptor", () => {
+  // A local server on a free port; `answer: false` accepts and never replies.
+  const listen = (answer: boolean) =>
+    Effect.acquireRelease(
+      Effect.promise(
+        () =>
+          new Promise<NodeHttp.Server>((resolve) => {
+            const server = NodeHttp.createServer((_request, response) => {
+              if (answer) response.end();
+            });
+            server.listen(0, "127.0.0.1", () => resolve(server));
+          }),
+      ),
+      (server) =>
+        Effect.sync(() => {
+          server.closeAllConnections();
+          server.close();
+        }),
+    ).pipe(Effect.map((server) => (server.address() as NodeNet.AddressInfo).port));
+
+  const probe = (port: number) =>
+    probeEnvironmentDescriptor(`http://127.0.0.1:${port}`).pipe(
+      Effect.provide(FetchHttpClient.layer),
+    );
+
+  it.live("calls a server that accepts but doesn't answer busy, not gone", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const port = yield* listen(false);
+        expect(yield* probe(port)).toEqual({ _tag: "busy" });
+      }),
+    ),
+  );
+
+  it.live("calls a refused connection unreachable", () =>
+    Effect.gen(function* () {
+      // Take a free port, then close it so nothing listens there.
+      const port = yield* Effect.scoped(listen(true));
+      expect(yield* probe(port)).toEqual({ _tag: "unreachable" });
+    }),
+  );
 });

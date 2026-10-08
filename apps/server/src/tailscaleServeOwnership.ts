@@ -21,14 +21,17 @@ const WELL_KNOWN_ENVIRONMENT_PATH = "/.well-known/cz/environment";
 const PROBE_TIMEOUT = Duration.millis(2_500);
 
 /**
- * Three outcomes, because they drive different decisions: a cz descriptor,
- * nothing answering (safe to point Serve here), or something answering that
- * is not a cz server (never overwrite its mapping).
+ * Four outcomes, because they drive different decisions: a cz descriptor,
+ * nothing answering (safe to point Serve here), something answering that is
+ * not a cz server, or no answer within the timeout (never overwrite either).
+ * A loaded host's server can stall for seconds; taking that for "gone" let a
+ * dev server repoint the host's route.
  */
 export type EnvironmentProbeResult =
   | { readonly _tag: "descriptor"; readonly descriptor: ExecutionEnvironmentDescriptor }
   | { readonly _tag: "unreachable" }
-  | { readonly _tag: "not-a-cz-server" };
+  | { readonly _tag: "not-a-cz-server" }
+  | { readonly _tag: "busy" };
 
 export const probeEnvironmentDescriptor = (
   baseUrl: string,
@@ -37,9 +40,13 @@ export const probeEnvironmentDescriptor = (
     const client = yield* HttpClient.HttpClient;
     const request = HttpClientRequest.get(new URL(WELL_KNOWN_ENVIRONMENT_PATH, baseUrl).toString());
     const response = yield* client.execute(request).pipe(
-      Effect.timeout(PROBE_TIMEOUT),
-      // Transport failure or timeout: nothing (reachable) is listening there.
+      // Transport failure, such as a refused connection: nothing is listening there.
       Effect.mapError(() => ({ _tag: "unreachable" }) as const),
+      // Accepted but slow: something is there, so leave it alone.
+      Effect.timeoutOrElse({
+        duration: PROBE_TIMEOUT,
+        orElse: () => Effect.fail({ _tag: "busy" } as const),
+      }),
     );
     // Bad-gateway family means a proxy answered for a backend that is gone.
     if (response.status === 502 || response.status === 503 || response.status === 504) {
@@ -61,7 +68,7 @@ export type ServePortOwner =
   | { readonly _tag: "stale"; readonly proxy: string }
   /** A live cz server for a different environment owns it. */
   | { readonly _tag: "other-environment"; readonly proxy: string }
-  /** Something that isn't a cz server owns it. */
+  /** Something that isn't a cz server, or a server too busy to answer, owns it. */
   | { readonly _tag: "occupied"; readonly proxy: string };
 
 /** Whether two URLs share an origin; false for anything unparseable. */
@@ -84,7 +91,9 @@ export function decideServePortOwner(input: {
   if (proxy === null) return { _tag: "free" };
   if (sameOrigin(proxy, input.ownLocalUrl)) return { _tag: "ours" };
   if (probe === null || probe._tag === "unreachable") return { _tag: "stale", proxy };
-  if (probe._tag === "not-a-cz-server") return { _tag: "occupied", proxy };
+  if (probe._tag === "not-a-cz-server" || probe._tag === "busy") {
+    return { _tag: "occupied", proxy };
+  }
   return probe.descriptor.environmentId === input.ownEnvironmentId
     ? { _tag: "ours" }
     : { _tag: "other-environment", proxy };
