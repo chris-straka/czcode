@@ -129,6 +129,20 @@ export function resolveScopedSettingsTargets(
   );
 }
 
+/**
+ * The value a target actually uses. Repository-backed keys left unset fall
+ * through to the built-in, so "unset" and the built-in value don't count as a
+ * difference between machines.
+ */
+export function effectiveScopedSetting<K extends keyof ServerSettings>(
+  settings: ServerSettings,
+  key: K,
+): ServerSettings[K] {
+  return settings[key] === null
+    ? resolveProjectSettings(settings, null, null, null).settings[key]
+    : settings[key];
+}
+
 export function scopedSettingsAreMixed(
   targets: readonly Pick<ScopedSettingsTarget, "settings">[],
   keys: readonly (keyof ServerSettings)[],
@@ -137,9 +151,37 @@ export function scopedSettingsAreMixed(
   return (
     first !== undefined &&
     targets.some((candidate) =>
-      keys.some((key) => !Equal.equals(first.settings[key], candidate.settings[key])),
+      keys.some(
+        (key) =>
+          !Equal.equals(
+            effectiveScopedSetting(first.settings, key),
+            effectiveScopedSetting(candidate.settings, key),
+          ),
+      ),
     )
   );
+}
+
+/** Shown wherever selected machines hold different values for one setting. */
+export const DIFFERS_BY_MACHINE = "Differs by machine";
+
+/**
+ * Machines grouped by the value they hold, in first-seen order, so a row can
+ * say which machine has what: "z, basement: New worktree · f-MS-7917: Current
+ * checkout". Targets of one machine (several checkouts) collapse.
+ */
+export function describeMachineDifferences<T extends Pick<ScopedSettingsTarget, "label">>(
+  targets: readonly T[],
+  valueLabel: (target: T) => string,
+): string {
+  const groups = new Map<string, string[]>();
+  for (const target of targets) {
+    const label = valueLabel(target);
+    const machines = groups.get(label) ?? [];
+    if (!machines.includes(target.label)) machines.push(target.label);
+    groups.set(label, machines);
+  }
+  return [...groups].map(([label, machines]) => `${machines.join(", ")}: ${label}`).join(" · ");
 }
 
 export type ScopedSettingSource = ProjectSettingSource | "mixed";

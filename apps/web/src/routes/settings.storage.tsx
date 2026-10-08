@@ -1,4 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { StorageSettingsPanel } from "../components/settings/StorageSettings";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/settings/storage")({ component: StorageSettingsPanel });
+// Storage's worktree rows live in Source Control now; keep old links working.
+export const Route = createFileRoute("/settings/storage")({
+  beforeLoad: ({ search }) => {
+    throw redirect({ to: "/settings/source-control", search, replace: true });
+  },
+});
