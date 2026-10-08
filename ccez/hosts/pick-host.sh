@@ -30,9 +30,14 @@ done
 probe() {
   local host=$1 login=$2 stats
   # shellcheck disable=SC2016 # expands on the host
-  local cmd='nproc; cut -d" " -f2 /proc/loadavg;
+  # Linux reads /proc; a Mac host (a MacBook in the fleet) answers through
+  # sysctl and vm_stat. Both print: threads, 5-minute load, "GB-free swap%".
+  local cmd='if [ -r /proc/loadavg ]; then nproc; cut -d" " -f2 /proc/loadavg;
     awk "/^MemAvailable:/ {a = \$2} /^SwapTotal:/ {t = \$2} /^SwapFree:/ {f = \$2}
-      END {print int(a / 1048576), (t > 0 ? int((t - f) * 100 / t) : 0)}" /proc/meminfo'
+      END {print int(a / 1048576), (t > 0 ? int((t - f) * 100 / t) : 0)}" /proc/meminfo;
+    else sysctl -n hw.ncpu; sysctl -n vm.loadavg | awk "{print \$3}";
+    free=$(vm_stat | awk "/page size/ {p = \$8} /Pages (free|inactive|speculative)/ {gsub(/\\./, \"\", \$NF); n += \$NF} END {print int(n * p / 1073741824)}");
+    sysctl -n vm.swapusage | awk -v free="$free" "{t = \$3 + 0; u = \$6 + 0; print free, (t > 0 ? int(u * 100 / t) : 0)}"; fi'
   if [ "$host" = "$(this_host)" ]; then
     stats=$(bash -c "$cmd")
   else
