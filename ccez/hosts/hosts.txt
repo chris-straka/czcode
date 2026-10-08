@@ -1,0 +1,11 @@
+# The agent hosts, read by the host jobs (host-jobs.sh) and pick-host.sh.
+# Columns: Tailscale name; SSH login (Tailscale SSH); the host that keeps this
+# one's nightly userdata backup; hardware beyond CPUs: `gpu` for the GPU jobs
+# (Blender GPU renders, Whisper, local models, shader work) and `emulator`
+# for the fast Android emulator ("-" for none). The Mac has no SSH server
+# (Tailscale from the App Store can't run one), so the jobs only check that
+# it's online.
+f-ms-7917    f@f-ms-7917      basement   -
+art-ms-7917  art@art-ms-7917  basement   gpu,emulator
+basement     b@basement       f-ms-7917  -
+z            -                -          -

@@ -67,6 +67,9 @@ import {
   DecisionMediaRef,
   DecisionMediaUploadQuery,
   DecisionNotFoundError,
+  DecisionProjectBlurb,
+  DecisionProjectBlurbInput,
+  DecisionProjectBlurbList,
   DecisionStorageError,
   DecisionSubmitInput,
   DecisionWaitQuery,
@@ -84,6 +87,8 @@ import {
   ThreadControlListResult,
   ThreadControlNotFoundError,
   ThreadStopInput,
+  ThreadDigestInput,
+  ThreadDigestResult,
   ThreadStopResult,
 } from "./threadControl.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
@@ -785,6 +790,21 @@ class EnvironmentDecisionsHttpApi extends HttpApiGroup.make("decisions")
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
+    HttpApiEndpoint.get("projects", "/api/decisions/projects", {
+      headers: OptionalBearerHeaders,
+      success: DecisionProjectBlurbList,
+      error: DecisionReadErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("describeProject", "/api/decisions/projects", {
+      headers: OptionalBearerHeaders,
+      payload: DecisionProjectBlurbInput,
+      success: DecisionProjectBlurb,
+      error: DecisionWriteErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
     HttpApiEndpoint.get("get", "/api/decisions/:id", {
       headers: OptionalBearerHeaders,
       params: DecisionIdParams,
@@ -922,6 +942,14 @@ class EnvironmentThreadsHttpApi extends HttpApiGroup.make("threads")
     HttpApiEndpoint.get("list", "/api/threads", {
       headers: OptionalBearerHeaders,
       success: ThreadControlListResult,
+      error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("digests", "/api/threads/digests", {
+      headers: OptionalBearerHeaders,
+      payload: ThreadDigestInput,
+      success: ThreadDigestResult,
       error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
     }).middleware(EnvironmentAuthenticatedAuth),
   )

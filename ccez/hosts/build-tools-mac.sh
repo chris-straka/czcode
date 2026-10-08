@@ -18,7 +18,7 @@
 set -euo pipefail
 
 BLENDER_VERSION=5.2.1                         # same as the Mac
-NDK_VERSIONS="28.2.13676358 30.0.16138531"    # first one is the default (games/tools/build_android.sh)
+NDK_VERSIONS="28.2.13676358 30.0.16138531"    # first one is the default (games/_tools/build_android.sh)
 ANDROID_PACKAGES="platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2"
 JDK=21
 
@@ -233,8 +233,8 @@ if ! $dry; then
 fi
 
 step "Factory CLIs from this account's checkouts"
-if $dry || { [ -d "$HOME/SWE/games/tools/gk" ] && ! have gk; }; then
-  run cargo install --locked --path "$HOME/SWE/games/tools/gk" || echo "gk did not build; re-run later."
+if $dry || { [ -d "$HOME/SWE/games/_tools/gk" ] && ! have gk; }; then
+  run cargo install --locked --path "$HOME/SWE/games/_tools/gk" || echo "gk did not build; re-run later."
 fi
 
 if $dry; then

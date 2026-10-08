@@ -12,7 +12,11 @@
 # - Disk swap file of min(RAM, 16 GB), the backstop before the out-of-memory
 #   killer.
 # - Higher file-watcher limits (dev servers, cargo watch, editors).
-# - A cap on journald and Docker logs, so logs can't fill the disk.
+# - A cap on journald and Docker logs, and no rsyslog copies in /var/log
+#   (a dying drive's kernel errors once filled 106 GB there), so logs can't
+#   fill the disk.
+# - On Killer (alx) wired chips, a network watchdog that reconnects the chip
+#   when the router stops answering (net-watchdog.sh).
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 in_wsl=false
@@ -92,6 +96,12 @@ step "Log size caps"
 mkdir -p /etc/systemd/journald.conf.d
 printf '[Journal]\nSystemMaxUse=1G\n' > /etc/systemd/journald.conf.d/cz-host.conf
 systemctl restart systemd-journald
+# rsyslog copies the journal into /var/log/syslog and kern.log, rotated only
+# daily and with no size cap. journalctl has everything.
+if systemctl is-enabled -q rsyslog.service 2> /dev/null; then
+  systemctl disable --now rsyslog.service syslog.socket > /dev/null 2>&1 || true
+  echo "rsyslog is off; read logs with journalctl."
+fi
 if command -v docker > /dev/null 2>&1 && [ ! -e /etc/docker/daemon.json ]; then
   mkdir -p /etc/docker
   printf '{\n  "log-driver": "json-file",\n  "log-opts": { "max-size": "50m", "max-file": "3" }\n}\n' > /etc/docker/daemon.json
@@ -100,5 +110,43 @@ if command -v docker > /dev/null 2>&1 && [ ! -e /etc/docker/daemon.json ]; then
   else
     echo "Docker log caps apply after Docker's next restart (containers are running)."
   fi
+fi
+# The wired chips that hang after a router restart; other hosts recover alone.
+alx_wired=false
+for dev in /sys/class/net/*; do
+  [ -e "$dev/device" ] && [ ! -d "$dev/wireless" ] &&
+    [ "$(basename "$(readlink -f "$dev/device/driver")")" = alx ] && alx_wired=true
+done
+if ! $in_wsl && $alx_wired && command -v nmcli > /dev/null 2>&1; then
+  step "Network watchdog"
+  # Reconnects the chip when it stops passing traffic after the router
+  # restarts (net-watchdog.sh says why). Log: journalctl -t cz-net-watchdog
+  install -m 755 "$(dirname "${BASH_SOURCE[0]}")/net-watchdog.sh" /usr/local/sbin/cz-net-watchdog
+  cat > /etc/systemd/system/cz-net-watchdog.service << 'UNIT'
+[Unit]
+Description=Reconnect the wired network when the router stops answering (ccez/hosts/net-watchdog.sh)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cz-net-watchdog
+UNIT
+  cat > /etc/systemd/system/cz-net-watchdog.timer << 'UNIT'
+[Unit]
+Description=Check the wired network every minute (ccez/hosts/net-watchdog.sh)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now cz-net-watchdog.timer > /dev/null 2>&1
+elif [ -e /etc/systemd/system/cz-net-watchdog.timer ]; then
+  systemctl disable --now cz-net-watchdog.timer > /dev/null 2>&1 || true
+  rm -f /etc/systemd/system/cz-net-watchdog.{timer,service} /usr/local/sbin/cz-net-watchdog
+  systemctl daemon-reload
+  echo "Network watchdog removed: this host's wired chip isn't a Killer (alx) one."
 fi
 echo "Tuning done."

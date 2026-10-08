@@ -55,6 +55,14 @@ export const rules: readonly Rule[] = [
   [/(?<![A-Za-z0-9-])t3\.tools(?![A-Za-z0-9])/g, domain],
   [/(?<![A-Za-z0-9-])t3\.chat(?![A-Za-z0-9])/g, `chat.${domain}`],
 
+  // CI runners. Upstream runs on Blacksmith, which the fork has no account
+  // for; jobs on its labels never start. Use the GitHub-hosted image of the
+  // same OS instead.
+  [/blacksmith-\d+vcpu-ubuntu-2404-arm/g, "ubuntu-24.04-arm"],
+  [/blacksmith-\d+vcpu-ubuntu-2404/g, "ubuntu-24.04"],
+  [/blacksmith-\d+vcpu-windows-2025/g, "windows-2025"],
+  [/blacksmith-\d+vcpu-macos-26/g, "macos-26"],
+
   // Product and org names.
   [/T3(?: |\+|%20)Code/g, app],
   [/T3CODE_/g, `${CLI}_`],

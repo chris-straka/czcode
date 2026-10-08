@@ -31,6 +31,8 @@ import { composerFloatingLayerProps } from "./composerEventScope";
 interface ExpandedImageDialogProps {
   preview: ExpandedImagePreview;
   onClose: () => void;
+  /** An action for the shown item, like picking a decision option from full screen. */
+  renderAction?: (index: number) => ReactNode;
 }
 
 const EXPANDED_MEDIA_STATE_CLASS_NAME =
@@ -72,6 +74,7 @@ function ExpandedVideo({ item }: { readonly item: ExpandedImageItem }) {
 export const ExpandedImageDialog = memo(function ExpandedImageDialog({
   preview,
   onClose,
+  renderAction,
 }: ExpandedImageDialogProps) {
   const [imageOffset, setImageOffset] = useState(0);
   const [failedImageSrc, setFailedImageSrc] = useState<string | null>(null);
@@ -272,6 +275,7 @@ export const ExpandedImageDialog = memo(function ExpandedImageDialog({
               ) : item.source ? (
                 <SnapShotContentsButton source={item.source} side="top" />
               ) : null}
+              {renderAction?.(index)}
             </div>
           </div>
         </MediaActions>

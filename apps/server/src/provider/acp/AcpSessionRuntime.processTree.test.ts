@@ -654,8 +654,15 @@ describe("terminatePosixOwnedProcessTree", () => {
 
   it.live("rotates more than 64 live parents without scanning retained tombstones", () =>
     Effect.gen(function* () {
+      // Fake pids must miss the real worker pid, which the fixture registers as
+      // the server and termination never signals. CI VMs hand out low pids.
+      const base = [1_000, 20_000].find(
+        (start) =>
+          !(process.pid >= start && process.pid < start + 130) &&
+          !(process.pid >= start + 10_000 && process.pid < start + 10_130),
+      )!;
       const parents = Array.from({ length: 130 }, (_, index) =>
-        identity(1_000 + index, 100, 1_000 + index, 1_000 + index),
+        identity(base + index, 100, base + index, base + index),
       );
       let childListReads = 0;
       let identityCalls = 0;

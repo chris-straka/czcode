@@ -90,7 +90,11 @@ export const connectionStorageLayer = (configDir: string) =>
         put: (profile) =>
           catalog.update((document) => ({
             ...document,
-            profiles: replaceCatalogValue(document.profiles, (value) => value.connectionId, profile),
+            profiles: replaceCatalogValue(
+              document.profiles,
+              (value) => value.connectionId,
+              profile,
+            ),
           })),
         remove: (connectionId) =>
           catalog.update((document) => ({

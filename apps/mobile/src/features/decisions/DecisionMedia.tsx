@@ -3,7 +3,7 @@ import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { Alert, Linking, Platform, Pressable, View } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -22,10 +22,39 @@ export function useDecisionMediaUrl(
   return resolveAssetUrl(connection.value.httpBaseUrl, media.url);
 }
 
+/** Resolves any of a host's decision media to a loadable URL. */
+export function useDecisionMediaResolver(
+  environmentId: EnvironmentId,
+): (media: DecisionMediaRef | null | undefined) => string | null {
+  const connection = usePreparedConnection(environmentId);
+  return (media) =>
+    media?.url && connection._tag === "Some"
+      ? resolveAssetUrl(connection.value.httpBaseUrl, media.url)
+      : null;
+}
+
+/**
+ * Told when the owner plays a sound or video or installs a build, so a
+ * decision can hold its verdict until they have (see `unseenMediaProblem`).
+ */
+export const DecisionMediaEngagement = createContext<(key: string) => void>(() => {});
+
 /** Plays one sound; tap to play or pause, the loop toggle repeats it. */
-export function DecisionAudio({ uri, label }: { uri: string; label?: string }) {
+export function DecisionAudio({
+  uri,
+  label,
+  engageKey,
+}: {
+  uri: string;
+  label?: string;
+  engageKey?: string;
+}) {
   const player = useAudioPlayer({ uri }, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
+  const engage = useContext(DecisionMediaEngagement);
+  useEffect(() => {
+    if (status.playing && engageKey) engage(engageKey);
+  }, [engage, engageKey, status.playing]);
   const [loop, setLoop] = useState(false);
   useEffect(() => {
     player.loop = loop;
@@ -70,8 +99,15 @@ export function DecisionAudio({ uri, label }: { uri: string; label?: string }) {
   );
 }
 
-function DecisionVideo({ uri }: { uri: string }) {
+function DecisionVideo({ uri, engageKey }: { uri: string; engageKey: string }) {
   const player = useVideoPlayer({ uri });
+  const engage = useContext(DecisionMediaEngagement);
+  useEffect(() => {
+    const subscription = player.addListener("playingChange", ({ isPlaying }) => {
+      if (isPlaying) engage(engageKey);
+    });
+    return () => subscription.remove();
+  }, [engage, engageKey, player]);
   return (
     <VideoView
       player={player}
@@ -106,19 +142,44 @@ document.getElementById("clay").onclick=()=>{clay=!clay;m.model.materials.forEac
   );
 }
 
-/** One attachment, sized for a card (`compact`) or the full view. */
+/**
+ * The one frame every option's media shares, so options of different shapes
+ * line up: fixed aspect, contained, on a neutral letterbox.
+ */
+export const OPTION_FRAME_STYLE = { width: "100%", aspectRatio: 4 / 3, borderRadius: 10 } as const;
+
+/** One attachment, sized for a card (`compact`), an option tile (`framed`), or the full view. */
 export function DecisionMedia({
   environmentId,
   media,
   compact = false,
+  framed = false,
 }: {
   environmentId: EnvironmentId;
   media: DecisionMediaRef;
   compact?: boolean;
+  framed?: boolean;
 }) {
   const uri = useDecisionMediaUrl(environmentId, media);
+  const engage = useContext(DecisionMediaEngagement);
   if (!uri)
-    return <View className={compact ? "h-20 rounded-lg bg-subtle" : "h-48 rounded-lg bg-subtle"} />;
+    return framed ? (
+      <View className="bg-subtle" style={OPTION_FRAME_STYLE} />
+    ) : (
+      <View className={compact ? "h-20 rounded-lg bg-subtle" : "h-48 rounded-lg bg-subtle"} />
+    );
+  if (framed && media.type === "image") {
+    return (
+      <View className="overflow-hidden bg-subtle" style={OPTION_FRAME_STYLE}>
+        <Image
+          source={{ uri }}
+          accessibilityLabel={media.caption ?? media.name}
+          contentFit="contain"
+          style={{ width: "100%", height: "100%" }}
+        />
+      </View>
+    );
+  }
   switch (media.type) {
     case "image":
       return (
@@ -131,9 +192,9 @@ export function DecisionMedia({
       );
     case "audio":
     case "voice":
-      return <DecisionAudio uri={uri} label={media.name} />;
+      return <DecisionAudio uri={uri} label={media.name} engageKey={media.key} />;
     case "video":
-      return <DecisionVideo uri={uri} />;
+      return <DecisionVideo uri={uri} engageKey={media.key} />;
     case "glb":
       return compact ? <View className="h-20 rounded-lg bg-subtle" /> : <DecisionModel uri={uri} />;
     case "apk":
@@ -142,6 +203,7 @@ export function DecisionMedia({
           tone="primary"
           label={`Install ${media.name}`}
           onPress={() => {
+            engage(media.key);
             if (Platform.OS !== "android") return void Linking.openURL(uri);
             void downloadAndInstallApk(
               uri,

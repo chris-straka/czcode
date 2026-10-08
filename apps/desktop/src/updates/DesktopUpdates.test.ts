@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 import { DESKTOP_UPDATE_RESTART_MARKER_FILE } from "@cz/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
@@ -87,23 +88,26 @@ describe("DesktopUpdates", () => {
     }).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });
 
-  it.effect("updates Linux .deb installs and leaves other non-AppImage installs off", () =>
-    Effect.gen(function* () {
-      const linuxState = (packageType: string | undefined) =>
-        Effect.scoped(
-          Effect.gen(function* () {
-            const updates = yield* DesktopUpdates.DesktopUpdates;
-            yield* updates.configure;
-            return yield* updates.getState;
-          }),
-        ).pipe(Effect.provide(makeHarness({ platform: "linux", packageType }).layer));
+  // Linux packages only; Windows reports its own install kinds.
+  it.effect.skipIf(HostProcessPlatform.defaultValue() === "win32")(
+    "updates Linux .deb installs and leaves other non-AppImage installs off",
+    () =>
+      Effect.gen(function* () {
+        const linuxState = (packageType: string | undefined) =>
+          Effect.scoped(
+            Effect.gen(function* () {
+              const updates = yield* DesktopUpdates.DesktopUpdates;
+              yield* updates.configure;
+              return yield* updates.getState;
+            }),
+          ).pipe(Effect.provide(makeHarness({ platform: "linux", packageType }).layer));
 
-      const deb = yield* linuxState("deb\n");
-      assert.equal(deb.status, "idle");
+        const deb = yield* linuxState("deb\n");
+        assert.equal(deb.status, "idle");
 
-      const unmarked = yield* linuxState(undefined);
-      assert.equal(unmarked.status, "disabled");
-    }),
+        const unmarked = yield* linuxState(undefined);
+        assert.equal(unmarked.status, "disabled");
+      }),
   );
 
   it.effect("subscribe delivers the latest state plus subsequent changes", () => {

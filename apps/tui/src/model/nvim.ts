@@ -5,7 +5,7 @@
  *
  * @module nvim
  */
-import { execFile } from "node:child_process";
+import * as NodeChildProcess from "node:child_process";
 
 /** The parent nvim's socket, when the TUI runs in a neovim terminal. */
 export function parentNvim(): string | null {
@@ -68,8 +68,11 @@ export async function processAncestors(pid: number, depth = 8): Promise<Array<nu
   let current = pid;
   for (let step = 0; step < depth; step++) {
     const parent = await new Promise<number | null>((resolve) =>
-      execFile("ps", ["-o", "ppid=", "-p", String(current)], { timeout: 2000 }, (error, out) =>
-        resolve(error ? null : Number(out.trim()) || null),
+      NodeChildProcess.execFile(
+        "ps",
+        ["-o", "ppid=", "-p", String(current)],
+        { timeout: 2000 },
+        (error, out) => resolve(error ? null : Number(out.trim()) || null),
       ),
     );
     if (parent === null || parent <= 1) break;
@@ -86,7 +89,7 @@ export function runInParentNvim(lua: string): Promise<string | null> {
   // luaeval keeps the code a single expression for --remote-expr.
   const expr = `luaeval(${JSON.stringify(lua.replace(/\n\s*/g, " "))})`;
   return new Promise((resolve) => {
-    execFile(
+    NodeChildProcess.execFile(
       "nvim",
       ["--server", socket, "--remote-expr", expr],
       { timeout: 5000 },

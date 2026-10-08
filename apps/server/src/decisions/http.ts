@@ -30,9 +30,11 @@ import {
 } from "../auth/http.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import { signPayload, timingSafeEqualBase64Url } from "../auth/utils.ts";
+import { assetFileResponse } from "../http.ts";
 import * as DecisionService from "./DecisionService.ts";
+import * as ProjectBlurbService from "./ProjectBlurbService.ts";
 
-export const DECISION_MEDIA_ROUTE_PREFIX = "/api/decision-media";
+const DECISION_MEDIA_ROUTE_PREFIX = "/api/decision-media";
 const SIGNING_SECRET_NAME = "decision-media-signing-key";
 const MEDIA_URL_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -69,6 +71,7 @@ export const decisionsHttpApiLayer = HttpApiBuilder.group(
   "decisions",
   Effect.fnUntraced(function* (handlers) {
     const decisions = yield* DecisionService.DecisionService;
+    const blurbs = yield* ProjectBlurbService.ProjectBlurbService;
     const signed = (entries: ReadonlyArray<DecisionItemWithAnswer>) =>
       withMediaUrls(entries).pipe(
         Effect.catch((cause) => failEnvironmentInternal("internal_error", cause)),
@@ -89,6 +92,21 @@ export const decisionsHttpApiLayer = HttpApiBuilder.group(
           yield* annotateEnvironmentRequest(args.endpoint.name);
           yield* requireEnvironmentScope(AuthOrchestrationReadScope);
           return { items: yield* signed(yield* decisions.history(args.query)) };
+        }),
+      )
+      .handle("projects", (args) =>
+        Effect.gen(function* () {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          const open = yield* decisions.list({ status: "open" });
+          return { blurbs: yield* blurbs.blurbs(open.map((entry) => entry.item.project)) };
+        }),
+      )
+      .handle("describeProject", (args) =>
+        Effect.gen(function* () {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationOperateScope);
+          return yield* blurbs.describe(args.payload);
         }),
       )
       .handle("get", (args) =>
@@ -165,9 +183,11 @@ export const decisionMediaRouteLayer = HttpRouter.add(
     const decisions = yield* DecisionService.DecisionService;
     const path = yield* decisions.mediaPath(key);
     if (Option.isNone(path)) return notFound;
-    return yield* HttpServerResponse.file(path.value, {
-      contentType: mime,
-      headers: { "cache-control": "private, max-age=3600", "x-content-type-options": "nosniff" },
-    }).pipe(Effect.orElseSucceed(() => notFound));
+    // Range-aware, so the app's video and audio players can seek.
+    return yield* assetFileResponse(
+      { path: path.value, mimeType: mime },
+      request.headers.range,
+      request.headers["if-range"],
+    ).pipe(Effect.orElseSucceed(() => notFound));
   }),
 );

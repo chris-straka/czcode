@@ -2,6 +2,7 @@ import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 import { assert, describe, it } from "vite-plus/test";
 
 import {
@@ -127,19 +128,23 @@ describe("electron development launcher", () => {
     ]);
   });
 
-  it("restores execute permissions on an unchanged launcher", () => {
-    const directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "cz-launcher-"));
-    const launcherPath = NodePath.join(directory, "launcher");
-    try {
-      writeDevelopmentLauncherScript(launcherPath, "/runtime/Electron");
-      NodeFS.chmodSync(launcherPath, 0o644);
+  // Windows has no execute bit to restore.
+  it.skipIf(HostProcessPlatform.defaultValue() === "win32")(
+    "restores execute permissions on an unchanged launcher",
+    () => {
+      const directory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "cz-launcher-"));
+      const launcherPath = NodePath.join(directory, "launcher");
+      try {
+        writeDevelopmentLauncherScript(launcherPath, "/runtime/Electron");
+        NodeFS.chmodSync(launcherPath, 0o644);
 
-      assert.isFalse(writeDevelopmentLauncherScript(launcherPath, "/runtime/Electron"));
-      assert.equal(NodeFS.statSync(launcherPath).mode & 0o777, 0o755);
-    } finally {
-      NodeFS.rmSync(directory, { recursive: true, force: true });
-    }
-  });
+        assert.isFalse(writeDevelopmentLauncherScript(launcherPath, "/runtime/Electron"));
+        assert.equal(NodeFS.statSync(launcherPath).mode & 0o777, 0o755);
+      } finally {
+        NodeFS.rmSync(directory, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("derives launcher icons from canonical development and production assets", () => {
     const development = resolveMacLauncherIconPaths("/runtime", true);

@@ -5,21 +5,23 @@
  *
  * @module media
  */
-import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeCrypto from "node:crypto";
+import * as NodeFS from "node:fs";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
+
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 
 export function cacheDir(): string {
-  const base = process.env.XDG_CACHE_HOME?.trim() || join(homedir(), ".cache");
-  const dir = join(base, "czcode", "tui", "media");
-  mkdirSync(dir, { recursive: true });
+  const base = process.env.XDG_CACHE_HOME?.trim() || NodePath.join(NodeOS.homedir(), ".cache");
+  const dir = NodePath.join(base, "czcode", "tui", "media");
+  NodeFS.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 const safeName = (key: string) =>
-  `${createHash("sha256").update(key).digest("hex").slice(0, 16)}-${
+  `${NodeCrypto.createHash("sha256").update(key).digest("hex").slice(0, 16)}-${
     key
       .split("/")
       .pop()
@@ -28,18 +30,18 @@ const safeName = (key: string) =>
 
 /** Downloads a signed media URL once; later calls return the cached path. */
 export async function cachedMedia(key: string, url: string): Promise<string> {
-  const path = join(cacheDir(), safeName(key));
-  if (existsSync(path)) return path;
+  const path = NodePath.join(cacheDir(), safeName(key));
+  if (NodeFS.existsSync(path)) return path;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Download failed (${response.status}).`);
-  writeFileSync(`${path}.partial`, new Uint8Array(await response.arrayBuffer()));
+  NodeFS.writeFileSync(`${path}.partial`, new Uint8Array(await response.arrayBuffer()));
   await run("mv", [`${path}.partial`, path]);
   return path;
 }
 
 function run(command: string, args: ReadonlyArray<string>, timeout = 60_000): Promise<string> {
   return new Promise((resolve, reject) =>
-    execFile(command, [...args], { timeout }, (error, stdout, stderr) =>
+    NodeChildProcess.execFile(command, [...args], { timeout }, (error, stdout, stderr) =>
       error ? reject(new Error(stderr.trim() || error.message)) : resolve(stdout),
     ),
   );
@@ -55,11 +57,11 @@ export function pngFor(path: string): Promise<Uint8Array> {
   let png = pngs.get(path);
   if (!png) {
     png = (async () => {
-      const bytes = readFileSync(path);
+      const bytes = NodeFS.readFileSync(path);
       if (bytes[0] === 0x89 && bytes[1] === 0x50) return bytes;
       const out = `${path}.png`;
-      if (!existsSync(out)) await run("magick", [`${path}[0]`, out]);
-      return readFileSync(out);
+      if (!NodeFS.existsSync(out)) await run("magick", [`${path}[0]`, out]);
+      return NodeFS.readFileSync(out);
     })();
     // A failure (a file still downloading, magick missing) can be retried.
     png.catch(() => pngs.delete(path));
@@ -71,13 +73,13 @@ export function pngFor(path: string): Promise<Uint8Array> {
 /** A poster frame of a video (a second in, or the first frame of a short clip), cached beside it. */
 export async function posterFrame(path: string): Promise<string> {
   const out = `${path}.poster.png`;
-  if (existsSync(out)) return out;
+  if (NodeFS.existsSync(out)) return out;
   try {
     await run("ffmpeg", ["-v", "error", "-y", "-ss", "1", "-i", path, "-frames:v", "1", out]);
   } catch {
     // Shorter than a second: take the first frame.
   }
-  if (!existsSync(out)) {
+  if (!NodeFS.existsSync(out)) {
     await run("ffmpeg", ["-v", "error", "-y", "-i", path, "-frames:v", "1", out]);
   }
   return out;
@@ -90,7 +92,7 @@ export async function turntableFrame(path: string, frame: number, clay: boolean)
   const angle =
     (((frame % TURNTABLE_FRAMES) + TURNTABLE_FRAMES) % TURNTABLE_FRAMES) * (360 / TURNTABLE_FRAMES);
   const out = `${path}.${clay ? "clay" : "lit"}.${angle}.png`;
-  if (existsSync(out)) return out;
+  if (NodeFS.existsSync(out)) return out;
   await run("f3d", [
     path,
     "--no-config",
@@ -106,12 +108,12 @@ export async function turntableFrame(path: string, frame: number, clay: boolean)
 
 /** Opens a model in f3d's own window for free orbit; it outlives the TUI. */
 export function openInF3d(path: string): void {
-  spawn("f3d", [path], { detached: true, stdio: "ignore" }).unref();
+  NodeChildProcess.spawn("f3d", [path], { detached: true, stdio: "ignore" }).unref();
 }
 
 /** Plays sound or video with mpv (video in its own window); stop by killing the handle. */
-export function play(path: string, video: boolean, loop = false): ChildProcess {
-  return spawn(
+export function play(path: string, video: boolean, loop = false): NodeChildProcess.ChildProcess {
+  return NodeChildProcess.spawn(
     "mpv",
     [
       ...(video ? [] : ["--no-video"]),
@@ -131,8 +133,12 @@ export async function adbInstall(path: string): Promise<string> {
 
 /** Anything else: the OS default app. */
 export function openWithSystem(path: string): void {
-  spawn(process.platform === "darwin" ? "open" : "xdg-open", [path], {
-    detached: true,
-    stdio: "ignore",
-  }).unref();
+  NodeChildProcess.spawn(
+    HostProcessPlatform.defaultValue() === "darwin" ? "open" : "xdg-open",
+    [path],
+    {
+      detached: true,
+      stdio: "ignore",
+    },
+  ).unref();
 }

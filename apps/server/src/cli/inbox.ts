@@ -12,6 +12,8 @@ import {
   type DecisionMediaRef,
   type DecisionMediaType,
   type DecisionOption,
+  type DecisionSubmitInput,
+  decisionSubmitWarnings,
   type DecisionTimelineStep,
   normalizeDecisionKind,
 } from "@cz/contracts";
@@ -30,6 +32,7 @@ import * as ServerConfig from "../config.ts";
 import * as DecisionService from "../decisions/DecisionService.ts";
 import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 import { baseDirFlag, resolveCliAuthConfig } from "./config.ts";
+import { hostFlag, withServer } from "./serverClient.ts";
 
 export class InboxCliError extends Schema.TaggedError<InboxCliError>()("InboxCliError", {
   message: Schema.String,
@@ -196,6 +199,10 @@ const submitCommand = Command.make("submit", {
     Flag.optional,
   ),
   costNote: Flag.String("cost-note").pipe(Flag.optional),
+  device: Flag.Literals("device", ["phone", "desktop", "any"]).pipe(
+    Flag.withDescription("Where the owner acts on it (default: phone for a playtest with an apk)."),
+    Flag.optional,
+  ),
   resumePrompt: Flag.String("resume-prompt").pipe(
     Flag.withDescription("If you won't be waiting: what a new thread should do with the answer."),
     Flag.optional,
@@ -230,7 +237,7 @@ const submitCommand = Command.make("submit", {
         if (Option.isSome(flags.expires) && expiresAt === null) {
           return yield* fail(`Can't read --expires ${flags.expires.value}.`);
         }
-        const item = yield* decisions.submit({
+        const input = {
           project: flags.project,
           kind,
           question: flags.question,
@@ -253,8 +260,12 @@ const submitCommand = Command.make("submit", {
           resume: Option.isSome(flags.resumePrompt)
             ? { project: flags.project, prompt: flags.resumePrompt.value }
             : null,
-        });
-        yield* flags.json ? printJson({ item }) : Console.log(item.id);
+          ...(Option.isSome(flags.device) ? { target_device: flags.device.value } : {}),
+        } satisfies DecisionSubmitInput;
+        const item = yield* decisions.submit(input);
+        const warnings = decisionSubmitWarnings(input);
+        for (const warning of warnings) yield* Console.error(`warning: ${warning}`);
+        yield* flags.json ? printJson({ item, warnings }) : Console.log(item.id);
       }),
     ),
   ),
@@ -284,7 +295,6 @@ const waitCommand = Command.make("wait", {
         const exitCode =
           current.item.status === "answered" ? 0 : current.item.status === "open" ? 3 : 2;
         if (exitCode !== 0) {
-          // oxlint-disable-next-line czcode/no-global-process-runtime -- the CLI reports the outcome as its exit status.
           yield* Effect.sync(() => (process.exitCode = exitCode));
         }
       }),
@@ -357,6 +367,60 @@ const withdrawCommand = Command.make("withdraw", { baseDir: baseDirFlag, id: idA
   ),
 );
 
+const answerCommand = Command.make("answer", {
+  baseDir: baseDirFlag,
+  host: hostFlag,
+  id: idArgument,
+  option: Flag.String("option").pipe(
+    Flag.withDescription("Option id to pick (repeat for several)."),
+    Flag.atLeast(0),
+  ),
+  choice: Flag.String("choice").pipe(
+    Flag.withDescription("Verdict for kinds that have one: approve, reject, changes, yes, later…"),
+    Flag.optional,
+  ),
+  rank: Flag.String("rank").pipe(
+    Flag.withDescription("Option ids, best first, comma-separated."),
+    Flag.optional,
+  ),
+  comment: Flag.String("comment").pipe(Flag.optional),
+  retry: Flag.Boolean("retry").pipe(
+    Flag.withDescription("None of these, try again."),
+    Flag.withDefault(false),
+  ),
+}).pipe(
+  Command.withDescription(
+    "Answer a decision through the running server, here or on a paired machine, so the asking agent continues.",
+  ),
+  Command.withHandler((flags) =>
+    withServer(
+      { baseDir: flags.baseDir, host: flags.host, sessionLabel: "cz inbox cli" },
+      ({ client, headers }) =>
+        Effect.gen(function* () {
+          const rank = Option.map(flags.rank, (value) =>
+            value
+              .split(",")
+              .map((id) => id.trim())
+              .filter((id) => id !== ""),
+          );
+          const answer = yield* client.decisions.answer({
+            headers,
+            params: { id: flags.id },
+            payload: {
+              choice: Option.getOrNull(flags.choice),
+              option_ids: flags.option.length > 0 ? flags.option : null,
+              rank: Option.getOrNull(rank),
+              comment: Option.getOrNull(flags.comment),
+              voice_key: null,
+              ...(flags.retry ? { retry: true } : {}),
+            },
+          });
+          yield* Console.log(`answered: ${answer.item_id}`);
+        }),
+    ),
+  ),
+);
+
 export const inboxCommand = Command.make("inbox").pipe(
   Command.withDescription("Ask the owner and read their answers (the Decisions tab)."),
   Command.withSubcommands([
@@ -366,5 +430,6 @@ export const inboxCommand = Command.make("inbox").pipe(
     listingCommand("list"),
     listingCommand("history"),
     withdrawCommand,
+    answerCommand,
   ]),
 );
