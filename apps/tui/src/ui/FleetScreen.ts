@@ -77,6 +77,16 @@ function Gauge(props: {
   );
 }
 
+/**
+ * An activity on one row: its first line, with tabs and other control
+ * characters (which terminals draw wider than Ink measures) as spaces.
+ */
+const oneLine = (text: string) =>
+  (text.split("\n")[0] ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+
 const warningText = (warning: FleetWarning) =>
   warning.kind === "disk"
     ? `disk ${warning.mount} ${formatBytes(warning.freeBytes)} free`
@@ -453,12 +463,12 @@ export function FleetScreen(props: {
           : null,
         h(
           Box,
-          { flexGrow: 1, marginRight: 1 },
+          { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, marginRight: 1 },
           h(
             Text,
             { color: agent.needsYou ? "yellow" : agent.stuck ? "red" : "cyan", wrap: "truncate" },
             // First line only: a multi-line activity would add rows.
-            agent.activity.split("\n")[0] ?? "",
+            oneLine(agent.activity),
           ),
         ),
         h(
