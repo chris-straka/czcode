@@ -1,8 +1,4 @@
-import {
-  answerSummary,
-  VERDICT_BUTTONS,
-  optionMedia,
-} from "@cz/client-runtime/decisions/draft";
+import { answerSummary, VERDICT_BUTTONS, optionMedia } from "@cz/client-runtime/decisions/draft";
 import { filterChips } from "@cz/client-runtime/decisions/feed";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";

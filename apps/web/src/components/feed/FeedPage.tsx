@@ -1,8 +1,4 @@
-import {
-  answerSummary,
-  VERDICT_BUTTONS,
-  optionMedia,
-} from "@cz/client-runtime/decisions/draft";
+import { answerSummary, VERDICT_BUTTONS, optionMedia } from "@cz/client-runtime/decisions/draft";
 import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
 import {
   buildOneFeed,
@@ -36,10 +32,7 @@ import { useJobsOn } from "~/state/jobs";
 import { useNavigateBack } from "~/hooks/useNavigateBack";
 import { useVimKeys } from "~/hooks/useVimKeys";
 import { useAtomCommand } from "~/state/use-atom-command";
-import {
-  DECISION_OPTION_FRAME_CLASS,
-  DecisionMedia,
-} from "../decisions/DecisionMedia";
+import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
 import { NoProjectsHero } from "../NoProjectsHero";
 import { SidebarUpdateArchitectureWarning } from "../sidebar/SidebarUpdatePill";
@@ -834,8 +827,7 @@ function DecisionCard({
       ? []
       : item.media.filter((media) => media.type === "image").slice(0, 3);
   // A review or pitch answers right on the card; a wrong answer is undone from its toast.
-  const quick =
-    item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
+  const quick = item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
   const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Only single-choice picks answer from the card; the rest open the full view.
   const inlinePick = item.kind === "pick" && item.max_choices === 1 && item.options.length > 0;

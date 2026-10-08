@@ -360,8 +360,7 @@ export function DecisionView({
               ))
             ) : item.kind === "timeline" ? (
               <>
-                <Button onClick={() => submit({ choice: "approve", redoFrom: null })}
-                >
+                <Button onClick={() => submit({ choice: "approve", redoFrom: null })}>
                   Approve run
                 </Button>
                 <Button

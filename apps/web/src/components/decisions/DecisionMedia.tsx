@@ -199,12 +199,7 @@ export function DecisionMedia({
             className="size-full object-cover"
           />
         ) : media.type === "video" ? (
-          <video
-            controls
-            preload="metadata"
-            src={url}
-            className="size-full object-contain"
-          />
+          <video controls preload="metadata" src={url} className="size-full object-contain" />
         ) : (
           <BoxIcon className="size-6 text-muted-foreground" />
         )}
@@ -230,11 +225,7 @@ export function DecisionMedia({
     case "voice":
       return (
         <div className={cn("w-full", className)}>
-          <WaveformPlayer
-            url={url}
-            media={media}
-            compact={compact}
-          />
+          <WaveformPlayer url={url} media={media} compact={compact} />
         </div>
       );
     case "video":
@@ -256,10 +247,7 @@ export function DecisionMedia({
       );
     case "apk":
       return (
-        <Button
-          render={<a href={url} download={media.name} />}
-          className={className}
-        >
+        <Button render={<a href={url} download={media.name} />} className={className}>
           <DownloadIcon />
           Install {media.name}
         </Button>
