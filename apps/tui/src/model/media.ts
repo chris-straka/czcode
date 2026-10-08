@@ -47,13 +47,42 @@ function run(command: string, args: ReadonlyArray<string>, timeout = 60_000): Pr
   );
 }
 
-/** A PNG of the image (converted with magick when it isn't one), for the Kitty protocol. */
-export async function pngFor(path: string): Promise<Uint8Array> {
-  const bytes = NodeFS.readFileSync(path);
-  if (bytes[0] === 0x89 && bytes[1] === 0x50) return bytes;
-  const out = `${path}.png`;
-  if (!NodeFS.existsSync(out)) await run("magick", [`${path}[0]`, out]);
-  return NodeFS.readFileSync(out);
+const pngs = new Map<string, Promise<Uint8Array>>();
+
+/**
+ * A PNG of the image (converted with magick when it isn't one), for the Kitty
+ * protocol. Read and converted once per path for the life of the process.
+ */
+export function pngFor(path: string): Promise<Uint8Array> {
+  let png = pngs.get(path);
+  if (!png) {
+    png = (async () => {
+      const bytes = NodeFS.readFileSync(path);
+      if (bytes[0] === 0x89 && bytes[1] === 0x50) return bytes;
+      const out = `${path}.png`;
+      if (!NodeFS.existsSync(out)) await run("magick", [`${path}[0]`, out]);
+      return NodeFS.readFileSync(out);
+    })();
+    // A failure (a file still downloading, magick missing) can be retried.
+    png.catch(() => pngs.delete(path));
+    pngs.set(path, png);
+  }
+  return png;
+}
+
+/** A poster frame of a video (a second in, or the first frame of a short clip), cached beside it. */
+export async function posterFrame(path: string): Promise<string> {
+  const out = `${path}.poster.png`;
+  if (NodeFS.existsSync(out)) return out;
+  try {
+    await run("ffmpeg", ["-v", "error", "-y", "-ss", "1", "-i", path, "-frames:v", "1", out]);
+  } catch {
+    // Shorter than a second: take the first frame.
+  }
+  if (!NodeFS.existsSync(out)) {
+    await run("ffmpeg", ["-v", "error", "-y", "-i", path, "-frames:v", "1", out]);
+  }
+  return out;
 }
 
 export const TURNTABLE_FRAMES = 12;

@@ -1,5 +1,5 @@
 import { collectComposerContextReferences } from "@cz/shared/composerContextReferences";
-import { PLAN_IMPLEMENTATION_PROMPT_PREFIX } from "../../proposedPlan";
+import { PLAN_IMPLEMENTATION_PROMPT_PREFIX } from "@cz/client-runtime/proposed-plan";
 
 /**
  * Terminal-style prompt recall for the composer. ArrowUp on an empty

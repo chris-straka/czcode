@@ -91,7 +91,15 @@ function EnvironmentResetQueue({
                   Cancel
                 </Button>
               </>
-            ) : null}
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void cancel({ environmentId, input: { id: run.id } }).then(refresh)}
+              >
+                Dismiss
+              </Button>
+            )}
           </li>
         ))}
       </ul>

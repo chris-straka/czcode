@@ -10,8 +10,8 @@
  * `cz-agent-<pid>-<name>.scope` units through the user manager; whatever they
  * start afterwards is born in the scope. Quick commands finish before a sweep
  * picks them up. Scopes set no memory limit. Scopes left by a previous server
- * are stopped at startup, as their agents lost their server anyway. Only a
- * server running as a systemd service does any of this.
+ * are stopped at startup, as their agents lost their server anyway, which is
+ * why only the service itself may turn scopes on (see hostServiceCgroupProblem).
  *
  * @module AgentScopesService
  */
@@ -23,6 +23,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
+import { hostServiceCgroupProblem, readOwnCgroupPath } from "../hostService.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { parseProcStat, planScopes, processKey, scopeUnitName, type ProcessEntry } from "./plan.ts";
 
@@ -48,23 +49,10 @@ const run = Effect.gen(function* () {
   const serverPid = process.pid;
 
   // cgroup v2: "0::/user.slice/.../app.slice/cz-host.service".
-  const cgroupLine = yield* fs.readFileString("/proc/self/cgroup");
-  const cgroupPath = cgroupLine
-    .split("\n")
-    .find((line) => line.startsWith("0::"))
-    ?.slice(3)
-    .trim();
-  if (!cgroupPath || !cgroupPath.includes("user@")) {
-    yield* Effect.logInfo("Agent scopes are off: not running under a systemd user manager");
-    return;
-  }
-  // Only the host's own service manages scopes. A server an agent started (a
-  // dev server inheriting the service's environment) lives in that agent's
-  // scope, and its startup cleanup below would stop every agent on the host.
-  if (!cgroupPath.endsWith(".service")) {
-    yield* Effect.logInfo("Agent scopes are off: not running as a systemd service", {
-      cgroup: cgroupPath,
-    });
+  const cgroupPath = yield* readOwnCgroupPath;
+  const problem = hostServiceCgroupProblem(cgroupPath);
+  if (problem !== null || !cgroupPath) {
+    yield* Effect.logInfo(`Agent scopes are off: ${problem ?? "no cgroup"}`);
     return;
   }
   const procsFile = `/sys/fs/cgroup${cgroupPath}/cgroup.procs`;

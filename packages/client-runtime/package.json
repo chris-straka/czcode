@@ -35,6 +35,18 @@
       "types": "./src/projectFaviconCache.ts",
       "default": "./src/projectFaviconCache.ts"
     },
+    "./pending-user-input": {
+      "types": "./src/pendingUserInput.ts",
+      "default": "./src/pendingUserInput.ts"
+    },
+    "./proposed-plan": {
+      "types": "./src/proposedPlan.ts",
+      "default": "./src/proposedPlan.ts"
+    },
+    "./fleet": {
+      "types": "./src/fleet.ts",
+      "default": "./src/fleet.ts"
+    },
     "./user-message": {
       "types": "./src/userMessage.ts",
       "default": "./src/userMessage.ts"
@@ -306,6 +318,10 @@
     "./state/thread-subagents": {
       "types": "./src/state/threadSubagents.ts",
       "default": "./src/state/threadSubagents.ts"
+    },
+    "./state/fleet": {
+      "types": "./src/state/fleet.ts",
+      "default": "./src/state/fleet.ts"
     },
     "./state/thread-settled": {
       "types": "./src/state/threadSettled.ts",

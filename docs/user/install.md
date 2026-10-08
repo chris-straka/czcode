@@ -33,16 +33,16 @@ through each provider sign-in, and prints a pairing link.
 
 ## Command line
 
-| Task                                  | Command               |
-| ------------------------------------- | --------------------- |
-| Start the server and open the web app | `cz`                  |
-| Start the server without a browser    | `cz serve`            |
-| Open the terminal app                 | `cz tui`              |
-| Pair a device over Tailscale          | `cz pair --tailscale` |
-| Ask the owner, read answers           | `cz inbox`            |
-| Run a task at the next quota reset    | `cz queue`            |
-| List threads, stop a run              | `cz thread`           |
-| Pair this terminal with a machine     | `cz host add <link>`  |
+| Task                                       | Command               |
+| ------------------------------------------ | --------------------- |
+| Start the server and open the web app      | `cz`                  |
+| Start the server without a browser         | `cz serve`            |
+| Open the [terminal app](./terminal-app.md) | `cz tui`              |
+| Pair a device over Tailscale               | `cz pair --tailscale` |
+| Ask the owner, read answers                | `cz inbox`            |
+| Run a task at the next quota reset         | `cz queue`            |
+| List threads, stop a run                   | `cz thread`           |
+| Pair this terminal with a machine          | `cz host add <link>`  |
 
 `cz queue` and `cz thread` act on another machine with `--host <name>`, once
 `cz host add` (or the terminal app's Hosts tab) has paired with it. They share

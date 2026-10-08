@@ -8,7 +8,7 @@ import {
   proposedPlanTitle,
   resolvePlanFollowUpSubmission,
   stripDisplayedPlanMarkdown,
-} from "./proposedPlan";
+} from "./proposedPlan.ts";
 
 describe("proposedPlanTitle", () => {
   it("reads the first markdown heading as the plan title", () => {

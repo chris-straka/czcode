@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { DecisionItemWithAnswer, EnvironmentId } from "@cz/contracts";
+import { type DecisionItemWithAnswer, type EnvironmentId, ThreadId } from "@cz/contracts";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { Box, type DOMElement, Text } from "ink";
@@ -10,7 +10,9 @@ import { age } from "../model/threadList.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { DecisionScreen } from "./DecisionScreen.ts";
 import { useNow, useViewport } from "./hooks.ts";
-import { useClick, useKeys } from "./input.ts";
+import { useClick, useKeys, useVimMotion } from "./input.ts";
+import { HostLoadLine, type HostResult, useHostLoads } from "./useHostLoads.ts";
+import { anyLoading } from "../model/hostLoad.ts";
 
 interface HostDecisions {
   readonly environmentId: EnvironmentId;
@@ -23,15 +25,21 @@ export function openDecisionsAtom(atoms: TuiAtoms) {
   return Atom.make((get) => {
     const catalog = get(atoms.catalog.catalogValueAtom);
     const hosts: Array<HostDecisions> = [];
-    let pending = false;
+    const results: Array<HostResult> = [];
     for (const [environmentId, entry] of catalog.entries) {
       if (!entry.enabled) continue;
       const result = get(atoms.decisions.list({ environmentId, input: { status: "open" } }));
       const items = Option.getOrNull(AsyncResult.value(result));
-      if (items === null) pending ||= result._tag !== "Failure";
-      else hosts.push({ environmentId, label: entry.target.label, items });
+      const label = entry.target.label;
+      results.push({
+        environmentId,
+        label,
+        hasValue: items !== null,
+        failed: result._tag === "Failure",
+      });
+      if (items !== null) hosts.push({ environmentId, label, items });
     }
-    return { hosts, pending };
+    return { hosts, results };
   });
 }
 
@@ -42,19 +50,21 @@ export function DecisionsScreen(props: {
   readonly scopeNames: ReadonlySet<string> | null;
   /** Lets the app hide its tab bar while a decision is open. */
   readonly onOpenChange: (open: boolean) => void;
+  readonly onOpenThread: (environmentId: EnvironmentId, threadId: ThreadId) => void;
 }) {
   const feedAtom = useMemo(() => openDecisionsAtom(props.atoms), [props.atoms]);
-  const { hosts, pending } = useAtomValue(feedAtom);
-  const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
+  const { hosts, results } = useAtomValue(feedAtom);
+  const loads = useHostLoads(props.atoms, results);
+  const [answeredIds, setAnswered] = useState<ReadonlySet<string>>(new Set());
   const entries = useMemo(
-    () => decisionFeed(hosts, props.scopeNames).filter((entry) => !answered.has(entry.item.id)),
-    [hosts, props.scopeNames, answered],
+    () => decisionFeed(hosts, props.scopeNames).filter((entry) => !answeredIds.has(entry.item.id)),
+    [hosts, props.scopeNames, answeredIds],
   );
   const [cursor, setCursor] = useState(0);
   const [open, setOpen] = useState<DecisionEntry | null>(null);
   const now = useNow(60_000);
   const { rows: height, columns } = useViewport();
-  const visible = Math.max(3, height - 4);
+  const visible = Math.max(3, height - 6);
   const selected = Math.min(cursor, Math.max(0, entries.length - 1));
   const top = Math.max(0, Math.min(selected - Math.floor(visible / 2), entries.length - visible));
   const openEntry = (entry: DecisionEntry) => {
@@ -62,11 +72,19 @@ export function DecisionsScreen(props: {
     props.onOpenChange(true);
   };
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
-      if (key.downArrow || input === "j") setCursor(Math.min(entries.length - 1, selected + 1));
-      else if (key.upArrow || input === "k") setCursor(Math.max(0, selected - 1));
-      else if (key.return && entries[selected]) openEntry(entries[selected]);
+      if (
+        vim(input, key, {
+          cursor: selected,
+          count: entries.length,
+          page: visible,
+          onMove: setCursor,
+        })
+      )
+        return;
+      if (key.return && entries[selected]) openEntry(entries[selected]);
     },
     { isActive: props.active && open === null },
   );
@@ -83,59 +101,108 @@ export function DecisionsScreen(props: {
   );
 
   if (open) {
+    const index = entries.findIndex((entry) => entry.item.id === open.item.id);
+    const close = () => {
+      setOpen(null);
+      props.onOpenChange(false);
+    };
     return h(DecisionScreen, {
       key: open.item.id,
       atoms: props.atoms,
       entry: open,
       active: props.active,
-      onDone: () => {
-        // The list re-reads on its interval; hide an answered item until then.
-        if (open.item.status === "open") setAnswered(new Set([...answered, open.item.id]));
-        setOpen(null);
-        props.onOpenChange(false);
+      position: index >= 0 ? `${index + 1}/${entries.length}` : "",
+      onStep: (direction) => {
+        const next = entries[index + direction];
+        if (next) setOpen(next);
+      },
+      onOpenThread: (threadId) => {
+        close();
+        props.onOpenThread(open.environmentId, ThreadId.make(threadId));
+      },
+      onDone: (answered) => {
+        if (!answered) return close();
+        // The list re-reads on its interval; hide the answered item until then,
+        // and carry on to the next one, as Review all does.
+        setAnswered(new Set([...answeredIds, open.item.id]));
+        const next = entries[index + 1] ?? entries[index - 1];
+        if (next && next.item.id !== open.item.id) setOpen(next);
+        else close();
       },
     });
   }
+  const total = hosts.reduce((sum, host) => sum + host.items.length, 0);
+  const machines = new Set(entries.map((entry) => entry.environmentId)).size;
+  const elsewhere = Math.max(0, total - entries.length - answeredIds.size);
+  const summary = h(
+    Text,
+    { dimColor: true, wrap: "truncate" },
+    h(
+      Text,
+      entries.length > 0 ? { color: "yellow", bold: true } : { bold: true },
+      `${entries.length} open`,
+    ),
+    entries.length > 0 ? ` on ${machines} machine${machines === 1 ? "" : "s"}` : "",
+    props.scopeNames !== null && elsewhere > 0
+      ? ` · ${elsewhere} more in other projects · a all`
+      : "",
+  );
   if (entries.length === 0) {
-    return h(Text, { dimColor: true }, pending ? "Loading decisions…" : "Nothing waiting on you.");
+    return h(
+      Box,
+      { flexDirection: "column" },
+      total > 0 ? summary : null,
+      h(
+        Text,
+        { dimColor: true },
+        anyLoading(loads) ? "Loading decisions…" : "Nothing waiting on you.",
+      ),
+      h(HostLoadLine, { hosts: loads }),
+    );
   }
   const tagWidth = 7;
   const projectWidth = Math.min(14, Math.floor(columns / 5));
   return h(
     Box,
-    { ref: list, flexDirection: "column" },
-    entries.slice(top, top + visible).map((entry, offset) => {
-      const index = top + offset;
-      const focused = index === selected;
-      return h(
-        Box,
-        { key: `${entry.environmentId}:${entry.item.id}` },
-        h(Box, { width: 2, flexShrink: 0 }, h(Text, { color: "cyan" }, focused ? "›" : " ")),
-        h(
+    { flexDirection: "column" },
+    summary,
+    h(
+      Box,
+      { ref: list, flexDirection: "column" },
+      entries.slice(top, top + visible).map((entry, offset) => {
+        const index = top + offset;
+        const focused = index === selected;
+        return h(
           Box,
-          { width: tagWidth, flexShrink: 0 },
+          { key: `${entry.environmentId}:${entry.item.id}` },
+          h(Box, { width: 2, flexShrink: 0 }, h(Text, { color: "cyan" }, focused ? "›" : " ")),
           h(
-            Text,
-            entry.item.blocking ? { color: "yellow" } : { dimColor: true },
-            KIND_TAG[entry.item.kind],
+            Box,
+            { width: tagWidth, flexShrink: 0 },
+            h(
+              Text,
+              entry.item.blocking ? { color: "yellow" } : { dimColor: true },
+              KIND_TAG[entry.item.kind],
+            ),
           ),
-        ),
-        h(
-          Box,
-          { width: projectWidth, flexShrink: 0, marginRight: 1 },
-          h(Text, { dimColor: true, wrap: "truncate" }, entry.item.project),
-        ),
-        h(
-          Box,
-          { flexGrow: 1, marginRight: 1 },
-          h(Text, { bold: focused, wrap: "truncate" }, entry.item.title || entry.item.question),
-        ),
-        h(
-          Box,
-          { width: 4, flexShrink: 0, justifyContent: "flex-end" },
-          h(Text, { dimColor: true }, age(now, entry.item.created_at)),
-        ),
-      );
-    }),
+          h(
+            Box,
+            { width: projectWidth, flexShrink: 0, marginRight: 1 },
+            h(Text, { dimColor: true, wrap: "truncate" }, entry.item.project),
+          ),
+          h(
+            Box,
+            { flexGrow: 1, marginRight: 1 },
+            h(Text, { bold: focused, wrap: "truncate" }, entry.item.title || entry.item.question),
+          ),
+          h(
+            Box,
+            { width: 4, flexShrink: 0, justifyContent: "flex-end" },
+            h(Text, { dimColor: true }, age(now, entry.item.created_at)),
+          ),
+        );
+      }),
+    ),
+    h(HostLoadLine, { hosts: loads }),
   );
 }

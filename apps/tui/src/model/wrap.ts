@@ -23,6 +23,9 @@ export function cellWidth(codePoint: number): number {
 }
 
 /** Splits on newlines, then breaks each line at spaces (or mid-word when one word is too long). */
+/** Prose (messages, decision text) wraps here even in a wide window: long lines are hard to read. */
+export const READING_WIDTH = 70;
+
 export function wrapText(text: string, width: number): Array<string> {
   const max = Math.max(1, width);
   const rows: Array<string> = [];

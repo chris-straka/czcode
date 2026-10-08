@@ -5,17 +5,19 @@ import { createElement as h, useCallback, useEffect, useMemo, useRef, useState }
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { StatusContext } from "./command.ts";
+import { FleetScreen } from "./FleetScreen.ts";
 import { HostsScreen } from "./HostsScreen.ts";
 import { NewThreadScreen } from "./NewThreadScreen.ts";
+import { decisionFeed } from "../model/decisionFeed.ts";
 import { projectScope } from "../model/scope.ts";
-import { DecisionsScreen } from "./DecisionsScreen.ts";
+import { DecisionsScreen, openDecisionsAtom } from "./DecisionsScreen.ts";
 import { DiffScreen } from "./DiffScreen.ts";
 import { QueueScreen } from "./QueueScreen.ts";
 import { environmentShellsAtom, ThreadListScreen } from "./ThreadListScreen.ts";
 import { ThreadScreen } from "./ThreadScreen.ts";
 import { useClick, useKeys, useMouseRouter } from "./input.ts";
 
-const TABS = ["Threads", "Decisions", "Queue", "Hosts"] as const;
+const TABS = ["Threads", "Decisions", "Queue", "Hosts", "Fleet"] as const;
 type Tab = (typeof TABS)[number];
 
 type Overlay =
@@ -30,7 +32,7 @@ type Overlay =
     };
 
 /**
- * Tabs across the top (1-2 or Tab to switch), one screen below, a status line
+ * Tabs across the top (digits or Tab to switch), one screen below, a status line
  * at the bottom. Keys stay off `\` and `|` (the owner's float toggle and
  * terminal-normal exit) and Cmd chords; Esc always goes back.
  */
@@ -40,12 +42,24 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
   const [listCursor, setListCursor] = useState(0);
   const [decisionOpen, setDecisionOpen] = useState(false);
+  // The thread list is taking text (search, rename) or showing a menu.
+  const [listCapturing, setListCapturing] = useState(false);
   // Opens on the project containing the cwd (one Ghostty tab per project); `a` shows all.
   const [allProjects, setAllProjects] = useState(false);
   const shellsAtom = useMemo(() => environmentShellsAtom(atoms), [atoms]);
   const shells = useAtomValue(shellsAtom);
+  // Open decisions on every machine, counted the way the Decisions tab filters
+  // them (this project, or all with `a`), as the desktop badge does.
+  const decisionsAtom = useMemo(() => openDecisionsAtom(atoms), [atoms]);
+  const decisionHosts = useAtomValue(decisionsAtom).hosts;
+  const tabLabel = (name: Tab, index: number) =>
+    `${index + 1} ${name}${name === "Decisions" && openDecisionCount > 0 ? ` ${openDecisionCount}` : ""}`;
   const scope = useMemo(() => projectScope(shells, cwd), [shells, cwd]);
   const scopeKeys = allProjects || scope === null ? null : scope.keys;
+  const openDecisionCount = useMemo(
+    () => decisionFeed(decisionHosts, allProjects || scope === null ? null : scope.names).length,
+    [decisionHosts, allProjects, scope],
+  );
   const [status, setStatusText] = useState("");
   const setStatus = useCallback((message: string) => setStatusText(message), []);
   useEffect(() => {
@@ -62,7 +76,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
     ({ column }) => {
       let start = 0;
       for (const [index, name] of TABS.entries()) {
-        const width = `${index + 1} ${name}`.length;
+        const width = tabLabel(name, index).length;
         if (column >= start && column < start + width) return setTab(name);
         start += width + 2;
       }
@@ -81,7 +95,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
         setListCursor(0);
       }
     },
-    { isActive: atTop },
+    { isActive: atTop && !listCapturing },
   );
 
   const back = () => setOverlay({ kind: "none" });
@@ -106,6 +120,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       active: true,
       onBack: back,
       onDiff: (toTurnCount: number) => setOverlay({ ...overlay, kind: "diff", toTurnCount }),
+      onOpenThread: openThread,
     });
   } else if (overlay.kind === "new-thread") {
     body = h(NewThreadScreen, {
@@ -121,11 +136,17 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       active: true,
       scopeNames: allProjects || scope === null ? null : scope.names,
       onOpenChange: setDecisionOpen,
+      onOpenThread: (environmentId: EnvironmentId, threadId: ThreadId) => {
+        setDecisionOpen(false);
+        openThread(environmentId, threadId);
+      },
     });
   } else if (tab === "Queue") {
     body = h(QueueScreen, { atoms, active: true });
   } else if (tab === "Hosts") {
     body = h(HostsScreen, { atoms, active: true });
+  } else if (tab === "Fleet") {
+    body = h(FleetScreen, { atoms, active: true, onOpen: openThread });
   } else {
     body = h(ThreadListScreen, {
       atoms,
@@ -134,6 +155,7 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       cursor: listCursor,
       onCursor: setListCursor,
       scope: scopeKeys,
+      onCaptureChange: setListCapturing,
     });
   }
 
@@ -158,6 +180,9 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
                     Text,
                     name === tab ? { bold: true, color: "cyan" } : { dimColor: true },
                     `${index + 1} ${name}`,
+                    name === "Decisions" && openDecisionCount > 0
+                      ? h(Text, { color: "yellow", bold: true }, ` ${openDecisionCount}`)
+                      : null,
                   ),
                 ),
               ),

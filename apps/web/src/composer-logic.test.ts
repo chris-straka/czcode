@@ -25,7 +25,7 @@ import {
   parseStandaloneComposerSlashCommand,
   replaceTextRange,
 } from "./composer-logic";
-import { carryDisplacedCustomAnswerIntoPrompt } from "./pendingUserInput";
+import { carryDisplacedCustomAnswerIntoPrompt } from "@cz/client-runtime/pending-user-input";
 import { formatTerminalContextReference } from "./lib/terminalContext";
 
 const terminalReference = formatTerminalContextReference({

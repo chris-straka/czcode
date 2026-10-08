@@ -106,6 +106,7 @@ import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRoute
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
 import { DecisionRouteScreen } from "./features/decisions/DecisionRouteScreen";
 import { DecisionsRouteScreen } from "./features/decisions/DecisionsRouteScreen";
+import { FleetRouteScreen } from "./features/fleet/FleetRouteScreen";
 import { SettingsRouteScreen } from "./features/settings/SettingsRouteScreen";
 import { SettingsThreadsRouteScreen } from "./features/settings/SettingsThreadsRouteScreen";
 import { SettingsEnvironmentFilterProvider } from "./features/settings/settings-environment-filter";
@@ -528,6 +529,7 @@ const WORKSPACE_OVERLAY_ROUTES = new Set([
   "Connections",
   "Decisions",
   "Decision",
+  "Fleet",
   "ConnectionsNew",
   "GitBranches",
   "GitCommit",
@@ -837,6 +839,11 @@ const RootStackConfig = createNativeStackNavigator({
       screen: DecisionsRouteScreen,
       linking: "decisions",
       options: { title: "Decisions", presentation: "card", headerShown: false },
+    }),
+    Fleet: createNativeStackScreen({
+      screen: FleetRouteScreen,
+      linking: "fleet",
+      options: { title: "Fleet", presentation: "card", headerShown: false },
     }),
     Decision: createNativeStackScreen({
       screen: DecisionRouteScreen,

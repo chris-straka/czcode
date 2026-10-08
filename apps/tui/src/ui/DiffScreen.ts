@@ -7,7 +7,7 @@ import { createElement as h, useMemo, useState } from "react";
 
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useViewport } from "./hooks.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 
 const lineColor = (line: string) =>
   line.startsWith("+++") || line.startsWith("---")
@@ -22,7 +22,7 @@ const lineColor = (line: string) =>
             ? { bold: true, color: "yellow" }
             : {};
 
-/** Everything the thread changed, from the host (works for threads on any machine). */
+/** What the thread changed, one turn at a time or all together, from the host (works for threads on any machine). */
 export function DiffScreen(props: {
   readonly atoms: TuiAtoms;
   readonly environmentId: EnvironmentId;
@@ -31,29 +31,53 @@ export function DiffScreen(props: {
   readonly active: boolean;
   readonly onBack: () => void;
 }) {
+  // Opens on the latest turn, like the desktop's diff panel; `a` shows the whole thread.
+  const [turn, setTurn] = useState(props.toTurnCount);
+  const [whole, setWhole] = useState(false);
   const result = useAtomValue(
-    props.atoms.orchestration.fullThreadDiff({
-      environmentId: props.environmentId,
-      input: { threadId: props.threadId, toTurnCount: props.toTurnCount },
-    }),
+    whole
+      ? props.atoms.orchestration.fullThreadDiff({
+          environmentId: props.environmentId,
+          input: { threadId: props.threadId, toTurnCount: props.toTurnCount },
+        })
+      : props.atoms.orchestration.turnDiff({
+          environmentId: props.environmentId,
+          input: { threadId: props.threadId, fromTurnCount: turn - 1, toTurnCount: turn },
+        }),
   );
   const { rows: height, columns } = useViewport();
   const [top, setTop] = useState(0);
+  const showTurn = (next: number) => {
+    setWhole(false);
+    setTurn(Math.max(1, Math.min(props.toTurnCount, next)));
+    setTop(0);
+  };
   const diff = Option.getOrNull(AsyncResult.value(result))?.diff ?? null;
   const lines = useMemo(() => (diff ?? "").split("\n"), [diff]);
   const visible = Math.max(3, height - 3);
   const maxTop = Math.max(0, lines.length - visible);
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
       if (key.escape || input === "d") return props.onBack();
-      if (input === "j" || key.downArrow) setTop(Math.min(maxTop, top + 1));
-      else if (input === "k" || key.upArrow) setTop(Math.max(0, top - 1));
-      else if (key.pageDown || (key.ctrl && input === "f") || input === " ")
-        setTop(Math.min(maxTop, top + visible - 1));
-      else if (key.pageUp || (key.ctrl && input === "b")) setTop(Math.max(0, top - visible + 1));
-      else if (input === "g") setTop(0);
-      else if (input === "G") setTop(maxTop);
+      if (input === "<" || key.leftArrow) return showTurn(turn - 1);
+      if (input === ">" || key.rightArrow) return showTurn(turn + 1);
+      if (input === "a") {
+        setWhole(!whole);
+        return setTop(0);
+      }
+      if (
+        vim(input, key, {
+          cursor: top,
+          count: maxTop + 1,
+          page: visible,
+          onMove: setTop,
+          onBack: props.onBack,
+        })
+      )
+        return;
+      if (input === " ") setTop(Math.min(maxTop, top + visible - 1));
       else if (input === "]") {
         const next = lines.findIndex((line, index) => index > top && line.startsWith("diff "));
         if (next >= 0) setTop(Math.min(maxTop, next));
@@ -74,7 +98,10 @@ export function DiffScreen(props: {
       result._tag === "Failure" ? "Couldn't load the diff." : "Loading diff…",
     );
   }
-  if (diff.trim() === "") return h(Text, { dimColor: true }, "No changes. (esc back)");
+  const scopeLabel = whole ? "all turns" : `turn ${turn}/${props.toTurnCount}`;
+  const keys = `</> turn · a ${whole ? "one turn" : "all turns"}`;
+  if (diff.trim() === "")
+    return h(Text, { dimColor: true }, `No changes in ${scopeLabel}. ${keys} · q back`);
   return h(
     Box,
     { flexDirection: "column" },
@@ -94,7 +121,7 @@ export function DiffScreen(props: {
     h(
       Text,
       { dimColor: true },
-      `${top + 1}-${Math.min(lines.length, top + visible)}/${lines.length} · ]/[ file · space/pgdn · esc back`,
+      `${scopeLabel} · ${top + 1}-${Math.min(lines.length, top + visible)}/${lines.length} · ]/[ file · ${keys} · q back`,
     ),
   );
 }

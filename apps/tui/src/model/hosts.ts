@@ -89,3 +89,63 @@ function withOfferedOptions(
   const { options: _saved, ...rest } = selection;
   return options ? { ...rest, options } : rest;
 }
+
+type Providers = Pick<ServerConfig, "providers">["providers"];
+
+function modelCapabilities(selection: ModelSelection, providers: Providers) {
+  return providers
+    .find((provider) => provider.instanceId === selection.instanceId)
+    ?.models.find((model) => model.slug === selection.model)?.capabilities;
+}
+
+/** The option a TUI user tunes most (reasoning effort), or the model's first choice list. */
+function effortDescriptor(selection: ModelSelection, providers: Providers) {
+  const caps = modelCapabilities(selection, providers);
+  if (!caps) return null;
+  const selects = getProviderOptionDescriptors({ caps, selections: selection.options }).filter(
+    (descriptor) => descriptor.type === "select" && descriptor.options.length > 1,
+  );
+  return (
+    selects.find((descriptor) => /effort|reasoning|think/i.test(descriptor.id)) ??
+    selects[0] ??
+    null
+  );
+}
+
+/** "Opus 4.5 · High": the model's name and its effort, for the composer's status line. */
+export function modelLabel(
+  selection: ModelSelection,
+  config: Pick<ServerConfig, "providers"> | null,
+): string {
+  const providers = config?.providers ?? [];
+  const model = providers
+    .find((provider) => provider.instanceId === selection.instanceId)
+    ?.models.find((candidate) => candidate.slug === selection.model);
+  const name = model?.shortName ?? model?.name ?? selection.model;
+  const descriptor = effortDescriptor(selection, providers);
+  const effort =
+    descriptor?.type === "select"
+      ? descriptor.options.find(
+          (option) =>
+            option.id ===
+            (descriptor.currentValue ?? descriptor.options.find((o) => o.isDefault)?.id),
+        )?.label
+      : undefined;
+  return effort ? `${name} · ${effort}` : name;
+}
+
+/** The selection with its effort moved to the next choice, or null when the model has none. */
+export function cycleEffort(
+  selection: ModelSelection,
+  config: Pick<ServerConfig, "providers"> | null,
+): ModelSelection | null {
+  const descriptor = effortDescriptor(selection, config?.providers ?? []);
+  if (descriptor?.type !== "select") return null;
+  const current =
+    descriptor.currentValue ?? descriptor.options.find((option) => option.isDefault)?.id;
+  const index = descriptor.options.findIndex((option) => option.id === current);
+  const next = descriptor.options[(index + 1) % descriptor.options.length];
+  if (!next) return null;
+  const others = (selection.options ?? []).filter((option) => option.id !== descriptor.id);
+  return { ...selection, options: [...others, { id: descriptor.id, value: next.id }] };
+}

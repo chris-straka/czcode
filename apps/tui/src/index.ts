@@ -9,14 +9,21 @@ import { render } from "ink";
 import { createElement as h } from "react";
 
 import type { RunTuiOptions, TuiModule } from "./api.ts";
+import { parentNvim, passEscapeLua, processAncestors, runInParentNvim } from "./model/nvim.ts";
 import { makeTuiRuntime } from "./runtime/connection.ts";
 import { makeTuiAtoms } from "./state/atoms.ts";
 import { App } from "./ui/App.ts";
+import { terminalImages } from "./ui/InlineImage.ts";
 
 export type { LocalServer, RunTuiOptions } from "./api.ts";
 
 /** Runs the TUI until the user quits. Typed for other packages by entry.d.ts. */
 export const runTui: TuiModule["runTui"] = async (options: RunTuiOptions) => {
+  // Inside a neovim terminal, make sure Esc reaches the TUI even when the
+  // user maps terminal-mode Esc to leave insert (toggleterm's suggestion).
+  if (parentNvim() !== null) {
+    void processAncestors(process.pid).then((pids) => runInParentNvim(passEscapeLua(pids)));
+  }
   const tuiRuntime = makeTuiRuntime(options);
   const atoms = makeTuiAtoms(tuiRuntime);
   const app = render(
@@ -44,6 +51,12 @@ export const runTui: TuiModule["runTui"] = async (options: RunTuiOptions) => {
     await app.waitUntilExit();
   } finally {
     process.off("SIGHUP", onHangup);
+    // Free the images ct sent; the terminal keeps them otherwise.
+    try {
+      terminalImages.clear();
+    } catch {
+      // The terminal may already be gone (hangup).
+    }
     tuiRuntime.registry.dispose();
     // Unmounting queued atom removals that run a tick later and re-arm the
     // registry's idle timers, which would keep the process (and the shell's

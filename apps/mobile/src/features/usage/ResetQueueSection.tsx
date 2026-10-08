@@ -90,7 +90,17 @@ function EnvironmentResetQueue({
                   }
                 />
               </View>
-            ) : null}
+            ) : (
+              <View className="flex-row gap-2">
+                <MaterialButton
+                  tone="text"
+                  label="Dismiss"
+                  onPress={() =>
+                    void cancel({ environmentId, input: { id: run.id } }).then(refresh)
+                  }
+                />
+              </View>
+            )}
           </View>
         ))}
       </View>

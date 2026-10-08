@@ -95,7 +95,9 @@ const addCommand = Command.make("add", {
     Flag.optional,
   ),
   model: Flag.String("model").pipe(
-    Flag.withDescription("Provider instance and model, like claude/claude-opus-5-5."),
+    Flag.withDescription(
+      "Provider instance and model, like claudeAgent/claude-opus-5-5. A driver name (claude) works when the host has one instance of it.",
+    ),
   ),
   title: Flag.String("title").pipe(Flag.optional),
   option: Flag.String("option").pipe(
@@ -115,7 +117,7 @@ const addCommand = Command.make("add", {
         const path = yield* Path.Path;
         const slash = flags.model.indexOf("/");
         if (slash <= 0)
-          return yield* fail("--model is instance/model, like claude/claude-opus-5-5.");
+          return yield* fail("--model is instance/model, like claudeAgent/claude-opus-5-5.");
         const options = flags.option.map((entry) => {
           const equals = entry.indexOf("=");
           const value = entry.slice(equals + 1).trim();
@@ -213,7 +215,7 @@ export const queueCommand = Command.make("queue").pipe(
   Command.withSubcommands([
     addCommand,
     listCommand,
-    mutationCommand("cancel", "Cancel a queued run."),
+    mutationCommand("cancel", "Cancel a queued run, or dismiss one that failed to start."),
     mutationCommand("run-now", "Start a queued run now instead of at the reset."),
   ]),
 );

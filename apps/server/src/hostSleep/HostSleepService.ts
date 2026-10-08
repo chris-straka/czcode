@@ -29,6 +29,7 @@ import * as Path from "effect/Path";
 import { HostProcessPlatform } from "@cz/shared/hostProcess";
 
 import * as ServerConfig from "../config.ts";
+import { hostServiceCgroupProblem, readOwnCgroupPath } from "../hostService.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as ResetQueueService from "../resetQueue/ResetQueueService.ts";
@@ -60,6 +61,11 @@ const run = Effect.gen(function* () {
     () => 0,
   );
   if (idleMinutes <= 0 || (yield* HostProcessPlatform) !== "linux") return;
+  const problem = hostServiceCgroupProblem(yield* readOwnCgroupPath);
+  if (problem !== null) {
+    yield* Effect.logInfo(`Sleeping when idle is off: ${problem}`);
+    return;
+  }
   const idleMs = idleMinutes * 60 * 1000;
   const wakeTimes = Option.getOrElse(
     yield* wakeTimesConfig.pipe(Effect.orElseSucceed(() => Option.none<string>())),

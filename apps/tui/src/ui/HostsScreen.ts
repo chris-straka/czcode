@@ -10,7 +10,7 @@ import { hostStateLabel } from "../model/hosts.ts";
 import type { TuiAtoms } from "../state/atoms.ts";
 import { useCommand } from "./command.ts";
 import { TextInput } from "./TextInput.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 import { useWakeHost } from "./useWakeHost.ts";
 
 /** Paired machines with their state; `p` pairs a new one from a `cz pair` link, `w` wakes a sleeping one. */
@@ -32,15 +32,17 @@ export function HostsScreen({
   const selected = entries[Math.min(cursor, entries.length - 1)];
   const wakeHost = useWakeHost(atoms);
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
       if (input === "p") return setPairing("");
-      if (key.downArrow || input === "j") setCursor(Math.min(entries.length - 1, cursor + 1));
-      else if (key.upArrow || input === "k") setCursor(Math.max(0, cursor - 1));
-      else if (input === "r" && selected) void retry(selected[0]);
+      if (vim(input, key, { cursor, count: entries.length, page: 10, onMove: setCursor })) return;
+      if (input === "r" && selected) void retry(selected[0]);
       else if (input === "w" && selected) {
         setNote(`Waking ${selected[1].target.label}…`);
-        void wakeHost(selected[0]).then((message) => setNote(message ?? "Nothing to wake there."));
+        void wakeHost(selected[0], { userInitiated: true }).then((message) =>
+          setNote(message ?? ""),
+        );
       } else if (input === "e" && selected) {
         void setEnabled({ environmentId: selected[0], enabled: !selected[1].enabled });
       }

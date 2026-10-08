@@ -24,7 +24,7 @@ import { StatusContext, useCommand } from "./command.ts";
 import { queuedRunStartLabel } from "@cz/client-runtime/state/queue";
 import { environmentShellsAtom } from "./ThreadListScreen.ts";
 import { TextInput } from "./TextInput.ts";
-import { useKeys } from "./input.ts";
+import { useKeys, useVimMotion } from "./input.ts";
 
 const NO_VCS_STATUS = Atom.make(AsyncResult.initial<VcsStatusResult | null, unknown>());
 
@@ -93,12 +93,21 @@ export function NewThreadScreen(props: {
       ? hosts.map((host) => host.label)
       : projects.map((project) => project.title);
 
+  const vim = useVimMotion();
   useKeys(
     (input, key) => {
       if (key.escape) return props.onCancel();
-      if (key.downArrow || input === "j") setCursor(Math.min(choices.length - 1, cursor + 1));
-      else if (key.upArrow || input === "k") setCursor(Math.max(0, cursor - 1));
-      else if (key.return) {
+      if (
+        vim(input, key, {
+          cursor,
+          count: choices.length,
+          page: 10,
+          onMove: setCursor,
+          onBack: props.onCancel,
+        })
+      )
+        return;
+      if (key.return) {
         if (step.kind === "host") {
           const host = hosts[cursor];
           if (host) {

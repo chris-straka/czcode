@@ -46,6 +46,7 @@ import * as Option from "effect/Option";
 import {
   ArrowLeftIcon,
   ChartNoAxesColumnIcon,
+  ServerIcon,
   CheckIcon,
   ChevronRightIcon,
   CornerLeftUpIcon,
@@ -2225,6 +2226,27 @@ function OpenCommandPaletteDialog(props: {
     shortcutCommand: "usage.open",
     run: async () => {
       await navigate({ to: "/usage" });
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:fleet",
+    searchTerms: [
+      "fleet",
+      "machines",
+      "hosts",
+      "resources",
+      "cpu",
+      "memory",
+      "disk",
+      "agents",
+      "wake",
+    ],
+    title: "Open fleet",
+    icon: <ServerIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/fleet" });
     },
   });
 

@@ -13,6 +13,34 @@ export const HostResourcesSnapshot = Schema.Struct({
   cpuCount: NonNegativeInt,
   availableMemoryBytes: NonNegativeInt,
   totalMemoryBytes: NonNegativeInt,
+  /** 1, 5, and 15 minute load averages; absent on Windows and older servers. */
+  loadAverage: Schema.optionalKey(Schema.Array(Schema.Number)),
+  swap: Schema.optionalKey(
+    Schema.Struct({
+      totalBytes: NonNegativeInt,
+      usedBytes: NonNegativeInt,
+      devices: Schema.Array(
+        Schema.Struct({
+          name: Schema.String,
+          kind: Schema.Literals(["zram", "partition", "file"]),
+          sizeBytes: NonNegativeInt,
+          usedBytes: NonNegativeInt,
+          /** RAM a zram device takes for what it holds (compressed). */
+          memoryBytes: Schema.optionalKey(NonNegativeInt),
+        }),
+      ),
+    }),
+  ),
+  /** Free space per disk mount; a full disk stops builds and agents. */
+  disks: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        mount: Schema.String,
+        totalBytes: NonNegativeInt,
+        freeBytes: NonNegativeInt,
+      }),
+    ),
+  ),
 });
 export type HostResourcesSnapshot = typeof HostResourcesSnapshot.Type;
 

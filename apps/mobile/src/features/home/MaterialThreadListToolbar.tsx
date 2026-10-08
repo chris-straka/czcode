@@ -11,6 +11,7 @@ import type { MenuAction } from "@react-native-menu/menu";
 
 import { AndroidHeaderIconButton } from "../../components/AndroidScreenHeader";
 import { CompactBrandTitle } from "../../components/CompactBrandTitle";
+import { FleetHeaderButton } from "../fleet/FleetRouteScreen";
 import { DecisionsHeaderButton } from "../decisions/DecisionsHeaderButton";
 import { MaterialFloatingActionButton } from "../../components/MaterialFloatingActionButton";
 import { AndroidAnchoredMenu } from "../../components/AndroidAnchoredMenu";
@@ -109,6 +110,7 @@ export function MaterialThreadListToolbar(props: {
                   brand={<CompactBrandTitle allowFontScaling={false} />}
                 />
               </View>
+              <FleetHeaderButton />
               <DecisionsHeaderButton />
               <AndroidHeaderIconButton
                 accessibilityLabel="Search threads"

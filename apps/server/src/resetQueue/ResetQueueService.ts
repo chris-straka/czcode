@@ -12,6 +12,8 @@ import {
   QueuedRunError,
   type QueuedRunInput,
   QueuedRunNotFoundError,
+  type ModelSelection,
+  type ServerProvider,
 } from "@cz/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -84,6 +86,37 @@ function spareAllowanceExpiring(windows: ReadonlyArray<UsageWindow>, now: number
   return soonest !== null && soonest - now <= SPARE_ALLOWANCE_LEAD_MS;
 }
 
+/**
+ * The run's model on a configured instance. A driver name (`claude`) picks
+ * the host's one instance of that driver (`claudeAgent`); a name no instance
+ * or driver matches fails now rather than when the run comes due. With no
+ * providers loaded yet the selection is kept as given.
+ */
+function resolveQueuedModel(
+  selection: ModelSelection,
+  providers: ReadonlyArray<Pick<ServerProvider, "instanceId" | "driver" | "enabled">>,
+): Effect.Effect<ModelSelection, QueuedRunError> {
+  if (providers.length === 0) return Effect.succeed(selection);
+  if (providers.some((provider) => provider.instanceId === selection.instanceId)) {
+    return Effect.succeed(selection);
+  }
+  const byDriver = providers.filter(
+    (provider) => provider.enabled && String(provider.driver) === String(selection.instanceId),
+  );
+  if (byDriver.length === 1 && byDriver[0]) {
+    return Effect.succeed({ ...selection, instanceId: byDriver[0].instanceId });
+  }
+  const choices = providers.map((provider) => provider.instanceId).join(", ");
+  return Effect.fail(
+    new QueuedRunError({
+      reason:
+        byDriver.length > 1
+          ? `"${selection.instanceId}" matches several providers here; use one of ${byDriver.map((provider) => provider.instanceId).join(", ")}.`
+          : `No provider "${selection.instanceId}" on this host; use one of ${choices}.`,
+    }),
+  );
+}
+
 const make = Effect.gen(function* () {
   const { sql } = yield* ForkDatabase.ForkDatabase;
   const crypto = yield* Crypto.Crypto;
@@ -132,9 +165,11 @@ const make = Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
       let dueAt = input.dueAt ?? now;
       let dueReason: QueuedRun["dueReason"] = "chosen";
+      const snapshots = yield* providers.getProviders;
+      const modelSelection = yield* resolveQueuedModel(input.modelSelection, snapshots);
       if (input.dueAt === undefined) {
-        const provider = (yield* providers.getProviders).find(
-          (candidate) => candidate.instanceId === input.modelSelection.instanceId,
+        const provider = snapshots.find(
+          (candidate) => candidate.instanceId === modelSelection.instanceId,
         );
         const windows = provider?.usageLimits?.windows ?? [];
         const reset = nextResetAt(windows, now);
@@ -150,7 +185,7 @@ const make = Effect.gen(function* () {
         title: input.title,
         prompt: input.prompt,
         projectId: input.projectId,
-        modelSelection: input.modelSelection,
+        modelSelection,
         runtimeMode: input.runtimeMode ?? "auto",
         interactionMode: input.interactionMode ?? "default",
         workspaceStrategy: input.workspaceStrategy ?? { type: "root" },
@@ -183,7 +218,8 @@ const make = Effect.gen(function* () {
   const cancel: ResetQueueService["Service"]["cancel"] = Effect.fn("ResetQueueService.cancel")(
     function* (id) {
       const run = yield* find(id);
-      if (run.status !== "queued") return run;
+      // A failed run is dismissed the same way, so it leaves every list.
+      if (run.status !== "queued" && run.status !== "failed") return run;
       const cancelled: QueuedRun = { ...run, status: "cancelled" };
       yield* write(cancelled);
       return cancelled;
