@@ -45,7 +45,7 @@ export function VideoReviewPlayer({
         controls
         preload="metadata"
         src={url}
-        className="max-h-[60vh] w-full rounded-md bg-black"
+        className="max-h-[50vh] w-full rounded-md bg-black"
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
         onPlay={(event) => {
           claimPlayback(event.currentTarget);

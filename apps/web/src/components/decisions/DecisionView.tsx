@@ -382,7 +382,7 @@ export function DecisionView({
                 <Button
                   key={verdict.value}
                   variant={
-                    verdict.value === "reject" || verdict.value === "never" ? "outline" : "default"
+                    verdict.value === "approve" || verdict.value === "yes" ? "default" : "outline"
                   }
                   disabled={unseen !== null}
                   title={unseen ?? undefined}
