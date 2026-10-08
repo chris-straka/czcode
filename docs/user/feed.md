@@ -1,7 +1,7 @@
 # The feed
 
-cz opens on one feed for the machine you pick at the top left (or all of
-them). It has two tabs:
+cz opens on the feed for the machine you pick at the top left (or all of
+them). It has two pages, switched at the top:
 
 - **Needs you:** questions agents asked you (Decisions) and threads waiting
   for an approval or an answer, most important first, with the
@@ -13,7 +13,7 @@ them). It has two tabs:
   under **older**.
 
 Beside the search bar, **All · Games · Software** and **Projects** narrow
-both tabs, for one machine or all.
+both pages, for one machine or all.
 
 Opening a thread or a Decision shows it on its own page; **Back** (or Esc)
 returns to the feed where you left it.
