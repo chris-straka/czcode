@@ -40,7 +40,9 @@ the card.
   Superhuman does. After the last one, the view closes back to an empty Needs
   you. Prev and next arrows with "n of N" are always present, so going through
   everything never needs a separate mode.
-- Every card and view has **No longer relevant**. The server also withdraws a
+- Every card and view has **Dismiss** (withdraws it as no longer relevant).
+  Every answer is clickable at once, media played or not; the toast's Undo
+  is the safety net, not a gate. The server also withdraws a
   Decision when its agent asks again on the same subject or its thread is
   archived (`apps/server/src/decisions/DecisionFollowUps.ts`). The goal is that
   nothing sits in Needs you that the owner can't act on.

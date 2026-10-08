@@ -21,13 +21,11 @@ export function VideoReviewPlayer({
   media,
   marks,
   onMarks,
-  onEngage,
 }: {
   readonly url: string;
   readonly media: DecisionMediaRef;
   readonly marks: ReadonlyArray<TimelineMark>;
   readonly onMarks: (marks: ReadonlyArray<TimelineMark>) => void;
-  readonly onEngage: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [duration, setDuration] = useState(0);
@@ -47,15 +45,8 @@ export function VideoReviewPlayer({
         src={url}
         className="max-h-[50vh] w-full rounded-md bg-black"
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
-        onPlay={(event) => {
-          claimPlayback(event.currentTarget);
-          onEngage();
-        }}
-        onTimeUpdate={(event) => {
-          setTime(event.currentTarget.currentTime);
-          // Scrubbing moves the playhead; a load can report a seek without one.
-          if (event.currentTarget.currentTime > 0.5) onEngage();
-        }}
+        onPlay={(event) => claimPlayback(event.currentTarget)}
+        onTimeUpdate={(event) => setTime(event.currentTarget.currentTime)}
       />
       <ReviewTimeline
         media={media}

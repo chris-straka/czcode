@@ -617,6 +617,17 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(cz-mobil
 }
 
 @layer base {
+  /* Dragging across a button (Ask for changes, a tab, a pick tile) never
+     selects its words. Text fields inside them still select. */
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="option"],
+  [role="menuitem"],
+  [role="switch"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
   ::highlight(cz-assistant-citation) {
     background-color: color-mix(
       in oklab,

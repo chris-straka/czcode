@@ -181,46 +181,6 @@ export function answerSummary(item: DecisionItem, answer: DecisionAnswerInput): 
 }
 
 /**
- * You can't approve what you haven't seen. Video, sound, and an app build
- * must be played, scrubbed, or installed before a verdict counts; pictures
- * and models show in place, so seeing the view is enough for them.
- */
-function mediaToEngage(item: Pick<DecisionItem, "kind" | "media">): ReadonlyArray<string> {
-  if (item.kind === "pick" || item.kind === "rank" || item.kind === "request") return [];
-  return item.media
-    .filter((media) => media.type === "video" || media.type === "audio" || media.type === "apk")
-    .map((media) => media.key);
-}
-
-/** Why verdict buttons are still off, or null once every such media was engaged. */
-export function unseenMediaProblem(
-  item: Pick<DecisionItem, "kind" | "media">,
-  engaged: ReadonlySet<string>,
-): string | null {
-  const missing = item.media.filter(
-    (media) => mediaToEngage(item).includes(media.key) && !engaged.has(media.key),
-  );
-  if (missing.length === 0) return null;
-  const first = missing[0]!;
-  return first.type === "apk"
-    ? "Install the build first."
-    : first.type === "video"
-      ? "Watch the video first."
-      : "Play the sound first.";
-}
-
-/**
- * A feed card answers in place only when nothing on it needs watching,
- * hearing, or installing first; otherwise it offers Open.
- */
-export function canAnswerFromCard(item: Pick<DecisionItem, "kind" | "media">): boolean {
-  return (
-    mediaToEngage(item).length === 0 &&
-    !item.media.some((media) => media.type === "image" && item.kind !== "pick")
-  );
-}
-
-/**
  * The picture an option shows: its own media, or none. Media several options
  * point at (one overview image on every option) or media with no file
  * belongs to no option; `contextMedia` shows it once above them instead.

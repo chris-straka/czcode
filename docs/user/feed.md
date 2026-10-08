@@ -36,8 +36,8 @@ In an open Decision, answering moves straight to the next open one, and
 after the last it returns to Needs you. The arrows at the top step through
 them without answering.
 
-**No longer relevant** on any Decision dismisses it (you can undo for a few
-seconds). Decisions also close themselves when the agent asks the same
+**Dismiss** on any Decision withdraws it. Every answer and Dismiss can be
+undone for a few seconds from the toast that follows. Decisions also close themselves when the agent asks the same
 question again or its thread is archived.
 
 ## Tidying up

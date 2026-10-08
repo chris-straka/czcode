@@ -1,6 +1,5 @@
 import {
   answerSummary,
-  canAnswerFromCard,
   VERDICT_BUTTONS,
   optionMedia,
 } from "@cz/client-runtime/decisions/draft";
@@ -236,12 +235,9 @@ export function DecisionsRouteScreen() {
         ) : (
           entries.map((entry) => {
             const { item } = entry;
-            // A card answers in place only when nothing on it needs watching,
-            // hearing, or installing first; otherwise tapping opens it.
+            // A review or pitch answers right on the card; tapping elsewhere opens it.
             const quick =
-              (item.kind === "review" || item.kind === "pitch") && canAnswerFromCard(item)
-                ? VERDICT_BUTTONS[item.kind]
-                : null;
+              item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
             const thumbs = item.options.flatMap((option) => {
               const media = optionMedia(item, option);
               return item.kind === "pick" && media?.type === "image" ? [media] : [];

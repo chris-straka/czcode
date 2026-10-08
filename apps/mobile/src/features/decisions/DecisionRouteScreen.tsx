@@ -5,7 +5,6 @@ import {
   draftToAnswer,
   toggleOptionId,
   emptyDraft,
-  unseenMediaProblem,
   VERDICT_BUTTONS,
   contextMedia,
   optionMedia,
@@ -26,7 +25,7 @@ import {
 } from "expo-audio";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PanResponder, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -40,7 +39,6 @@ import { DecisionImageViewer } from "./DecisionImageViewer";
 import {
   DecisionAudio,
   DecisionMedia,
-  DecisionMediaEngagement,
   OPTION_FRAME_STYLE,
   useDecisionMediaResolver,
   useDecisionMediaUrl,
@@ -151,7 +149,7 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
               ]
             : []),
           {
-            accessibilityLabel: "No longer relevant",
+            accessibilityLabel: "Dismiss",
             icon: "xmark.circle.fill" as const,
             onPress: () => submit(null),
           },
@@ -164,7 +162,7 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
         <View className="m-4 flex-row items-center gap-3 rounded-xl bg-subtle p-4">
           <Text className="flex-1 text-foreground">
             {pending.answer === null
-              ? "Dismissed: no longer relevant"
+              ? "Dismissed"
               : `Answered: ${answerSummary(entry.item, pending.answer)}`}
           </Text>
           <MaterialButton
@@ -205,16 +203,8 @@ function DecisionAnswerForm({
     setDraft((current) => ({ ...current, ...patch }));
   const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: boolean) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
-  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
-  const engage = useCallback(
-    (key: string) =>
-      setEngaged((current) => (current.has(key) ? current : new Set(current).add(key))),
-    [],
-  );
-  // You can't approve what you haven't seen: verdicts wait for videos to be
-  // played, sounds heard, and builds installed.
-  const unseen = unseenMediaProblem(item, engaged);
-  const problem = unseen ?? draftProblem(item, draft);
+  // Every answer is always tappable; a wrong one is undone from the bar that follows.
+  const problem = draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
 
   return (
@@ -231,9 +221,7 @@ function DecisionAnswerForm({
         {item.kind !== "read" && item.body_md ? (
           <Text className="text-sm text-foreground-muted">{item.body_md}</Text>
         ) : null}
-        <DecisionMediaEngagement value={engage}>
-          <DecisionBody entry={entry} draft={draft} update={update} onUpload={onUpload} />
-        </DecisionMediaEngagement>
+        <DecisionBody entry={entry} draft={draft} update={update} onUpload={onUpload} />
       </ScrollView>
       <View
         className="gap-3 border-t border-subtle-strong bg-screen p-4"
@@ -271,7 +259,6 @@ function DecisionAnswerForm({
                   verdict.value === "reject" || verdict.value === "never" ? "secondary" : "primary"
                 }
                 label={verdict.label}
-                disabled={unseen !== null}
                 onPress={() => submit({ choice: verdict.value })}
               />
             ))
@@ -280,7 +267,6 @@ function DecisionAnswerForm({
               <MaterialButton
                 tone="primary"
                 label="Approve run"
-                disabled={unseen !== null}
                 onPress={() => submit({ choice: "approve", redoFrom: null })}
               />
               <MaterialButton
@@ -306,7 +292,7 @@ function DecisionAnswerForm({
             />
           ) : null}
         </View>
-        {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
+        {problem && !verdicts && item.kind !== "timeline" ? (
           <Text className="text-xs text-foreground-muted">{problem}</Text>
         ) : null}
       </View>

@@ -25,7 +25,6 @@ import {
   createContext,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -49,7 +48,6 @@ import { WaveformPlayer } from "./WaveformPlayer";
 import {
   DECISION_OPTION_FRAME_CLASS,
   DecisionMedia,
-  DecisionMediaEngagement,
   useDecisionMediaResolver,
   useDecisionMediaUrl,
 } from "./DecisionMedia";
@@ -59,7 +57,6 @@ import {
   draftToAnswer,
   toggleOptionId,
   emptyDraft,
-  unseenMediaProblem,
   VERDICT_BUTTONS,
   contextMedia,
   optionMedia,
@@ -111,16 +108,8 @@ export function DecisionView({
   const [draft, setDraft] = useState<DecisionDraft>(() => emptyDraft(item));
   const update = (patch: Partial<DecisionDraft>) =>
     setDraft((current) => ({ ...current, ...patch }));
-  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
-  const engage = useCallback(
-    (key: string) =>
-      setEngaged((current) => (current.has(key) ? current : new Set(current).add(key))),
-    [],
-  );
-  // You can't approve what you haven't seen: verdicts wait for videos to be
-  // played, sounds heard, and builds installed.
-  const unseen = unseenMediaProblem(item, engaged);
-  const problem = unseen ?? draftProblem(item, draft);
+  // Every answer is always clickable; a wrong one is undone from its toast.
+  const problem = draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
   const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: boolean) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
@@ -197,7 +186,7 @@ export function DecisionView({
             return option !== undefined;
           }
           const verdict = verdicts?.[digit - 1];
-          if (verdict && unseen === null) submit({ choice: verdict.value });
+          if (verdict) submit({ choice: verdict.value });
           return verdict !== undefined;
         }
       }
@@ -313,9 +302,7 @@ export function DecisionView({
           ) : null}
           <UploadContext value={onUpload}>
             <FullScreenContext value={fullScreenImages}>
-              <DecisionMediaEngagement value={engage}>
-                <DecisionBody entry={entry} draft={draft} update={update} />
-              </DecisionMediaEngagement>
+              <DecisionBody entry={entry} draft={draft} update={update} />
             </FullScreenContext>
           </UploadContext>
           {item.kind !== "read" && item.body_md && mediaFirst ? (
@@ -366,8 +353,6 @@ export function DecisionView({
                   variant={
                     verdict.value === "approve" || verdict.value === "yes" ? "default" : "outline"
                   }
-                  disabled={unseen !== null}
-                  title={unseen ?? undefined}
                   onClick={() => submit({ choice: verdict.value })}
                 >
                   {verdict.label}
@@ -375,10 +360,7 @@ export function DecisionView({
               ))
             ) : item.kind === "timeline" ? (
               <>
-                <Button
-                  disabled={unseen !== null}
-                  title={unseen ?? undefined}
-                  onClick={() => submit({ choice: "approve", redoFrom: null })}
+                <Button onClick={() => submit({ choice: "approve", redoFrom: null })}
                 >
                   Approve run
                 </Button>
@@ -408,11 +390,11 @@ export function DecisionView({
                 None of these
               </Button>
             ) : null}
-            {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
+            {problem && !verdicts && item.kind !== "timeline" ? (
               <span className="text-xs text-muted-foreground">{problem}</span>
             ) : null}
             <Button variant="ghost-muted" size="sm" className="ms-auto" onClick={onDismiss}>
-              No longer relevant
+              Dismiss
             </Button>
           </div>
         </div>
@@ -758,7 +740,6 @@ function ListenPlayer({
 }
 
 function ReviewBody({ entry, draft, update }: BodyProps) {
-  const engage = useContext(DecisionMediaEngagement);
   const resolveMedia = useDecisionMediaResolver(entry.environmentId);
   // The waveform player draws the sound itself; a waveform picture beside it is noise.
   const hasAudio = entry.item.media.some((media) => media.type === "audio");
@@ -781,7 +762,6 @@ function ReviewBody({ entry, draft, update }: BodyProps) {
                 ],
               })
             }
-            onEngage={() => engage(media.key)}
           />
         ) : media.type === "video" && resolveMedia(media) ? (
           <VideoReviewPlayer
@@ -797,7 +777,6 @@ function ReviewBody({ entry, draft, update }: BodyProps) {
                 ],
               })
             }
-            onEngage={() => engage(media.key)}
           />
         ) : media.type === "image" && waveformPicture(media) ? null : media.type === "image" ? (
           <RedlineImage

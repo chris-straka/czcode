@@ -65,14 +65,12 @@ export function WaveformPlayer({
   compact = false,
   marks = NO_MARKS,
   onMarks,
-  onEngage,
 }: {
   readonly url: string;
   readonly media: DecisionMediaRef;
   readonly compact?: boolean;
   readonly marks?: ReadonlyArray<TimelineMark>;
   readonly onMarks?: (marks: ReadonlyArray<TimelineMark>) => void;
-  readonly onEngage?: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const clipId = useId();
@@ -124,15 +122,8 @@ export function WaveformPlayer({
         src={url}
         preload="metadata"
         onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
-        onTimeUpdate={(event) => {
-          setTime(event.currentTarget.currentTime);
-          // Scrubbing moves the playhead; a load can report a seek without one.
-          if (event.currentTarget.currentTime > 0.5) onEngage?.();
-        }}
-        onPlay={() => {
-          setPaused(false);
-          onEngage?.();
-        }}
+        onTimeUpdate={(event) => setTime(event.currentTarget.currentTime)}
+        onPlay={() => setPaused(false)}
         onPause={() => setPaused(true)}
         onEnded={() => setPaused(true)}
       />

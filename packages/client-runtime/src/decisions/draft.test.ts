@@ -3,13 +3,11 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   answerSummary,
-  canAnswerFromCard,
   contextMedia,
   draftProblem,
   draftToAnswer,
   emptyDraft,
   optionMedia,
-  unseenMediaProblem,
   toggleOptionId,
 } from "./draft.ts";
 
@@ -86,27 +84,6 @@ describe("decision drafts", () => {
     const rank = item({ kind: "rank" });
     expect(answerSummary(rank, draftToAnswer(rank, emptyDraft(rank)))).toBe("Ember › Frost");
     expect(draftToAnswer(rank, emptyDraft(rank), true)).toMatchObject({ retry: true });
-  });
-});
-
-describe("seeing before approving", () => {
-  const media = (type: string, key: string) =>
-    ({ type, key, name: key, mime: "x", size: 1 }) as DecisionItem["media"][number];
-
-  it("keeps verdicts off until the video was played and the build installed", () => {
-    const item = { kind: "review", media: [media("video", "v"), media("image", "i")] } as const;
-    expect(unseenMediaProblem(item, new Set())).toBe("Watch the video first.");
-    expect(unseenMediaProblem(item, new Set(["v"]))).toBeNull();
-    expect(unseenMediaProblem({ kind: "playtest", media: [media("apk", "a")] }, new Set())).toBe(
-      "Install the build first.",
-    );
-  });
-
-  it("answers from a card only when nothing on it needs opening", () => {
-    expect(canAnswerFromCard({ kind: "review", media: [] })).toBe(true);
-    expect(canAnswerFromCard({ kind: "review", media: [media("video", "v")] })).toBe(false);
-    expect(canAnswerFromCard({ kind: "review", media: [media("image", "i")] })).toBe(false);
-    expect(canAnswerFromCard({ kind: "pick", media: [media("image", "i")] })).toBe(true);
   });
 });
 
