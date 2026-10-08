@@ -13,16 +13,18 @@
 # - mediaforge's store (~/.mediaforge) and the model caches (Hugging Face,
 #   torch, Whisper, gk-stylize), plus uv's and sccache's caches;
 # - the Android SDK and emulator images (~/Android, ~/.android/avd);
-# - build output under ~/SWE and ~/ResumeProjects: every Rust `target`
-#   folder, and Python `.venv` folders over 1 GB.
+# - Python `.venv` folders over 1 GB under ~/SWE and ~/ResumeProjects, and
+#   ccez-llm's Rust `target` folder, the one build output the owner keeps
+#   (sweep-builds.sh deletes the rest).
 #
 # A folder moves only while nothing uses it: no process has a file in it
 # open or mapped, or works inside it, and for a build folder no cargo or
-# rustc runs in its repo. Busy ones wait for the next run. New `target`
-# folders (new repos, new worktrees) follow on later nights.
+# rustc runs in its repo. Busy ones wait for the next run.
 #
 # Exit status: 0 nothing left to move, 2 some folders were busy, 1 failed.
 set -uo pipefail
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh"
 dry=false
 [ "${1:-}" = --dry-run ] && dry=true
 
@@ -46,31 +48,12 @@ candidates() {
       # Moved ones are links now; they're revisited to keep git ignoring them.
       [ -L "$path" ] && echo "$path" && continue
       case "$path" in
-        */target) [ -f "$(dirname "$path")/Cargo.toml" ] && echo "$path" ;;
+        SWE/ccez-llm/*/target) [ -f "$(dirname "$path")/Cargo.toml" ] && echo "$path" ;;
         */.venv) [ "$(du -sm "$path" | cut -f1)" -ge 1024 ] && echo "$path" ;;
       esac
     done
 }
 
-# Why a folder is in use, or nothing when it isn't.
-in_use() {
-  local dir="$HOME/$1" repo="" proc
-  [[ "$1" == */target ]] && repo="$HOME/$(dirname "$1")"
-  for proc in /proc/[0-9]*; do
-    [ -O "$proc" ] || continue
-    if [[ "$(readlink "$proc/cwd" 2> /dev/null)/" == "$dir/"* ]] ||
-      find "$proc/fd" -lname "$dir/*" 2> /dev/null | grep -q . ||
-      grep -qF " $dir/" "$proc/maps" 2> /dev/null; then
-      echo "$(cat "$proc/comm" 2> /dev/null) (pid ${proc#/proc/})"
-      return
-    fi
-    if [ -n "$repo" ] && [[ "$(readlink "$proc/cwd" 2> /dev/null)/" == "$repo/"* ]] &&
-      grep -qxE 'cargo|rustc|cc|ld|clippy-driver|rust-analyzer' "$proc/comm" 2> /dev/null; then
-      echo "$(cat "$proc/comm") (pid ${proc#/proc/}) building in its repo"
-      return
-    fi
-  done
-}
 
 # Ignore rules like `/target/` match only folders, so git would list the
 # symlink as a new file (and `git add -A` would commit it). Exclude it in
@@ -96,7 +79,7 @@ while read -r path; do
   fi
   [ -d "$path" ] || continue
   size=$(du -sh "$path" 2> /dev/null | cut -f1)
-  reason=$(in_use "$path")
+  reason=$(in_use "$HOME/$path" "$HOME/$(dirname "$path")" 'cargo|rustc|cc|ld|clippy-driver|rust-analyzer')
   if [ -n "$reason" ]; then
     busy+=("$path ($size, used by $reason)")
     continue
@@ -108,7 +91,7 @@ while read -r path; do
   mkdir -p "$(dirname "$dest")"
   # Copy while it's idle, check it's still idle, catch up, then swap in the
   # link. The old folder goes only once the link is in place.
-  if rsync -aH --delete "$path/" "$dest/" && [ -z "$(in_use "$path")" ] &&
+  if rsync -aH --delete "$path/" "$dest/" && [ -z "$(in_use "$HOME/$path")" ] &&
     rsync -aH --delete "$path/" "$dest/" && mv "$path" "$path.moving" &&
     ln -s "$dest" "$path"; then
     rm -rf "$path.moving"
