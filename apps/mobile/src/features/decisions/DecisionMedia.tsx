@@ -56,42 +56,42 @@ export function DecisionAudio({
   const playing = cues ? playingCue(cues, status.currentTime) : -1;
   return (
     <View className="gap-2">
-    <View className="flex-row items-center gap-3">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          status.playing ? `Pause ${label ?? "sound"}` : `Play ${label ?? "sound"}`
-        }
-        onPress={() => {
-          if (status.playing) player.pause();
-          else {
-            if (status.didJustFinish || status.currentTime >= status.duration)
-              void player.seekTo(0);
-            player.play();
+      <View className="flex-row items-center gap-3">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            status.playing ? `Pause ${label ?? "sound"}` : `Play ${label ?? "sound"}`
           }
-        }}
-        className="h-11 w-11 items-center justify-center rounded-full bg-primary active:opacity-70"
-      >
-        <Text className="text-lg text-primary-foreground">{status.playing ? "❚❚" : "▶"}</Text>
-      </Pressable>
-      <View className="h-1 flex-1 overflow-hidden rounded-full bg-subtle">
-        <View
-          className="h-1 bg-primary"
-          style={{
-            width: `${status.duration ? (status.currentTime / status.duration) * 100 : 0}%`,
+          onPress={() => {
+            if (status.playing) player.pause();
+            else {
+              if (status.didJustFinish || status.currentTime >= status.duration)
+                void player.seekTo(0);
+              player.play();
+            }
           }}
-        />
+          className="h-11 w-11 items-center justify-center rounded-full bg-primary active:opacity-70"
+        >
+          <Text className="text-lg text-primary-foreground">{status.playing ? "❚❚" : "▶"}</Text>
+        </Pressable>
+        <View className="h-1 flex-1 overflow-hidden rounded-full bg-subtle">
+          <View
+            className="h-1 bg-primary"
+            style={{
+              width: `${status.duration ? (status.currentTime / status.duration) * 100 : 0}%`,
+            }}
+          />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Loop"
+          accessibilityState={{ selected: loop }}
+          onPress={() => setLoop((value) => !value)}
+          className={loop ? "rounded-full bg-subtle-strong px-3 py-2" : "rounded-full px-3 py-2"}
+        >
+          <Text className="text-xs text-foreground-muted">Loop</Text>
+        </Pressable>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Loop"
-        accessibilityState={{ selected: loop }}
-        onPress={() => setLoop((value) => !value)}
-        className={loop ? "rounded-full bg-subtle-strong px-3 py-2" : "rounded-full px-3 py-2"}
-      >
-        <Text className="text-xs text-foreground-muted">Loop</Text>
-      </Pressable>
-    </View>
       {cues?.map((cue, index) => (
         <Pressable
           key={`${cue.at}:${cue.section}`}

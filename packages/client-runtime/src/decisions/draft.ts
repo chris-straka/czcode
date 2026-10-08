@@ -215,10 +215,7 @@ export function contextMedia(
 }
 
 /** The cue that's playing at `time`: the last one starting at or before it. */
-export function playingCue(
-  cues: ReadonlyArray<Pick<DecisionCue, "at">>,
-  time: number,
-): number {
+export function playingCue(cues: ReadonlyArray<Pick<DecisionCue, "at">>, time: number): number {
   let playing = -1;
   cues.forEach((cue, index) => {
     if (cue.at <= time && (playing < 0 || cue.at >= cues[playing]!.at)) playing = index;

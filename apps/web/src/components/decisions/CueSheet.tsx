@@ -21,7 +21,8 @@ export function CueSheet({
   readonly compact?: boolean;
 }) {
   const playing = playingCue(cues, time);
-  const columns = "grid grid-cols-[2.75rem_minmax(4rem,7rem)_minmax(0,1fr)_minmax(3rem,5rem)_2.5rem] gap-x-3";
+  const columns =
+    "grid grid-cols-[2.75rem_minmax(4rem,7rem)_minmax(0,1fr)_minmax(3rem,5rem)_2.5rem] gap-x-3";
   return (
     <div role="table" aria-label="Cue sheet" className={cn("text-xs", compact && "text-2xs")}>
       <div role="row" className={cn(columns, "px-2 pb-1 text-muted-foreground")}>

@@ -62,4 +62,3 @@ describe("cz inbox submit helpers", () => {
     }),
   );
 });
-
