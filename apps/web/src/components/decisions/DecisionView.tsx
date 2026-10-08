@@ -44,6 +44,7 @@ import { Textarea } from "../ui/textarea";
 import { ExpandedImageDialog } from "../chat/ExpandedImageDialog";
 import type { ExpandedImageItem } from "../chat/ExpandedImagePreview";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { VideoReviewPlayer } from "./VideoReviewPlayer";
 import { WaveformPlayer } from "./WaveformPlayer";
 import {
   DECISION_OPTION_FRAME_CLASS,
@@ -818,6 +819,22 @@ function ReviewBody({ entry, draft, update }: BodyProps) {
       {entry.item.media.map((media, index) =>
         media.type === "audio" && resolveMedia(media) ? (
           <WaveformPlayer
+            key={media.key}
+            url={resolveMedia(media)!}
+            media={media}
+            marks={draft.marks.filter((mark) => mark.media_idx === index)}
+            onMarks={(marks) =>
+              update({
+                marks: [
+                  ...draft.marks.filter((mark) => mark.media_idx !== index),
+                  ...marks.map((mark) => ({ ...mark, media_idx: index })),
+                ],
+              })
+            }
+            onEngage={() => engage(media.key)}
+          />
+        ) : media.type === "video" && resolveMedia(media) ? (
+          <VideoReviewPlayer
             key={media.key}
             url={resolveMedia(media)!}
             media={media}

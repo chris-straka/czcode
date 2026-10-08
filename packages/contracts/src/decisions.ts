@@ -64,7 +64,7 @@ export const DecisionMediaRef = Schema.Struct({
   mime: Schema.String,
   size: Schema.Number,
   caption: Schema.optionalKey(Schema.String),
-  /** Audio: named sections, labelled above the waveform ("intro" from 0 s, "calm" from 6.2 s). */
+  /** Audio and video: named sections labelled above the timeline ("intro" from 0 s, "calm" from 6.2 s). */
   sections: Schema.optionalKey(
     Schema.Array(Schema.Struct({ at: Schema.Number, label: Schema.String })),
   ),
@@ -193,13 +193,17 @@ export const DecisionRedline = Schema.Struct({
 });
 export type DecisionRedline = typeof DecisionRedline.Type;
 
-/** A stretch of audio the owner marked on the waveform: liked, or to change, with a note. */
+/**
+ * A stretch of a sound or video the owner marked on its timeline (sound:
+ * like or change; video: keep, cut, or change), or a comment pinned to one
+ * moment (`start` equals `end`, tag "note"), with an optional note.
+ */
 export const DecisionAudioMark = Schema.Struct({
   media_idx: Schema.Number,
   /** Seconds from the start. */
   start: Schema.Number,
   end: Schema.Number,
-  tag: Schema.Literals(["like", "change"]),
+  tag: Schema.Literals(["like", "keep", "cut", "change", "note"]),
   note: Schema.optionalKey(Schema.String),
 });
 export type DecisionAudioMark = typeof DecisionAudioMark.Type;
@@ -241,7 +245,7 @@ export const DecisionAnswer = Schema.Struct({
   /** Listen: send the kept sounds back for another round. */
   more_like_these: Schema.optionalKey(Schema.Boolean),
   redlines: Schema.optionalKey(Schema.Array(DecisionRedline)),
-  /** Review/listen: stretches of audio marked on the waveform. */
+  /** Review/listen: stretches of sound or video marked on their timelines, and pinned comments. */
   marks: Schema.optionalKey(Schema.Array(DecisionAudioMark)),
   passage_comments: Schema.optionalKey(Schema.Array(DecisionPassageComment)),
   playtest: Schema.optionalKey(DecisionPlaytestForm),

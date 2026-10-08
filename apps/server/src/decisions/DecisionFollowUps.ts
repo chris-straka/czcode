@@ -77,6 +77,23 @@ export function followUpFor(item: DecisionItem, answer: DecisionAnswer): FollowU
 const seconds = (value: number) =>
   `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
 
+const MARK_WORDS: Record<NonNullable<DecisionAnswer["marks"]>[number]["tag"], string> = {
+  like: "liked",
+  keep: "keep",
+  cut: "cut",
+  change: "change",
+  note: "note",
+};
+
+/** "change 0:12-0:31 (too busy)", or "note at 1:04 (logo too small)" for a moment. */
+function describeMark(mark: NonNullable<DecisionAnswer["marks"]>[number]): string {
+  const when =
+    mark.start === mark.end
+      ? `at ${seconds(mark.start)}`
+      : `${seconds(mark.start)}-${seconds(mark.end)}`;
+  return `${MARK_WORDS[mark.tag]} ${when}${mark.note ? ` (${mark.note})` : ""}`;
+}
+
 function describeAnswer(item: DecisionItem, answer: DecisionAnswer): string {
   const label = (id: string) => item.options.find((option) => option.id === id)?.label ?? id;
   const parts = [
@@ -85,14 +102,7 @@ function describeAnswer(item: DecisionItem, answer: DecisionAnswer): string {
     answer.choice,
     answer.retry ? "none of these, try again" : null,
     answer.declined ? "none of these, and don't try again" : null,
-    answer.marks?.length
-      ? `marked ${answer.marks
-          .map(
-            (mark) =>
-              `${mark.tag === "like" ? "liked" : "change"} ${seconds(mark.start)}-${seconds(mark.end)}${mark.note ? ` (${mark.note})` : ""}`,
-          )
-          .join(", ")}`
-      : null,
+    answer.marks?.length ? `marked ${answer.marks.map(describeMark).join(", ")}` : null,
     answer.comment ? `comment: ${answer.comment}` : null,
   ].filter((part) => part !== null && part !== "");
   return parts.length > 0 ? parts.join("; ") : "see the decision";

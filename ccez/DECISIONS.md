@@ -48,10 +48,13 @@ again"** (`retry: true`: make new options; the note, if any, says how).
    can be images, 3D models, sounds, or clips. Example: 4 Andras concepts.
 2. **Review:** one artifact; approve, reject, or ask for changes. On images
    the owner can **draw on it** (redline) and circle areas. Sound plays from
-   its waveform: the owner drags across it to mark stretches to like or
-   change, with a note; the answer carries them as `marks` (seconds). Give
-   audio `sections` (`[{ "at": 0, "label": "intro" }, …]`) and they label the
-   waveform; don't attach a waveform picture, the player draws it. Example: a
+   its waveform and video has a timeline under it: the owner drags across
+   either to mark stretches (sound: like / change; video: keep / cut /
+   change) with a note, and pins comments to moments. The answer carries
+   them as `marks` (seconds; a pinned comment has `start` equal to `end` and
+   tag `note`). Give audio or video `sections`
+   (`[{ "at": 0, "label": "intro" }, …]`) and they label the timeline; don't
+   attach a waveform picture, the player draws it. Example: a
    level blockout render, a turnaround sheet, an adaptive music cue.
 3. **Listen:** a board of sound variants (instead of A/B). Each row plays on
    tap, loops on long-press, and gets keep / kill / favourite plus an
