@@ -50,7 +50,8 @@ export type FleetWarning =
       readonly freeRatio: number;
     }
   | { readonly kind: "memory"; readonly usedRatio: number }
-  | { readonly kind: "swap"; readonly usedRatio: number };
+  | { readonly kind: "swap"; readonly usedRatio: number }
+  | { readonly kind: "pressure"; readonly level: "warn" | "critical" };
 
 export interface FleetMachine {
   readonly environmentId: EnvironmentId;
@@ -116,13 +117,24 @@ export function fleetWarnings(resources: HostResourcesSnapshot | null): Array<Fl
     const usedRatio = 1 - resources.availableMemoryBytes / resources.totalMemoryBytes;
     if (usedRatio >= MEMORY_HIGH_RATIO) warnings.push({ kind: "memory", usedRatio });
   }
-  if (resources.swap && resources.swap.totalBytes > 0) {
+  // A Mac reports its own pressure; its on-demand swap stays full of cold pages.
+  if (resources.memoryPressure !== undefined) {
+    if (resources.memoryPressure !== "normal") {
+      warnings.push({ kind: "pressure", level: resources.memoryPressure });
+    }
+  } else if (resources.swap && resources.swap.totalBytes > 0) {
     const usedRatio = resources.swap.usedBytes / resources.swap.totalBytes;
     if (usedRatio >= SWAP_HIGH_RATIO) warnings.push({ kind: "swap", usedRatio });
   }
   // Least headroom first.
   const headroom = (warning: FleetWarning) =>
-    warning.kind === "disk" ? warning.freeRatio : 1 - warning.usedRatio;
+    warning.kind === "disk"
+      ? warning.freeRatio
+      : warning.kind === "pressure"
+        ? warning.level === "critical"
+          ? 0
+          : 0.1
+        : 1 - warning.usedRatio;
   return [...warnings].sort((left, right) => headroom(left) - headroom(right));
 }
 
