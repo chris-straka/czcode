@@ -25,7 +25,6 @@ import {
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
 import { Button } from "../ui/button";
-import { Kbd } from "../ui/kbd";
 import {
   SidebarContent,
   SidebarFooter,
@@ -46,6 +45,7 @@ import {
   type SettingsSearchItem,
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
+import { useDeveloperControls } from "./DeveloperOnly";
 import { validateSettingsScopeSearch } from "./settingsScope";
 
 const SnapShotIcon = createLucideIcon("snap-shot", [
@@ -96,8 +96,11 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const currentHash = useLocation({ select: (location) => location.hash });
   const currentSearch = useLocation({ select: (location) => location.search });
   const scopeSearch = useMemo(() => validateSettingsScopeSearch(currentSearch), [currentSearch]);
+  const developerControls = useDeveloperControls();
   const navItems = SETTINGS_NAV_ITEMS.filter(
-    (item) => item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch),
+    (item) =>
+      (item.to !== "/settings/projects" || isSettingsOverviewVisible(scopeSearch)) &&
+      (item.to !== "/settings/source-control" || developerControls),
   );
   const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -223,8 +226,9 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
       <SidebarContent className="overflow-x-hidden">
         <SidebarGroup>
           <div className="flex flex-col gap-2">
-            <div className="flex h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
-              <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
+            {/* Same inset, gap and icon as the section rows below, so the icons line up. */}
+            <div className="flex h-8 items-center gap-[var(--sidebar-control-gap)] rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+              <SearchIcon className="size-4 shrink-0 text-[var(--sidebar-icon-color)]" />
               <SidebarInput
                 ref={searchInputRef}
                 nativeInput
@@ -262,9 +266,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 >
                   <XIcon className="size-3" />
                 </Button>
-              ) : (
-                <Kbd>/</Kbd>
-              )}
+              ) : null}
             </div>
             {isSearching && results.length === 0 ? (
               <p

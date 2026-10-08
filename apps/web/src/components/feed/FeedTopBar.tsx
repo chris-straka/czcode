@@ -41,6 +41,7 @@ import {
 } from "../ui/menu";
 import { SidebarMenu } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { useDeveloperControls } from "../settings/DeveloperOnly";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 
 function TopBarButton({
@@ -208,7 +209,9 @@ export function FeedTopBar({
   readonly filters?: ReactNode;
 }) {
   const navigate = useNavigate();
-  const pullRequestsSupported = usePullRequestsSupported();
+  const developerControls = useDeveloperControls();
+  // Pull requests are a developer's view (Settings > Developer controls).
+  const pullRequestsSupported = usePullRequestsSupported() && developerControls;
   return (
     <WorkspacePageHeader electron={isElectron} className="gap-1.5 border-b border-border">
       <MachineFilterMenu />
