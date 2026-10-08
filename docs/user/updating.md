@@ -69,6 +69,10 @@ Select a cell, or pick a machine in the header, to change that machine's provide
 at once. Hover it to see which providers it will update. Providers that only
 offer a manual update command are not included.
 
+When a provider release comes out, a notice lists the machines that are behind. Its **Update**
+does the same as **Update all**, shows each machine's progress, and ends with one line per machine
+saying what changed or why it failed.
+
 ## Mobile updates
 
 From your phone, open **Settings → Environments** and select a machine to
