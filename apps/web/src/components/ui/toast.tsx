@@ -5,6 +5,7 @@ import { Spinner } from "~/components/ui/spinner";
 import { Toast } from "@base-ui/react/toast";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type CSSProperties,
@@ -526,6 +527,29 @@ function ToastProvider({ children, position = "top-right", ...props }: ToastProv
   );
 }
 
+/**
+ * Where the header bars stacked at the top of the window end (the feed's bar
+ * plus a page's own, like the Decision view's), so top toasts sit below them
+ * instead of over their buttons. Measured when toasts appear; null when hidden.
+ */
+function useStackedHeaderBottom(active: boolean): number | null {
+  const [bottom, setBottom] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!active) return;
+    let edge = 0;
+    // Each bar starts where the one above it ends; a header further down is page content.
+    for (const header of Array.from(document.querySelectorAll("header"))
+      .map((element) => element.getBoundingClientRect())
+      .filter((rect) => rect.height > 0)
+      .sort((a, b) => a.top - b.top)) {
+      if (header.top > edge + 1) break;
+      edge = Math.max(edge, header.bottom);
+    }
+    setBottom(edge > 0 ? edge : null);
+  }, [active]);
+  return bottom;
+}
+
 function Toasts({ position }: { position: ToastPosition }) {
   const { toasts } = Toast.useToastManager<ThreadToastData>();
   const activeThreadRef = useActiveThreadRefFromRoute();
@@ -534,6 +558,7 @@ function Toasts({ position }: { position: ToastPosition }) {
     shouldRenderThreadScopedToast(toast.data, activeThreadRef),
   );
   const visibleToastLayout = buildVisibleToastLayout(visibleToasts);
+  const headerOffset = useStackedHeaderBottom(isTop && visibleToasts.length > 0);
 
   useEffect(() => {
     const activeToastIds = new Set(toasts.map((toast) => toast.id));
@@ -562,6 +587,7 @@ function Toasts({ position }: { position: ToastPosition }) {
         style={
           {
             "--toast-frontmost-height": `${visibleToastLayout.frontmostHeight}px`,
+            ...(headerOffset === null ? {} : { "--toast-header-offset": `${headerOffset}px` }),
           } as CSSProperties
         }
       >
