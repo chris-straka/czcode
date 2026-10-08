@@ -86,43 +86,26 @@ The jobs run without root. These need the owner (`sudo`) once:
 
 ## Agent work drive
 
-Agent work (worktrees, `node_modules`, Rust `target` folders) is many small
-files written and deleted all day, much of it duplicated. Upstream's author
-keeps it on a separate drive formatted XFS on VDO (deduplication and
-compression) and saved about 44% of the space. art's `/data` (the 1 TB T7,
-empty, ext4) is meant for it.
+The system drives fill up with build output, model caches and media, so a
+host with a second drive keeps those there. `agent-drive.sh`, a nightly host
+job, moves them to `/data/<user>/<same path>` and leaves a symlink behind, so
+every path and tool keeps working: mediaforge's store, the model caches
+(Hugging Face, torch, Whisper, gk-stylize), uv's and sccache's caches, the
+Android SDK and emulator images, every Rust `target` folder, and Python
+`.venv` folders over 1 GB. It moves a folder only while nothing is using
+it, so busy ones and new build folders follow on later nights. Hosts
+without a second drive skip it. If the drive isn't mounted, the moved
+folders are unreachable and the health job says so.
 
-Measured on art with `bash ~/SWE/czcode/ccez/hosts/disk-bench.sh <folder>`
-(2026-10-07, load around 30 on 4 cores, both ext4):
-
-- `pnpm install` from a warm store: 22 s on the T7, 23 s on the internal SSD.
-- Clean `cargo build` of rfcheck (2 jobs): 13 s on the T7, 12 s internal.
-
-So on art the disk isn't what's slow; its 4 cores are. The case for `/data`
-is space: art's 224 GB system drive is 83% full. VDO's deduplication and
-compression run on the CPU, which art has least of, so start with plain XFS
-(its reflinks make copies of worktrees and build folders nearly free) and
-add VDO only if space runs short. basement has no second drive; its one hard
-drive is the slowest disk in the fleet, so an SSD there would help more than
-any filesystem.
-
-**owner**, to reformat `/data` as XFS (erases the T7; first check `lsblk`
-shows it as `sdb`, model `PSSD T7`):
-
-```sh
-sudo umount /data && sudo wipefs -a /dev/sdb1
-sudo mkfs.xfs -f -m reflink=1 -L agents /dev/sdb1
-sudo sed -i '\#[[:space:]]/data[[:space:]]#d' /etc/fstab
-echo 'LABEL=agents /data xfs defaults,noatime,nofail,x-systemd.device-timeout=30s 0 0' | sudo tee -a /etc/fstab
-sudo systemctl daemon-reload && sudo mount /data && sudo chown art:art /data
-```
-
-With VDO instead (after `sudo apt-get install -y lvm2 vdo`): make the whole
-disk an LVM volume group, `sudo lvcreate --type vdo -n work -l 100%FREE -V 2T
-agents`, and `mkfs.xfs -K` on `/dev/agents/work`. Then point agent work at
-it: the pnpm store (`pnpm config set store-dir /data/pnpm-store`), czcode
-worktrees and Rust target folders, and rerun `disk-bench.sh /data` to
-compare.
+art's `/data` (the 1 TB T7, ext4) is that drive. It stays ext4: measured
+with `disk-bench.sh` (2026-10-07, load around 30 on 4 cores), the T7 and
+the internal SSD are equally fast for agent work (`pnpm install` 22 s vs
+23 s, a clean `cargo build` 13 s vs 12 s), because art is limited by its 4
+cores, not its disk. Upstream's author uses XFS on VDO to save space through
+deduplication and compression; VDO costs CPU, which art has least of, and
+the T7 has room to spare, so it isn't worth reformatting a drive that now
+holds data. basement has no second drive; its one hard drive is the slowest
+disk in the fleet, and an SSD there would help more than any filesystem.
 
 ## Accounts
 

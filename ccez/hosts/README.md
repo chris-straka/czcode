@@ -69,6 +69,7 @@ systemd user timers named `cz-job-<name>`):
 | 03:30 | `health` | Disk space, SMART, logs, failed units, memory, other hosts |
 | 03:35 | `backup` | Copies `~/.cz/userdata` to another host, 7 days kept       |
 | 03:45 | `sync`   | Clones and fast-forwards the repos in `repos.txt`          |
+| 03:50 | `drive`  | Moves build output and caches to a second drive, when idle |
 | 04:00 | `update` | Builds the latest cz, restarts into it when idle           |
 
 Hosts that sleep when idle wake at 03:30 for them and stay awake until they
@@ -88,7 +89,7 @@ is in `~/.local/state/cz-host/jobs/<name>.log`, every run is in
 
 **Run one now:** `systemctl --user start --no-block cz-job-<name>.service`.
 
-- **health:** reports a disk over 85% full, SMART warnings or kernel disk
+- **health:** reports a disk over 80% full (time to act before 85%), SMART warnings or kernel disk
   errors, oversized logs, failed services (yours and agents', not the
   desktop's), timers whose program is missing, low memory, heavy swap or
   out-of-memory kills, cz not running, and hosts in `hosts.txt` that don't
@@ -104,6 +105,10 @@ is in `~/.local/state/cz-host/jobs/<name>.log`, every run is in
   `repos.txt` (some exist on one machine only) are listed for you. A
   `pnpm-lock.yaml` that is the only change is `vp i` churn and is put back.
   Add a line to `repos.txt` for a repo every host should have.
+- **drive:** on a host with a second drive at `/data`, moves build output
+  (Rust `target` folders, big `.venv`s), model caches, mediaforge's store and
+  the Android SDK there, leaving symlinks so paths don't change. A folder
+  moves only when nothing is using it. See [FLEET.md](FLEET.md#agent-work-drive).
 - **update:** cz runs from a build in `~/.local/lib/cz-host/cz`, not from
   `~/SWE/czcode`, so agents' edits there never break it. The job builds the
   latest `main` next to the running build, then restarts cz only when no

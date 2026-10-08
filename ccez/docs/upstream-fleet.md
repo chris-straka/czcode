@@ -62,15 +62,15 @@ owner's one Claude account and run agents at the same time.
 
 ## How our hosts compare
 
-|                      | Theo                         | Us (`ccez/hosts`)                                                                       |
-| -------------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
-| Setting up a machine | Fleet doc + an agent         | `linux.sh` / `mac.sh` scripts (an agent can run them)                                   |
-| Machine inventory    | In the fleet repo            | [`ccez/hosts/FLEET.md`](../hosts/FLEET.md): machines and an agent runbook for a new box |
-| Networking           | Tailscale (+ T3 Connect)     | Tailscale only (Connect removed)                                                        |
-| Projects             | Repos, grouped by git origin | Every repo in `repos.txt` is a cz project on every host (the sync job)                  |
-| Parallel work        | Linux boxes; Macs 1-2 tasks  | Linux hosts; the Mac stays free by day                                                  |
-| Agent filesystem     | Separate XFS + VDO drive     | Planned on art's `/data` (FLEET.md); OS drive, ext4 today                               |
-| Extra we need        |                              | See [What we run that upstream doesn't](#what-we-run-that-upstream-doesnt)              |
+|                      | Theo                         | Us (`ccez/hosts`)                                                                                   |
+| -------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| Setting up a machine | Fleet doc + an agent         | `linux.sh` / `mac.sh` scripts (an agent can run them)                                               |
+| Machine inventory    | In the fleet repo            | [`ccez/hosts/FLEET.md`](../hosts/FLEET.md): machines and an agent runbook for a new box             |
+| Networking           | Tailscale (+ T3 Connect)     | Tailscale only (Connect removed)                                                                    |
+| Projects             | Repos, grouped by git origin | Every repo in `repos.txt` is a cz project on every host (the sync job)                              |
+| Parallel work        | Linux boxes; Macs 1-2 tasks  | Linux hosts; the Mac stays free by day                                                              |
+| Agent filesystem     | Separate XFS + VDO drive     | A second drive where there is one (art's `/data`, ext4): build output and caches move there nightly |
+| Extra we need        |                              | See [What we run that upstream doesn't](#what-we-run-that-upstream-doesnt)                          |
 
 **He reviews and merges his own PRs.** He has an agent sort his open PRs by
 how easy they are to merge, then squash-merges them himself in T3 Code.
@@ -98,6 +98,7 @@ NIC that hangs, small RAM, and an owner who never reviews PRs.
 | `backup` (nightly)                                           | `~/.cz/userdata` (threads, Decisions, secrets) lives on old home drives, one of them a hard drive                                                   | Not described                                               | **Keep**                                                                                                                    |
 | `sync` (nightly)                                             | Any thread can run on any host, so every host has all 121 repos as cz projects                                                                      | An agent sets up each box from his fleet repo               | **Keep**                                                                                                                    |
 | `update` (nightly)                                           | Hosts run a build of `main`, not a release, and restart only when no agent is working                                                               | Releases and `npx t3`                                       | **Keep**                                                                                                                    |
+| `drive` (nightly)                                            | System drives filled with build output, model caches and media (art reached 89% on 2026-10-07)                                                      | A separate XFS + VDO drive for agent work                   | **Keep**                                                                                                                    |
 | Sleep when idle (checks every minute) + 03:30 wake           | Home PCs idle at about 100 W                                                                                                                        | Always-on boxes                                             | **Owner's call**. In its first 3 days it slept once (art); logged-in sessions and load kept f and basement up               |
 | Host wake (asks every tailnet peer every 5 minutes)          | Wakes a sleeping host over Wake-on-LAN; needed only with sleep when idle                                                                            | Always on, plus T3 Connect                                  | **Goes with sleep when idle**                                                                                               |
 | Agent scopes (every 5 seconds, Linux)                        | Hosts have 15-32 GB; systemd-oomd ended `cz-host` and every thread with it                                                                          | Not described                                               | **Keep**                                                                                                                    |
