@@ -197,13 +197,12 @@ function SchedulesButton() {
 /** The feed's one slim bar: the machine filter, search, and every app-wide button. */
 export function FeedTopBar({
   badge,
-  reviewing,
-  onReviewAll,
+  onOpenNeedsYou,
   filters,
 }: {
   readonly badge: number;
-  readonly reviewing: boolean;
-  readonly onReviewAll: () => void;
+  /** Shows Needs you: every open Decision as a card. */
+  readonly onOpenNeedsYou: () => void;
   /** Games/software and project filters, beside the search bar. */
   readonly filters?: ReactNode;
 }) {
@@ -243,9 +242,8 @@ export function FeedTopBar({
             <Button
               size="icon-sm"
               variant="ghost"
-              aria-label={badge > 0 ? `Review ${badge} decisions` : "Decisions"}
-              disabled={!reviewing}
-              onClick={onReviewAll}
+              aria-label={badge > 0 ? `Needs you: ${badge} decisions` : "Needs you"}
+              onClick={onOpenNeedsYou}
               className="relative"
             />
           }
@@ -257,7 +255,7 @@ export function FeedTopBar({
             </span>
           ) : null}
         </TooltipTrigger>
-        <TooltipPopup side="bottom">Review all decisions</TooltipPopup>
+        <TooltipPopup side="bottom">Needs you</TooltipPopup>
       </Tooltip>
       {pullRequestsSupported ? (
         <span className="max-sm:hidden">

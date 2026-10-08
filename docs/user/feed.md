@@ -6,7 +6,8 @@ them). It has two pages, switched at the top:
 - **Needs you:** questions agents asked you (Decisions) and threads waiting
   for an approval or an answer, most important first, with the
   [Morning brief](./morning-brief.md) on top. **Answered** at the bottom
-  shows what you already answered.
+  shows what you already answered. The inbox icon in the top bar, with the
+  open count, brings you here from anywhere.
 - **Threads:** a card per project, the ones that need you or have something
   running first, with counts and the latest threads. Click a card for that
   project's threads. The list button beside the tabs shows projects as
