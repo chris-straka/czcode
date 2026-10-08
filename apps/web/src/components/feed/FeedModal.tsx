@@ -25,10 +25,13 @@ function editingText(target: EventTarget | null): target is HTMLElement {
 export function FeedModal({
   label,
   onClose,
+  ownBack = false,
   children,
 }: {
   readonly label: string;
   readonly onClose: () => void;
+  /** The content draws its own Back (the Decision view, which has no header bar). */
+  readonly ownBack?: boolean;
   readonly children: ReactNode;
 }) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -117,15 +120,17 @@ export function FeedModal({
       className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-background [transform:translateZ(0)] [--workspace-controls-top:0px] [--workspace-gutter-start:3.25rem] [--workspace-titlebar-content-left:3.25rem] sm:top-[var(--workspace-topbar-height)] sm:border-t sm:border-border"
     >
       {children}
-      <Button
-        size="icon-sm"
-        variant="ghost"
-        aria-label="Back"
-        className="absolute top-[calc((var(--workspace-topbar-height)-2rem)/2)] left-3 z-50 [-webkit-app-region:no-drag]"
-        onClick={onClose}
-      >
-        <ArrowLeftIcon />
-      </Button>
+      {ownBack ? null : (
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          aria-label="Back"
+          className="absolute top-[calc((var(--workspace-topbar-height)-2rem)/2)] left-3 z-50 [-webkit-app-region:no-drag]"
+          onClick={onClose}
+        >
+          <ArrowLeftIcon />
+        </Button>
+      )}
     </div>
   );
 }

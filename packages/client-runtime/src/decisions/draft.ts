@@ -131,6 +131,8 @@ export function draftToAnswer(
     voice_key: draft.voiceKey,
     // Stretches and comments marked on a sound's or video's timeline, whatever the kind.
     ...(draft.marks.length > 0 ? { marks: draft.marks } : {}),
+    // Pictures attached to the note (a Request's files), whatever the kind.
+    ...(draft.uploads.length > 0 ? { uploads: draft.uploads } : {}),
   };
   if (noneOfThese) return { ...base, retry: true };
   switch (item.kind) {
@@ -173,7 +175,9 @@ export function answerSummary(item: DecisionItem, answer: DecisionAnswerInput): 
     const kept = answer.reactions.filter((reaction) => reaction.verdict !== "kill").length;
     return `${kept} kept, ${answer.reactions.length - kept} killed`;
   }
-  if (answer.uploads?.length) return `${answer.uploads.length} file(s)`;
+  if (item.kind === "request" && answer.uploads?.length) {
+    return `${answer.uploads.length} file(s)`;
+  }
   if (answer.choice === "redo") return `Redo from ${answer.redo_from}`;
   const verdict = VERDICT_BUTTONS[item.kind]?.find((button) => button.value === answer.choice);
   const marks = answer.marks?.length ? ` · ${answer.marks.length} marked` : "";

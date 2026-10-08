@@ -4,13 +4,16 @@ import type {
   DecisionMediaRef,
   DecisionMediaUploadQuery,
   DecisionRedline,
+  EnvironmentId,
 } from "@cz/contracts";
 import {
   ArrowDownIcon,
+  ArrowLeftIcon,
   ArrowUpIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   HeartIcon,
+  ImagePlusIcon,
   MicIcon,
   RepeatIcon,
   SquareIcon,
@@ -32,7 +35,6 @@ import {
   useState,
 } from "react";
 
-import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
 import type { DecisionEntry } from "~/state/decisions";
 import ChatMarkdown from "../ChatMarkdown";
@@ -42,7 +44,6 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { ExpandedImageDialog } from "../chat/ExpandedImageDialog";
 import type { ExpandedImageItem } from "../chat/ExpandedImagePreview";
-import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { VideoReviewPlayer } from "./VideoReviewPlayer";
 import { WaveformPlayer } from "./WaveformPlayer";
 import {
@@ -94,6 +95,12 @@ function isTypingTarget(target: EventTarget | null): target is HTMLElement {
 }
 
 /** One decision, full screen, with its answer panel pinned to the bottom. */
+/**
+ * The one centred column everything in the view shares (meta row, text,
+ * players, options, answer bar), so nothing runs wider or sits off-centre.
+ */
+const DECISION_COLUMN_CLASS = "mx-auto w-full max-w-3xl px-4 sm:px-6";
+
 export function DecisionView({
   entry,
   position,
@@ -111,6 +118,16 @@ export function DecisionView({
   // Every answer is always clickable; a wrong one is undone from its toast.
   const problem = draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
+  // Pictures on the note: pasted, dropped, or picked, uploaded as they arrive.
+  const attachImages = async (files: ReadonlyArray<File>) => {
+    for (const file of files) {
+      const ref = await onUpload(
+        { name: file.name || "pasted.png", mime: file.type || "image/png", type: "image" },
+        new Uint8Array(await file.arrayBuffer()),
+      );
+      if (ref) setDraft((current) => ({ ...current, uploads: [...current.uploads, ref] }));
+    }
+  };
   const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: boolean) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
   // "None of these" sends the note and asks for new options.
@@ -228,65 +245,61 @@ export function DecisionView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-decision-kind={item.kind}>
-      <WorkspacePageHeader
-        electron={isElectron}
-        className="border-b border-border [--workspace-gutter-end:0.75rem]"
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
-          <Badge variant="secondary" size="sm">
-            {item.kind}
-          </Badge>
-          <span className="truncate">
-            {item.project} · {entry.environmentLabel}
-          </span>
-          {item.blocking ? (
-            <Badge variant="warning" size="sm">
-              Agent waiting
+      {/* A stable gutter: opening Details or a long write-up doesn't shift the column. */}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+        <div className={cn(DECISION_COLUMN_CLASS, "space-y-4 pb-5 wrap-anywhere")}>
+          {/* The view's one bar, in the page: back, what and where, position, thread, arrows. */}
+          <div className="flex min-h-[var(--workspace-topbar-height)] items-center gap-1.5 text-xs text-muted-foreground">
+            <Button size="icon-sm" variant="ghost" aria-label="Back" onClick={onClose}>
+              <ArrowLeftIcon />
+            </Button>
+            <Badge variant="secondary" size="sm">
+              {item.kind}
             </Badge>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {position ? (
-            <span className="px-1 text-xs text-muted-foreground tabular-nums">
-              {position.index + 1} of {position.total}
+            <span className="min-w-0 flex-1 truncate">
+              {item.project} · {entry.environmentLabel}
             </span>
-          ) : null}
-          {item.thread ? (
-            <Button
-              size="xs"
-              variant="outline"
-              render={
-                <Link
-                  to="/$environmentId/$threadId"
-                  params={{ environmentId: entry.environmentId, threadId: item.thread }}
-                />
-              }
-            >
-              Open thread
-            </Button>
-          ) : null}
-          {onPrevious ? (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Previous decision"
-              onClick={onPrevious}
-            >
-              <ChevronLeftIcon />
-            </Button>
-          ) : null}
-          {onSkip ? (
-            <Button size="icon-xs" variant="ghost" aria-label="Next decision" onClick={onSkip}>
-              <ChevronRightIcon />
-            </Button>
-          ) : null}
-        </div>
-      </WorkspacePageHeader>
-
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 wrap-anywhere sm:px-6">
-          {/* Text keeps a reading width (~70 characters); option images use the full column. */}
-          <div className="max-w-2xl space-y-1">
+            {item.blocking ? (
+              <Badge variant="warning" size="sm">
+                Agent waiting
+              </Badge>
+            ) : null}
+            {position ? (
+              <span className="px-1 tabular-nums">
+                {position.index + 1} of {position.total}
+              </span>
+            ) : null}
+            {item.thread ? (
+              <Button
+                size="xs"
+                variant="outline"
+                render={
+                  <Link
+                    to="/$environmentId/$threadId"
+                    params={{ environmentId: entry.environmentId, threadId: item.thread }}
+                  />
+                }
+              >
+                Open thread
+              </Button>
+            ) : null}
+            {onPrevious ? (
+              <Button
+                size="icon-xs"
+                variant="ghost"
+                aria-label="Previous decision"
+                onClick={onPrevious}
+              >
+                <ChevronLeftIcon />
+              </Button>
+            ) : null}
+            {onSkip ? (
+              <Button size="icon-xs" variant="ghost" aria-label="Next decision" onClick={onSkip}>
+                <ChevronRightIcon />
+              </Button>
+            ) : null}
+          </div>
+          <div className="space-y-1">
             <h1 className="text-lg font-semibold text-foreground">{title}</h1>
             {item.title && item.question !== item.title ? (
               <p className="text-sm text-foreground/80">{item.question}</p>
@@ -296,7 +309,7 @@ export function DecisionView({
             ) : null}
           </div>
           {item.kind !== "read" && item.body_md && !mediaFirst ? (
-            <div className="max-w-2xl">
+            <div>
               <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
             </div>
           ) : null}
@@ -306,7 +319,7 @@ export function DecisionView({
             </FullScreenContext>
           </UploadContext>
           {item.kind !== "read" && item.body_md && mediaFirst ? (
-            <details className="max-w-2xl rounded-md border border-border px-3 py-2">
+            <details className="rounded-md border border-border px-3 py-2">
               <summary className="cursor-pointer text-sm text-muted-foreground">Details</summary>
               <div className="pt-2">
                 <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
@@ -322,9 +335,26 @@ export function DecisionView({
         />
       ) : null}
 
-      <footer className="sticky bottom-0 border-t border-border bg-background">
-        <div className="mx-auto w-full max-w-4xl space-y-2 px-4 py-3 sm:px-6">
-          <div className="flex items-start gap-2">
+      <footer className="sticky bottom-0 border-t border-border bg-background [scrollbar-gutter:stable] overflow-y-hidden">
+        <div className={cn(DECISION_COLUMN_CLASS, "space-y-2 py-3")}>
+          {item.kind === "request" ? null : (
+            <NoteImages environmentId={environmentId} draft={draft} update={update} />
+          )}
+          <div
+            className="flex items-start gap-2"
+            onDragOver={(event) => {
+              if (item.kind !== "request" && event.dataTransfer.types.includes("Files")) {
+                event.preventDefault();
+              }
+            }}
+            onDrop={(event) => {
+              if (item.kind === "request") return;
+              const images = imageFiles(event.dataTransfer.files);
+              if (images.length === 0) return;
+              event.preventDefault();
+              void attachImages(images);
+            }}
+          >
             <Textarea
               aria-label="Note"
               placeholder={
@@ -334,9 +364,32 @@ export function DecisionView({
               }
               value={draft.comment}
               onChange={(event) => update({ comment: event.target.value })}
+              onPaste={(event) => {
+                if (item.kind === "request") return;
+                const images = imageFiles(event.clipboardData.files);
+                if (images.length === 0) return;
+                event.preventDefault();
+                void attachImages(images);
+              }}
               size="line"
               className="flex-1"
             />
+            {item.kind === "request" ? null : (
+              <Button variant="outline" size="icon" render={<label />} aria-label="Attach pictures">
+                <ImagePlusIcon />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    const images = imageFiles(event.target.files);
+                    event.target.value = "";
+                    void attachImages(images);
+                  }}
+                />
+              </Button>
+            )}
             <VoiceNoteButton
               recorded={draft.voiceKey !== null}
               onRecorded={async (bytes, mime) => {
@@ -381,11 +434,7 @@ export function DecisionView({
               </Button>
             )}
             {declinable ? (
-              <Button
-                variant="outline"
-                title="Sends your note and asks for new options"
-                onClick={() => submit({}, true)}
-              >
+              <Button variant="outline" onClick={() => submit({}, true)}>
                 None of these
               </Button>
             ) : null}
@@ -398,6 +447,43 @@ export function DecisionView({
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function imageFiles(files: FileList | null): File[] {
+  return [...(files ?? [])].filter((file) => file.type.startsWith("image/"));
+}
+
+/** The pictures attached to the note, each removable. */
+function NoteImages({
+  environmentId,
+  draft,
+  update,
+}: {
+  readonly environmentId: EnvironmentId;
+  readonly draft: DecisionDraft;
+  readonly update: (patch: Partial<DecisionDraft>) => void;
+}) {
+  if (draft.uploads.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {draft.uploads.map((ref) => (
+        <div key={ref.key} className="relative">
+          <DecisionMedia environmentId={environmentId} media={ref} compact className="size-14" />
+          <Button
+            size="icon-micro"
+            variant="secondary"
+            aria-label={`Remove ${ref.name}`}
+            className="absolute -top-1.5 -right-1.5"
+            onClick={() =>
+              update({ uploads: draft.uploads.filter((other) => other.key !== ref.key) })
+            }
+          >
+            <XIcon className="size-3" />
+          </Button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -910,7 +996,7 @@ function ReadBody({ entry, draft, update }: BodyProps) {
     setNote("");
   };
   return (
-    <div className="max-w-2xl space-y-3">
+    <div className="space-y-3">
       <div
         ref={containerRef}
         onMouseUp={capture}
