@@ -1,4 +1,4 @@
-import type { NetworkInterfaceInfo } from "node:os";
+import type * as NodeOS from "node:os";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -9,7 +9,11 @@ import {
   wakeInterface,
 } from "./wake.ts";
 
-const ipv4 = (address: string, mac: string, netmask = "255.255.255.0"): NetworkInterfaceInfo => ({
+const ipv4 = (
+  address: string,
+  mac: string,
+  netmask = "255.255.255.0",
+): NodeOS.NetworkInterfaceInfo => ({
   address,
   netmask,
   family: "IPv4",

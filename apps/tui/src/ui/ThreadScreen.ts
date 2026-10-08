@@ -11,7 +11,7 @@ import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
 import { Box, Text } from "ink";
 import { createElement as h, useContext, useEffect, useMemo, useState } from "react";
-import { randomUUID } from "node:crypto";
+import * as NodeCrypto from "node:crypto";
 
 import { hasActiveRun, type LineTone, transcriptLines } from "../model/transcript.ts";
 import { wrapText } from "../model/wrap.ts";
@@ -140,9 +140,14 @@ export function ThreadScreen(props: {
     void startTurn({
       environmentId: props.environmentId,
       input: {
-        commandId: CommandId.make(randomUUID()),
+        commandId: CommandId.make(NodeCrypto.randomUUID()),
         threadId: props.threadId,
-        message: { messageId: MessageId.make(randomUUID()), role: "user", text, attachments: [] },
+        message: {
+          messageId: MessageId.make(NodeCrypto.randomUUID()),
+          role: "user",
+          text,
+          attachments: [],
+        },
         runtimeMode: projection.thread.runtimeMode,
         interactionMode: projection.thread.interactionMode ?? DEFAULT_PROVIDER_INTERACTION_MODE,
         createdAt: new Date().toISOString(),

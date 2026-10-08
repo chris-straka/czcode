@@ -9,7 +9,7 @@ import {
 import type { DecisionMediaRef } from "@cz/contracts";
 import { Box, Text } from "ink";
 import { createElement as h, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import type { ChildProcess } from "node:child_process";
+import type * as NodeChildProcess from "node:child_process";
 
 import { type DecisionEntry, KIND_TAG } from "../model/decisionFeed.ts";
 import {
@@ -64,7 +64,7 @@ export function DecisionScreen(props: {
   const [text, setText] = useState("");
   const [mediaPath, setMediaPath] = useState<string | null>(null);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
-  const player = useRef<ChildProcess | null>(null);
+  const player = useRef<NodeChildProcess.ChildProcess | null>(null);
 
   const stop = () => {
     player.current?.kill();

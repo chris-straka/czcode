@@ -295,7 +295,6 @@ const waitCommand = Command.make("wait", {
         const exitCode =
           current.item.status === "answered" ? 0 : current.item.status === "open" ? 3 : 2;
         if (exitCode !== 0) {
-          // oxlint-disable-next-line czcode/no-global-process-runtime -- the CLI reports the outcome as its exit status.
           yield* Effect.sync(() => (process.exitCode = exitCode));
         }
       }),

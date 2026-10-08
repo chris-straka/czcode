@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "@effect/vitest";
 
 import { mediaTypeForFile, optionsFor, parseWhen, stepsFromFile } from "./inbox.ts";
 
@@ -28,23 +28,23 @@ describe("cz inbox submit helpers", () => {
     expect(parseWhen("soon", 0)).toBeNull();
   });
 
-  it("reads timeline steps, defaulting each step's media to the file at its position", async () => {
-    const steps = await Effect.runPromise(
-      stepsFromFile(
+  it.effect("reads timeline steps, defaulting each step's media to the file at its position", () =>
+    Effect.gen(function* () {
+      const steps = yield* stepsFromFile(
         JSON.stringify([
           { id: "blockout", label: "Blockout", status: "done" },
           { id: "rig", label: "Rig", status: "failed" },
           { id: "notes", label: "Notes", status: "skipped", media_idx: null },
         ]),
         2,
-      ),
-    );
-    expect(steps.map((step) => [step.id, step.media_idx])).toEqual([
-      ["blockout", 0],
-      ["rig", 1],
-      ["notes", null],
-    ]);
-    const bad = await Effect.runPromise(Effect.flip(stepsFromFile('[{"id":"x"}]', 0)));
-    expect(bad.message).toContain("--steps-file");
-  });
+      );
+      expect(steps.map((step) => [step.id, step.media_idx])).toEqual([
+        ["blockout", 0],
+        ["rig", 1],
+        ["notes", null],
+      ]);
+      const bad = yield* Effect.flip(stepsFromFile('[{"id":"x"}]', 0));
+      expect(bad.message).toContain("--steps-file");
+    }),
+  );
 });

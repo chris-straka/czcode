@@ -22,7 +22,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Socket from "effect/socket/Socket";
 import { Atom, AtomRegistry } from "effect/reactivity";
-import { webcrypto } from "node:crypto";
+import * as NodeCrypto from "node:crypto";
 
 import type { RunTuiOptions } from "../api.ts";
 import {
@@ -38,9 +38,11 @@ export type TuiRuntimeOptions = RunTuiOptions;
 const cryptoLayer = Layer.succeed(
   Crypto.Crypto,
   Crypto.make({
-    randomBytes: (size) => webcrypto.getRandomValues(new Uint8Array(size)),
+    randomBytes: (size) => NodeCrypto.webcrypto.getRandomValues(new Uint8Array(size)),
     digest: (algorithm, data) =>
-      Effect.promise(async () => new Uint8Array(await webcrypto.subtle.digest(algorithm, data))),
+      Effect.promise(
+        async () => new Uint8Array(await NodeCrypto.webcrypto.subtle.digest(algorithm, data)),
+      ),
   }),
 );
 

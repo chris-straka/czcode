@@ -12,7 +12,7 @@ import {
 } from "@cz/contracts";
 import { Box, Text } from "ink";
 import { createElement as h, useContext, useMemo, useState } from "react";
-import { randomBytes, randomUUID } from "node:crypto";
+import * as NodeCrypto from "node:crypto";
 import { buildTemporaryWorktreeBranchName } from "@cz/shared/git";
 import * as Option from "effect/Option";
 import { AsyncResult, Atom } from "effect/reactivity";
@@ -190,15 +190,20 @@ export function NewThreadScreen(props: {
     if (envMode === "worktree" && baseBranch === null) return;
     const runtimeMode = config?.settings.defaultRuntimeMode ?? "approval-required";
     const interactionMode = DEFAULT_PROVIDER_INTERACTION_MODE;
-    const threadId = ThreadId.make(randomUUID());
+    const threadId = ThreadId.make(NodeCrypto.randomUUID());
     const createdAt = new Date().toISOString();
     const title = deriveThreadTitleSeed({ text, attachments: [] });
     void startTurn({
       environmentId: step.environmentId,
       input: {
-        commandId: CommandId.make(randomUUID()),
+        commandId: CommandId.make(NodeCrypto.randomUUID()),
         threadId,
-        message: { messageId: MessageId.make(randomUUID()), role: "user", text, attachments: [] },
+        message: {
+          messageId: MessageId.make(NodeCrypto.randomUUID()),
+          role: "user",
+          text,
+          attachments: [],
+        },
         modelSelection,
         titleSeed: title,
         runtimeMode,
@@ -220,7 +225,7 @@ export function NewThreadScreen(props: {
                   projectCwd: step.project.workspaceRoot,
                   baseBranch,
                   branch: buildTemporaryWorktreeBranchName((bytes) =>
-                    randomBytes(bytes).toString("hex"),
+                    NodeCrypto.randomBytes(bytes).toString("hex"),
                   ),
                 },
                 runSetupScript: true,
