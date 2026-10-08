@@ -1708,6 +1708,33 @@ code {
    do not add drag rectangles over fixed controls. Explicit `none` is treated
    as `no-drag` and breaks titlebar dragging; `initial` emits no rectangle.
    The base layer lets explicit drag/no-drag utilities take precedence. */
+/* Everything clickable shows the pointer; Tailwind's preflight leaves buttons on
+   the arrow. Base layer, so a cursor-* utility still wins. Clickable elements
+   that aren't buttons need a role or a cursor class (lint: czcode/clickable-cursor). */
+@layer base {
+  button:not(:disabled),
+  summary,
+  label[for],
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="link"],
+  [role="tab"],
+  [role="checkbox"],
+  [role="switch"],
+  [role="radio"],
+  [role="slider"],
+  [role="option"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="menuitemcheckbox"]:not([aria-disabled="true"]),
+  [role="menuitemradio"]:not([aria-disabled="true"]),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="range"]:not(:disabled),
+  input[type="color"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 @layer base {
   .drag-region > * {
     -webkit-app-region: initial;
