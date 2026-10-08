@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   ChartNoAxesColumnIcon,
   ChevronDownIcon,
+  ClockIcon,
   FolderPlusIcon,
   InboxIcon,
   MonitorIcon,
@@ -21,6 +22,7 @@ import {
   usePrimaryEnvironmentId,
   usePullRequestsSupported,
 } from "~/state/environments";
+import { SchedulesFailureDot } from "../schedules/SchedulesPage";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { SidebarUpdatePill } from "../sidebar/SidebarUpdatePill";
@@ -115,6 +117,40 @@ function MachineFilterMenu() {
   );
 }
 
+/** Opens Schedules; a red dot when a job failed on a machine the feed shows. */
+function SchedulesButton() {
+  const navigate = useNavigate();
+  const machine = useFeedFilterStore((state) => state.machine);
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const { environments } = useEnvironments();
+  const resolved = resolveMachineFilter(machine, primaryEnvironmentId);
+  const shown =
+    resolved.type === "all"
+      ? environments.map((environment) => environment.environmentId)
+      : [resolved.environmentId];
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label="Schedules"
+            onClick={() => void navigate({ to: "/schedules" })}
+            className="relative"
+          />
+        }
+      >
+        <ClockIcon />
+        {shown.map((environmentId) => (
+          <SchedulesFailureDot key={environmentId} environmentId={environmentId} />
+        ))}
+      </TooltipTrigger>
+      <TooltipPopup side="bottom">Schedules</TooltipPopup>
+    </Tooltip>
+  );
+}
+
 /** The feed's one slim bar: the machine filter, search, and every app-wide button. */
 export function FeedTopBar({
   badge,
@@ -188,6 +224,7 @@ export function FeedTopBar({
           </TopBarButton>
         </span>
       ) : null}
+      <SchedulesButton />
       <span className="max-sm:hidden">
         <TopBarButton label="Usage" onClick={() => void navigate({ to: "/usage" })}>
           <ChartNoAxesColumnIcon />

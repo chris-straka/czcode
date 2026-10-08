@@ -5,6 +5,7 @@ import {
   ThreadHistoryController,
 } from "@cz/client-runtime/state/threads";
 import { DecisionsHttp } from "@cz/client-runtime/state/decisions";
+import * as JobsHttp from "@cz/client-runtime/state/jobs";
 import { QueueHttp } from "@cz/client-runtime/state/queue";
 import * as HostWakeHttp from "@cz/client-runtime/state/hostWake";
 import { PullRequestDiffLoader } from "@cz/client-runtime/state/pull-requests";
@@ -24,6 +25,7 @@ const layerSnapshotLoader = Layer.mergeAll(
   PullRequestDiffLoader.layer,
   DecisionsHttp.layer,
   QueueHttp.layer,
+  JobsHttp.layer,
   HostWakeHttp.layer,
 );
 

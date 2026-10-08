@@ -102,6 +102,7 @@ import { SettingsProjectGroupingRouteScreen } from "./features/settings/Settings
 import { SettingsProjectOverviewRouteScreen } from "./features/settings/SettingsProjectOverviewRouteScreen";
 import { UsageLimitAccountScreen } from "./features/usage/UsageLimitsPooled";
 import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
+import { SchedulesRouteScreen } from "./features/schedules/SchedulesRouteScreen";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
 import { DecisionRouteScreen } from "./features/decisions/DecisionRouteScreen";
@@ -390,6 +391,13 @@ const SettingsContentStack = createNativeStackNavigator({
       linking: "usage",
       options: {
         title: "Usage",
+      },
+    }),
+    SettingsSchedules: createNativeStackScreen({
+      screen: SchedulesRouteScreen,
+      linking: "schedules",
+      options: {
+        title: "Schedules",
       },
     }),
   },

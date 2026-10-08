@@ -249,6 +249,17 @@ export function CommandPalette(props: {
           }),
       },
       {
+        key: "schedules",
+        kind: "action",
+        title: "Schedules",
+        searchTerms: ["jobs", "timers", "cron", "nightly", "recurring"],
+        run: () =>
+          navigation.navigate("SettingsSheet", {
+            screen: "SettingsContent",
+            params: { screen: "SettingsSchedules" },
+          }),
+      },
+      {
         key: "archive",
         kind: "action",
         title: "Archived threads",

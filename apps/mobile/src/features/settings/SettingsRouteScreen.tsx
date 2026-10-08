@@ -162,6 +162,7 @@ function SettingsIndexSections() {
       <SettingsSection title="App">
         <AndroidUpdateRows environmentIds={environmentIds} />
         <SettingsRow icon="chart.bar.xaxis" label="Usage" target="SettingsUsage" />
+        <SettingsRow icon="clock" label="Schedules" target="SettingsSchedules" />
         <SettingsRow icon="info.circle" label="About" target="SettingsAbout" />
       </SettingsSection>
     </>
