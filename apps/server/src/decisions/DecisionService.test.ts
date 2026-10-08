@@ -42,12 +42,12 @@ it.layer(TestLayer)("DecisionService", (it) => {
     it.effect("keeps a sound's cue sheet, and rejects a cue before the start", () =>
       Effect.gen(function* () {
         const decisions = yield* DecisionService.DecisionService;
+        const uploaded = yield* decisions.putMedia(
+          { name: "theme.mp3", mime: "audio/mpeg", type: "audio" },
+          new Uint8Array([1, 2, 3]),
+        );
         const song = (at: number) => ({
-          type: "audio" as const,
-          key: "00000000-0000-4000-8000-000000000001.mp3",
-          name: "theme.mp3",
-          mime: "audio/mpeg",
-          size: 1,
+          ...uploaded,
           cues: [{ at, section: "calm", plays: "piano alone", intensity: "low", loop: true }],
         });
         const review = { ...pick(), kind: "review" as const, options: [] };
