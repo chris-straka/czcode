@@ -52,6 +52,9 @@ vi.mock("../ui/tooltip", async (importOriginal) => {
   };
 });
 
+// A turn's changed files show with Developer controls on; these tests cover that view.
+vi.mock("../settings/DeveloperOnly", () => ({ useDeveloperControls: () => true }));
+
 vi.mock("../DiffWorkerPoolProvider", () => ({
   DiffWorkerPoolProvider: ({ children }: { children?: ReactNode }) => children,
 }));

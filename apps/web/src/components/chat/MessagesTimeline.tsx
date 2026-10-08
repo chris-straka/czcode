@@ -170,6 +170,7 @@ import {
 import { ProposedPlanCard } from "./ProposedPlanCard";
 import { HtmlRenderFrame } from "./HtmlRenderFrame";
 import { ChangedFilesCard } from "./ChangedFilesTree";
+import { useDeveloperControls } from "../settings/DeveloperOnly";
 import { useFileContextMenuHandler } from "../../fileContextMenu";
 import { useProject, useThreadShell } from "../../state/entities";
 import {
@@ -3800,7 +3801,9 @@ const AssistantChangedFilesSection = memo(function AssistantChangedFilesSection(
   displayThreadKey?: string;
   onOpenTurnDiff: (runId: RunId, filePath?: string) => void;
 }) {
-  if (!turnSummary) return null;
+  // A turn's changed files are a developer's view (Settings > Developer controls).
+  const developerControls = useDeveloperControls();
+  if (!turnSummary || !developerControls) return null;
   const checkpointFiles = turnSummary.files;
   if (checkpointFiles.length === 0) return null;
 

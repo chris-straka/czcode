@@ -102,9 +102,11 @@ than** on the task.
 ## Defaults and inheritance
 
 General contains the model, permissions and workspace for new threads. Integrations controls
-agent browser access. Source Control keeps projects up to date and holds the GitHub account.
-Technical rows (submodules, merge method, worktree location and cleanup, text generation, diff and
-background tuning) appear once **Developer controls** is on in **Settings → General**.
+agent browser access. Technical rows (submodules, merge method, worktree location and cleanup,
+text generation, diff and background tuning) appear once **Developer controls** is on in
+**Settings → General**. So do the Source Control page (keeping projects up to date, the GitHub
+account), the Pull requests button, and a thread's details panel, git controls and changed
+files.
 
 When the selected machines hold different values for a setting, the row says **Differs by
 machine** and lists which machine has which value. Picking a value applies it to all of them. The same rows edit environment defaults or project overrides depending on the
