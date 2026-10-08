@@ -51,9 +51,22 @@ const queuedRuns = Effect.gen(function* () {
   yield* sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_queued_runs_decision ON queued_runs(decision_id) WHERE decision_id IS NOT NULL`;
 });
 
+/** The owner's own one-line description per decision project. */
+const projectBlurbs = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS project_blurbs (
+      project TEXT PRIMARY KEY,
+      description TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `;
+});
+
 const loader = Migrator.fromRecord({
   "1_DecisionItems": decisionItems,
   "2_QueuedRuns": queuedRuns,
+  "3_ProjectBlurbs": projectBlurbs,
 });
 
 /** Brings `cz.sqlite` up to date. Needs the fork SqlClient. */

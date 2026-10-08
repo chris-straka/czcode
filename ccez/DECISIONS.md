@@ -83,6 +83,10 @@ voice note, plus **"none of these, try again"** with a note.
 - `cost_note` (optional): what answering yes will spend ("runs Tripo, about
   $0.40").
 - `resume`: how work continues after the answer (see below).
+- `target_device` (optional): `phone`, `desktop`, or `any`. A playtest that
+  ships an app build defaults to `phone`; everything else to `any`. Each
+  client shows its own device's decisions and folds the rest into one quiet
+  line ("3 waiting on your phone").
 
 ## When agents should ask (rules for every agent)
 
@@ -113,6 +117,10 @@ How to ask:
   work or end the thread with a resume plan.
 - Give a recommendation when there is one (marked on the option), and say
   why in one line.
+- Render every option the same way and at the same size: an image of the
+  same dimensions for each, or none. Clients frame option media at one
+  aspect ratio, and `ask_owner` / `cz inbox submit` warn when only some
+  options have media.
 
 ## When the owner sees them (no push for now)
 

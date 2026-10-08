@@ -240,13 +240,30 @@ export const make = Effect.fn("LocalDeviceHost.make")(function* () {
   const restartDelayRef = yield* Ref.make(0);
   const hostId = LOCAL_DEVICE_HOST_ID;
 
-  const platformAvailability = Effect.fn("LocalDeviceHost.platformAvailability")(function* (
-    platform: DevicePlatform,
-  ): Effect.fn.Return<DevicePlatformAvailability> {
-    const reason = yield* platformReason(platform).pipe(
+  const reasonFor = (platform: DevicePlatform) =>
+    platformReason(platform).pipe(
       Effect.provideService(FileSystem.FileSystem, fs),
       Effect.provideService(Path.Path, path),
     );
+  // Command Line Tools alone ship xcrun without simctl; only full Xcode runs
+  // simulators. Xcode doesn't come and go while the server runs, so probe once.
+  const iosReason = yield* Effect.cached(
+    Effect.gen(function* () {
+      const reason = yield* reasonFor("ios");
+      if (reason !== null) return reason;
+      const simctl = yield* runner
+        .run({ command: "xcrun", args: ["simctl", "help"], timeout: "10 seconds" })
+        .pipe(Effect.option);
+      return Option.isSome(simctl) && simctl.value.code === 0
+        ? null
+        : "iOS Simulators need full Xcode; xcrun simctl is not available.";
+    }),
+  );
+
+  const platformAvailability = Effect.fn("LocalDeviceHost.platformAvailability")(function* (
+    platform: DevicePlatform,
+  ): Effect.fn.Return<DevicePlatformAvailability> {
+    const reason = yield* platform === "ios" ? iosReason : reasonFor(platform);
     return reason === null ? { platform, available: true } : { platform, available: false, reason };
   });
 

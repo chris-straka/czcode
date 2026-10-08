@@ -4,8 +4,10 @@ import {
   draftProblem,
   draftToAnswer,
   emptyDraft,
+  unseenMediaProblem,
   VERDICT_BUTTONS,
 } from "@cz/client-runtime/decisions/draft";
+import { shortMachineLabel } from "@cz/client-runtime/decisions/oneFeed";
 import type {
   DecisionAnswerInput,
   DecisionMediaRef,
@@ -21,7 +23,7 @@ import {
 } from "expo-audio";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PanResponder, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -31,7 +33,15 @@ import { AppText as Text } from "../../components/AppText";
 import { MaterialButton } from "../../components/MaterialButton";
 import { type DecisionEntry, decisionEnvironment, useOpenDecisions } from "../../state/decisions";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { DecisionAudio, DecisionMedia, useDecisionMediaUrl } from "./DecisionMedia";
+import { DecisionImageViewer } from "./DecisionImageViewer";
+import {
+  DecisionAudio,
+  DecisionMedia,
+  DecisionMediaEngagement,
+  OPTION_FRAME_STYLE,
+  useDecisionMediaResolver,
+  useDecisionMediaUrl,
+} from "./DecisionMedia";
 
 const UNDO_WINDOW_MS = 5_000;
 
@@ -114,8 +124,8 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
   return (
     <View className="flex-1 bg-screen">
       <AndroidScreenHeader
-        title={entry.item.kind}
-        subtitle={`${entry.item.project} · ${entry.environmentLabel}`}
+        title="Decision"
+        subtitle={`${entry.item.kind} · ${entry.item.project} · ${shortMachineLabel(entry.environmentLabel)}`}
         onBack={() => navigation.goBack()}
         actions={[
           ...(entry.item.thread
@@ -179,17 +189,26 @@ function DecisionAnswerForm({
     setDraft((current) => ({ ...current, ...patch }));
   const submit = (patch: Partial<DecisionDraft> = {}, retry = false) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, retry));
-  const problem = draftProblem(item, draft);
+  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
+  const engage = useCallback(
+    (key: string) =>
+      setEngaged((current) => (current.has(key) ? current : new Set(current).add(key))),
+    [],
+  );
+  // You can't approve what you haven't seen: verdicts wait for videos to be
+  // played, sounds heard, and builds installed.
+  const unseen = unseenMediaProblem(item, engaged);
+  const problem = unseen ?? draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
   const hasNote = draft.comment.trim().length > 0 || draft.voiceKey !== null;
 
   return (
     <View className="flex-1">
       <ScrollView className="flex-1" contentContainerClassName="gap-4 p-4">
+        <Text className="text-xl font-cz-bold text-foreground">{item.title || item.question}</Text>
         {item.title && item.title !== item.question ? (
-          <Text className="text-sm font-cz-medium text-foreground-muted">{item.title}</Text>
+          <Text className="text-base text-foreground">{item.question}</Text>
         ) : null}
-        <Text className="text-xl font-cz-bold text-foreground">{item.question}</Text>
         {item.blocking ? (
           <Text className="text-sm text-warning">An agent is waiting on this.</Text>
         ) : null}
@@ -197,7 +216,9 @@ function DecisionAnswerForm({
         {item.kind !== "read" && item.body_md ? (
           <Text className="text-sm text-foreground-muted">{item.body_md}</Text>
         ) : null}
-        <DecisionBody entry={entry} draft={draft} update={update} onUpload={onUpload} />
+        <DecisionMediaEngagement value={engage}>
+          <DecisionBody entry={entry} draft={draft} update={update} onUpload={onUpload} />
+        </DecisionMediaEngagement>
       </ScrollView>
       <View
         className="gap-3 border-t border-subtle-strong bg-screen p-4"
@@ -235,6 +256,7 @@ function DecisionAnswerForm({
                   verdict.value === "reject" || verdict.value === "never" ? "secondary" : "primary"
                 }
                 label={verdict.label}
+                disabled={unseen !== null}
                 onPress={() => submit({ choice: verdict.value })}
               />
             ))
@@ -243,6 +265,7 @@ function DecisionAnswerForm({
               <MaterialButton
                 tone="primary"
                 label="Approve run"
+                disabled={unseen !== null}
                 onPress={() => submit({ choice: "approve", redoFrom: null })}
               />
               <MaterialButton
@@ -268,7 +291,7 @@ function DecisionAnswerForm({
             />
           ) : null}
         </View>
-        {problem && !verdicts && item.kind !== "timeline" ? (
+        {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
           <Text className="text-xs text-foreground-muted">{problem}</Text>
         ) : null}
       </View>
@@ -308,50 +331,103 @@ function Chip({
   );
 }
 
+/**
+ * Pick options. As soon as one has a picture, every option shares one frame
+ * so tiles line up; an option without one shows its label in that frame.
+ * Pictures open full screen, where an option can be picked too.
+ */
+function PickOptions({ entry, draft, update }: BodyProps) {
+  const { item } = entry;
+  const resolve = useDecisionMediaResolver(entry.environmentId);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const mediaOf = (option: (typeof item.options)[number]) =>
+    option.media_idx === null ? null : (item.media[option.media_idx] ?? null);
+  const framed = item.options.some((option) => mediaOf(option) !== null);
+  const pictures = item.options.flatMap((option) => {
+    const uri = mediaOf(option)?.type === "image" ? resolve(mediaOf(option)) : null;
+    return uri ? [{ uri, label: option.label, optionId: option.id }] : [];
+  });
+  const pick = (id: string) =>
+    update({
+      optionIds:
+        item.max_choices === 1
+          ? [id]
+          : draft.optionIds.includes(id)
+            ? draft.optionIds.filter((value) => value !== id)
+            : [...draft.optionIds, id],
+    });
+  return (
+    <View className={framed ? "flex-row flex-wrap justify-between gap-y-3" : "gap-3"}>
+      {item.options.map((option) => {
+        const media = mediaOf(option);
+        const selected = draft.optionIds.includes(option.id);
+        const pictureIndex = pictures.findIndex((picture) => picture.optionId === option.id);
+        return (
+          <Pressable
+            key={option.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            onPress={() => pick(option.id)}
+            onLongPress={pictureIndex >= 0 ? () => setViewing(pictureIndex) : undefined}
+            style={framed ? { width: "48.5%" } : undefined}
+            className={
+              selected
+                ? "gap-2 rounded-xl border-2 border-primary p-2"
+                : "gap-2 rounded-xl border border-subtle-strong p-2"
+            }
+          >
+            {framed ? (
+              pictureIndex >= 0 ? (
+                <Pressable
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel={`Open ${option.label} full screen`}
+                  onPress={() => setViewing(pictureIndex)}
+                >
+                  <DecisionMedia environmentId={entry.environmentId} media={media!} framed />
+                </Pressable>
+              ) : media ? (
+                <DecisionMedia environmentId={entry.environmentId} media={media} />
+              ) : (
+                <View
+                  className="items-center justify-center bg-subtle p-3"
+                  style={OPTION_FRAME_STYLE}
+                >
+                  <Text className="text-center font-cz-medium text-foreground">{option.label}</Text>
+                </View>
+              )
+            ) : null}
+            {framed && !media ? null : (
+              <Text className="font-cz-medium text-foreground">{option.label}</Text>
+            )}
+            {option.recommended ? <Text className="text-xs text-primary">Recommended</Text> : null}
+            {option.reason ? (
+              <Text className="text-xs text-foreground-muted">{option.reason}</Text>
+            ) : null}
+          </Pressable>
+        );
+      })}
+      {viewing !== null ? (
+        <DecisionImageViewer
+          images={pictures}
+          index={viewing}
+          pickedIds={draft.optionIds}
+          onPick={(id) => {
+            pick(id);
+            if (item.max_choices === 1) setViewing(null);
+          }}
+          onClose={() => setViewing(null)}
+        />
+      ) : null}
+    </View>
+  );
+}
+
 function DecisionBody(props: BodyProps) {
   const { entry, draft, update } = props;
   const { item } = entry;
   switch (item.kind) {
     case "pick":
-      return (
-        <View className="gap-3">
-          {item.options.map((option) => {
-            const media = option.media_idx === null ? null : item.media[option.media_idx];
-            const selected = draft.optionIds.includes(option.id);
-            return (
-              <Pressable
-                key={option.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() =>
-                  update({
-                    optionIds:
-                      item.max_choices === 1
-                        ? [option.id]
-                        : selected
-                          ? draft.optionIds.filter((id) => id !== option.id)
-                          : [...draft.optionIds, option.id],
-                  })
-                }
-                className={
-                  selected
-                    ? "gap-2 rounded-xl border-2 border-primary p-3"
-                    : "gap-2 rounded-xl border border-subtle-strong p-3"
-                }
-              >
-                {media ? <DecisionMedia environmentId={entry.environmentId} media={media} /> : null}
-                <Text className="font-cz-medium text-foreground">
-                  {option.label}
-                  {option.recommended ? "  · recommended" : ""}
-                </Text>
-                {option.reason ? (
-                  <Text className="text-xs text-foreground-muted">{option.reason}</Text>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      );
+      return <PickOptions {...props} />;
     case "rank":
       return (
         <View className="gap-2">

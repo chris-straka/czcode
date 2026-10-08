@@ -1,4 +1,5 @@
-import { type EnvironmentId, type ThreadId } from "@cz/contracts";
+import { feedFolderLabel } from "@cz/client-runtime/decisions/oneFeed";
+import { type EnvironmentId, type ScopedThreadRef, type ThreadId } from "@cz/contracts";
 import { scopeThreadRef } from "@cz/client-runtime/environment";
 import type { EnvironmentProject } from "@cz/client-runtime/state/shell";
 import {
@@ -31,6 +32,10 @@ import {
   WorkspaceBreadcrumbText,
 } from "../WorkspaceBreadcrumb";
 import { cn } from "~/lib/utils";
+import { useThreadDigests } from "~/state/decisions";
+import { useProjects, useThreadShell } from "~/state/entities";
+import { useEnvironment } from "~/state/environments";
+import { FeedMeta, threadModelLabel } from "../feed/FeedThreadCard";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -332,6 +337,30 @@ export const ChatHeader = memo(function ChatHeader({
           )}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
+      {isServerThread ? <ThreadPlacement threadRef={activeThreadRef} /> : null}
     </div>
   );
 });
+
+/** "f · games/hll · Opus 5.5": the machine, the folder it works in, and its model. */
+function ThreadPlacement({ threadRef }: { readonly threadRef: ScopedThreadRef }) {
+  const thread = useThreadShell(threadRef);
+  const project = useProjects().find(
+    (candidate) =>
+      candidate.environmentId === threadRef.environmentId && candidate.id === thread?.projectId,
+  );
+  const machine = useEnvironment(threadRef.environmentId)?.label ?? "";
+  const digest = useThreadDigests(thread ? [thread] : []).get(
+    `${threadRef.environmentId}:${threadRef.threadId}`,
+  );
+  if (!thread) return null;
+  return (
+    <div className="shrink-0 max-md:hidden">
+      <FeedMeta
+        machine={machine}
+        folder={feedFolderLabel(project?.title ?? "", digest?.workingSubpath)}
+        model={threadModelLabel(thread)}
+      />
+    </div>
+  );
+}

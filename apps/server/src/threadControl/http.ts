@@ -26,6 +26,7 @@ import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import { threadSummaries } from "./summaries.ts";
+import * as ThreadDigestService from "./ThreadDigestService.ts";
 
 export const threadsHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,
@@ -35,6 +36,7 @@ export const threadsHttpApiLayer = HttpApiBuilder.group(
     const projects = yield* ProjectService.ProjectService;
     const threadManagement = yield* ThreadManagementService.ThreadManagementService;
     const crypto = yield* Crypto.Crypto;
+    const digests = yield* ThreadDigestService.ThreadDigestService;
 
     return handlers
       .handle("list", (args) =>
@@ -53,6 +55,13 @@ export const threadsHttpApiLayer = HttpApiBuilder.group(
               ),
             };
           }).pipe(Effect.catch((cause) => failEnvironmentInternal("internal_error", cause)));
+        }),
+      )
+      .handle("digests", (args) =>
+        Effect.gen(function* () {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationReadScope);
+          return { digests: yield* digests.digests(args.payload.threadIds) };
         }),
       )
       .handle("stop", (args) =>

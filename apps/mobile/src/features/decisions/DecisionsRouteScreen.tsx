@@ -1,13 +1,27 @@
-import { VERDICT_BUTTONS } from "@cz/client-runtime/decisions/draft";
+import {
+  answerSummary,
+  canAnswerFromCard,
+  VERDICT_BUTTONS,
+} from "@cz/client-runtime/decisions/draft";
+import { filterChips } from "@cz/client-runtime/decisions/feed";
+import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 
 import { AndroidScreenHeader } from "../../components/AndroidScreenHeader";
 import { AppText as Text } from "../../components/AppText";
 import { EmptyState } from "../../components/EmptyState";
 import { MaterialButton } from "../../components/MaterialButton";
-import { type DecisionEntry, decisionEnvironment, useOpenDecisions } from "../../state/decisions";
+import {
+  type DecisionEntry,
+  decisionEnvironment,
+  feedProjectsAtom,
+  useAnsweredDecisions,
+  useFilteredOpenDecisions,
+  useOpenDecisions,
+  useProjectBlurbs,
+} from "../../state/decisions";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { DecisionMedia } from "./DecisionMedia";
 
@@ -15,9 +29,30 @@ import { DecisionMedia } from "./DecisionMedia";
 export function DecisionsRouteScreen() {
   const navigation = useNavigation();
   const feed = useOpenDecisions();
+  const filtered = useFilteredOpenDecisions();
+  const answeredFeed = useAnsweredDecisions();
+  const blurbs = useProjectBlurbs();
+  const projects = useAtomValue(feedProjectsAtom);
+  const setProjects = useAtomSet(feedProjectsAtom);
+  const [tab, setTab] = useState<"open" | "answered">("open");
+  const [peek, setPeek] = useState<string | null>(null);
   const answerCommand = useAtomCommand(decisionEnvironment.answer, "answer decision");
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set());
-  const entries = feed.entries.filter((entry) => !answered.has(entry.item.id));
+  const entries = filtered.entries.filter((entry) => !answered.has(entry.item.id));
+  const chips = useMemo(
+    () => filterChips(feed.entries.map((entry) => entry.item)).projects,
+    [feed.entries],
+  );
+  const toggleProject = (project: string) =>
+    setProjects(
+      projects.includes(project)
+        ? projects.filter((value) => value !== project)
+        : [...projects, project],
+    );
+  // Lines for one or two picked projects; a whole group would be a wall of text.
+  const described = [
+    ...new Set([...(projects.length <= 2 ? projects : []), ...(peek ? [peek] : [])]),
+  ];
   const open = (entry: DecisionEntry, session = false) =>
     navigation.navigate("Decision", {
       environmentId: entry.environmentId,
@@ -43,8 +78,159 @@ export function DecisionsRouteScreen() {
             }
           : {})}
       />
+      <View className="flex-row gap-2 px-4 pt-3">
+        {(["open", "answered"] as const).map((value) => (
+          <Pressable
+            key={value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === value }}
+            onPress={() => setTab(value)}
+            className={
+              tab === value
+                ? "rounded-full bg-primary px-3 py-1.5"
+                : "rounded-full bg-subtle px-3 py-1.5"
+            }
+          >
+            <Text
+              className={
+                tab === value ? "text-sm text-primary-foreground" : "text-sm text-foreground"
+              }
+            >
+              {value === "open"
+                ? `Open${entries.length > 0 ? ` ${entries.length}` : ""}`
+                : "Answered"}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {tab === "open" && chips.length > 1
+        ? (["games", "software"] as const).map((group) => {
+            const groupProjects = chips.filter(
+              (project) => (blurbs.get(project)?.group ?? "software") === group,
+            );
+            if (groupProjects.length === 0) return null;
+            const all = groupProjects.every((project) => projects.includes(project));
+            const label = group === "games" ? "Games" : "Software";
+            return (
+              <ScrollView
+                key={group}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerClassName="gap-2 px-4 pt-3"
+                className="shrink-0 grow-0"
+              >
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: all }}
+                  accessibilityLabel={`All ${label.toLowerCase()} projects`}
+                  onPress={() =>
+                    setProjects(
+                      all
+                        ? projects.filter((project) => !groupProjects.includes(project))
+                        : [...new Set([...projects, ...groupProjects])],
+                    )
+                  }
+                  className={
+                    all
+                      ? "rounded-full border border-primary bg-primary px-3 py-1.5"
+                      : "rounded-full border border-subtle-strong px-3 py-1.5"
+                  }
+                >
+                  <Text
+                    className={
+                      all
+                        ? "font-cz-medium text-sm text-primary-foreground"
+                        : "font-cz-medium text-sm text-foreground"
+                    }
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+                {groupProjects.map((project) => {
+                  const selected = projects.includes(project);
+                  return (
+                    <Pressable
+                      key={project}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityHint={blurbs.get(project)?.description ?? undefined}
+                      onPress={() => toggleProject(project)}
+                      onLongPress={() => setPeek(peek === project ? null : project)}
+                      className={
+                        selected
+                          ? "rounded-full bg-primary px-3 py-1.5"
+                          : "rounded-full bg-subtle px-3 py-1.5"
+                      }
+                    >
+                      <Text
+                        className={
+                          selected ? "text-sm text-primary-foreground" : "text-sm text-foreground"
+                        }
+                      >
+                        {project}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            );
+          })
+        : null}
+      {tab === "open"
+        ? described.map((project) => (
+            <Text key={project} className="px-4 pt-2 text-sm text-foreground-muted">
+              <Text className="font-cz-medium text-foreground">{project}</Text>
+              {blurbs.get(project)?.description
+                ? `: ${blurbs.get(project)?.description}`
+                : ": no description yet"}
+            </Text>
+          ))
+        : null}
       <ScrollView contentContainerClassName="gap-3 p-4">
-        {feed.isPending ? (
+        {tab === "answered" ? (
+          answeredFeed.entries.length === 0 ? (
+            <EmptyState title="No answers yet" detail="Decisions you answer show up here." />
+          ) : (
+            answeredFeed.entries.map((entry) => {
+              const { item, answer } = entry;
+              const pictures = item.options.flatMap((option) => {
+                const media =
+                  answer?.option_ids?.includes(option.id) && option.media_idx !== null
+                    ? item.media[option.media_idx]
+                    : undefined;
+                return media?.type === "image" ? [media] : [];
+              });
+              return (
+                <View
+                  key={`${entry.environmentId}:${item.id}`}
+                  className="gap-2 rounded-xl bg-subtle p-4"
+                >
+                  <Text className="text-xs text-foreground-muted">
+                    {item.kind} · {item.project} · {entry.environmentLabel}
+                  </Text>
+                  <Text className="font-cz-medium text-base text-foreground">
+                    {item.title || item.question}
+                  </Text>
+                  {pictures.length > 0 ? (
+                    <View className="flex-row gap-2">
+                      {pictures.slice(0, 3).map((media, index) => (
+                        <View key={`${media.key}:${index}`} className="flex-1">
+                          <DecisionMedia environmentId={entry.environmentId} media={media} framed />
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                  {answer ? (
+                    <Text className="text-sm text-foreground">{answerSummary(item, answer)}</Text>
+                  ) : null}
+                  {answer?.comment ? (
+                    <Text className="text-sm text-foreground-muted">“{answer.comment}”</Text>
+                  ) : null}
+                </View>
+              );
+            })
+          )
+        ) : feed.isPending ? (
           <>
             <View className="h-28 rounded-xl bg-subtle" />
             <View className="h-28 rounded-xl bg-subtle" />
@@ -54,8 +240,12 @@ export function DecisionsRouteScreen() {
         ) : (
           entries.map((entry) => {
             const { item } = entry;
+            // A card answers in place only when nothing on it needs watching,
+            // hearing, or installing first; otherwise tapping opens it.
             const quick =
-              item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
+              (item.kind === "review" || item.kind === "pitch") && canAnswerFromCard(item)
+                ? VERDICT_BUTTONS[item.kind]
+                : null;
             const thumbs = item.options.flatMap((option) => {
               const media = option.media_idx === null ? undefined : item.media[option.media_idx];
               return item.kind === "pick" && media?.type === "image" ? [media] : [];
@@ -91,8 +281,8 @@ export function DecisionsRouteScreen() {
                 </Pressable>
                 {thumbs.length > 0 ? (
                   <Pressable onPress={() => open(entry)} className="flex-row gap-2">
-                    {thumbs.slice(0, 3).map((media) => (
-                      <View key={media.key} className="flex-1">
+                    {thumbs.slice(0, 3).map((media, index) => (
+                      <View key={`${media.key}:${index}`} className="flex-1">
                         <DecisionMedia environmentId={entry.environmentId} media={media} compact />
                       </View>
                     ))}
@@ -135,6 +325,11 @@ export function DecisionsRouteScreen() {
             );
           })
         )}
+        {tab === "open" && filtered.elsewhere > 0 ? (
+          <Text className="text-xs text-foreground-muted">
+            {filtered.elsewhere} waiting on your desktop
+          </Text>
+        ) : null}
         {feed.unreachable.length > 0 ? (
           <Text className="text-xs text-foreground-muted">
             Couldn't reach {feed.unreachable.join(", ")}; their decisions show up when they're back.
