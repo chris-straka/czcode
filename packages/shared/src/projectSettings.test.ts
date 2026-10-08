@@ -166,7 +166,7 @@ describe("resolveProjectSettings with a cz.json", () => {
     expect(fromFile.sources.defaultThreadEnvMode).toBe("cz.json");
 
     const builtIn = resolveProjectSettings(DEFAULT_SERVER_SETTINGS, projectId, null, null);
-    expect(builtIn.settings.defaultThreadEnvMode).toBe("local");
+    expect(builtIn.settings.defaultThreadEnvMode).toBe("worktree");
     expect(builtIn.sources.defaultThreadEnvMode).toBe("environment");
     // A stored null override defers like an unset one and is not reported
     // as the project's value.
@@ -358,7 +358,7 @@ describe("resolveWorktreeCleanup", () => {
       worktreeAfterDays: 15,
       worktreeOnDelete: true,
       worktreeOnMerge: true,
-      worktreeUnchanged: false,
+      worktreeUnchanged: true,
     });
     expect(
       resolveWorktreeCleanup(applyServerSettingsPatch(edited, { worktreeCleanup: null }), null)

@@ -8,6 +8,7 @@ import { useEnvironments } from "~/state/environments";
 import { useEnvironmentQuery } from "~/state/query";
 import { usePrimarySessionState } from "~/environments/primary";
 import { isWslSettingsRowVisible } from "./ConnectionsSettings.logic";
+import { useDeveloperControls } from "./DeveloperOnly";
 import { isProviderSettingsEnvironmentAvailable } from "./ProviderSettingsPanel.logic";
 import type { SettingsScopeSearch } from "./settingsScope";
 import {
@@ -24,6 +25,7 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
   );
   // No Connect (fork): never a managed tunnel.
   const managedTunnelActive = false;
+  const developerControls = useDeveloperControls();
   const canManageLocalBackend =
     !localEnvironmentDisabled &&
     (isElectron ||
@@ -62,9 +64,11 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
         hasThreadAutoSettlement:
           getThreadAutoSettlementSearchAvailability(environments).eligibleEnvironmentIds.length > 0,
         managedTunnelActive,
+        developerControls,
       }),
     [
       managedTunnelActive,
+      developerControls,
       canManageLocalBackend,
       desktopWsl.data,
       desktopWsl.error,

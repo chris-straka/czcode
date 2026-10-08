@@ -858,7 +858,7 @@ export default function DiffPanel({
                           <span className="block min-w-0 truncate pe-2">{choice.label}</span>
                           {hasBoth ? (
                             <div
-                              className="flex justify-end"
+                              className="flex cursor-default justify-end"
                               onClick={(event) => event.stopPropagation()}
                               onPointerDown={(event) => event.stopPropagation()}
                             >

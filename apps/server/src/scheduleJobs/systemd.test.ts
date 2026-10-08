@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  isVendorUnit,
+  parseSystemctlShowUnits,
   calendarInWords,
   onCalendarOf,
   parseSystemctlShow,
@@ -64,5 +66,30 @@ describe("systemd jobs", () => {
     const runs = runsFromJournal(journal);
     expect(scheduledRun(runs, 1791374400000)).toMatchObject({ status: "failed" });
     expect(runs.at(-1)).toMatchObject({ status: "ok" });
+  });
+});
+
+describe("isVendorUnit", () => {
+  it("tells timers the OS or a package installed from ones written on this machine", () => {
+    expect(isVendorUnit("apt-daily.timer", "/usr/lib/systemd/system/apt-daily.timer")).toBe(true);
+    expect(isVendorUnit("fstrim.timer", "/lib/systemd/system/fstrim.timer")).toBe(true);
+    expect(isVendorUnit("snap.firmware-updater.timer", "/etc/systemd/user/snap.x.timer")).toBe(
+      true,
+    );
+    expect(isVendorUnit("cz-net-watchdog.timer", "/etc/systemd/system/cz-net-watchdog.timer")).toBe(
+      false,
+    );
+    expect(isVendorUnit("mfr-daily.timer", "/home/art/.config/systemd/user/mfr-daily.timer")).toBe(
+      false,
+    );
+  });
+});
+
+describe("parseSystemctlShowUnits", () => {
+  it("splits several units' properties", () => {
+    const units = parseSystemctlShowUnits(
+      "Id=a.timer\nDescription=A\n\nId=b.timer\nDescription=B\n",
+    );
+    expect(units.map((unit) => unit.get("Description"))).toEqual(["A", "B"]);
   });
 });

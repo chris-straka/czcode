@@ -2,6 +2,7 @@ import type { ModelTotals } from "@cz/shared/usageMerge";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  foldEarlierPeriods,
   cacheHitRate,
   costPerMillionTokens,
   modelShare,
@@ -88,5 +89,15 @@ describe("model rates", () => {
     expect(cacheHitRate(mixed)).toBe(0.25);
     expect(costPerMillionTokens(mixed)).toBe(2);
     expect(costPerMillionTokens({ ...mixed, unpricedRecords: 4 })).toBeNull();
+  });
+});
+
+describe("foldEarlierPeriods", () => {
+  it("keeps the most recent periods and folds the rest", () => {
+    expect(foldEarlierPeriods([9, 8, 7, 6, 5], 2)).toEqual({ recent: [9, 8], earlier: [7, 6, 5] });
+  });
+
+  it("does not fold a single earlier period", () => {
+    expect(foldEarlierPeriods([9, 8, 7], 2)).toEqual({ recent: [9, 8, 7], earlier: [] });
   });
 });

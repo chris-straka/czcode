@@ -151,8 +151,10 @@ keeps when it rewrites its own entries. The view reads the schedule, next
 run and runs from systemd. Run the job's command through `job-run.sh <name>`
 (exit 0 ok, 2 needs the owner, anything else failed; the last line of output
 is the summary) and the view shows that summary too. `cz jobs list` shows the
-same as the view; `--all` adds timers nobody registered, which the view also
-lists, marked unregistered. `cz jobs remove <name>` unregisters a job and
+same as the view: registered jobs plus timers whose unit files were written on
+the machine (under `/etc` or `~/.config`). `--all` adds the OS's and packages'
+timers (unit files under `/usr` or `/lib`, and snap's), which the view hides
+under **Show system timers**. `cz jobs remove <name>` unregisters a job and
 leaves its timer alone.
 
 ## Where heavy work goes

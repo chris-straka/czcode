@@ -6,7 +6,8 @@ window. It talks to the server on this machine and to every machine paired in it
 phone and desktop, and back. Started inside a project folder, it shows that project's threads;
 `a` switches to all projects.
 
-Tabs: **1** Threads, **2** Decisions, **3** Queue, **4** Hosts, **5** [Fleet](./fleet.md). Each
+Tabs: **1** Threads, **2** Decisions, **3** Queue, **4** Hosts, **5** [Fleet](./fleet.md);
+`H`/`L` step to the previous/next tab. Each
 screen lists its keys at the bottom. Vim keys work everywhere: `j`/`k`, `gg`/`G`,
 `ctrl-d`/`ctrl-u`, `/` to search, and `q`, `h` or `esc` to go back (`q` quits from a tab).
 

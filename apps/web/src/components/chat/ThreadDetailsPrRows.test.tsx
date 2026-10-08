@@ -14,6 +14,7 @@ vi.mock("./ThreadDetailsPrRow", () => ({
     onStopWatching?: () => void;
   }) => (
     <span
+      className="cursor-pointer"
       data-row={String(number)}
       data-watched={onStopWatching ? "" : undefined}
       onClick={onStopWatching}

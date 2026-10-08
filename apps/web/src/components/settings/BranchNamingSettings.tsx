@@ -1,3 +1,4 @@
+import { DIFFERS_BY_MACHINE } from "./scopedSettings";
 import { useRef } from "react";
 import { BranchNamingMode, DEFAULT_SERVER_SETTINGS } from "@cz/contracts";
 
@@ -58,7 +59,9 @@ export function BranchNamingSettings() {
           >
             <SelectTrigger size="sm" aria-label="Worktree branch naming">
               <SelectValue>
-                {(value: BranchNamingMode | null) => (value === null ? "Mixed" : MODES[value])}
+                {(value: BranchNamingMode | null) =>
+                  value === null ? DIFFERS_BY_MACHINE : MODES[value]
+                }
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
@@ -97,7 +100,7 @@ export function BranchNamingSettings() {
               onChange={() => {
                 prefixEdited.current = true;
               }}
-              placeholder={prefixMixed ? "Mixed" : "No prefix"}
+              placeholder={prefixMixed ? DIFFERS_BY_MACHINE : "No prefix"}
               defaultValue={prefixMixed ? "" : settings.branchNamePrefix}
               onBlur={(event) => {
                 const value = event.target.value.trim();
@@ -141,7 +144,7 @@ export function BranchNamingSettings() {
               defaultValue={instructionsMixed ? "" : settings.branchNameInstructions}
               placeholder={
                 instructionsMixed
-                  ? "Mixed. Enter instructions to apply to all selected targets."
+                  ? `${DIFFERS_BY_MACHINE}. Enter instructions to apply to every selected machine.`
                   : "Use julius/ followed by the issue ID and a short description."
               }
               onBlur={(event) => {

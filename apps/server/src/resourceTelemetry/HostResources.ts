@@ -36,7 +36,8 @@ export class HostResources extends Context.Service<
   { readonly read: Effect.Effect<HostResourcesSnapshot> }
 >()("cz/resourceTelemetry/HostResources") {}
 
-function readCpu() {
+/** Summed CPU times across cores; two readings give the busy share between them. */
+export function readCpu() {
   const cpus = NodeOS.cpus();
   const cpu = cpus.reduce(
     (sum, { times }) => ({

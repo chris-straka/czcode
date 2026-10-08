@@ -32,6 +32,7 @@ import * as ElectronUpdater from "../electron/ElectronUpdater.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
+import { plainUpdateFailureMessage } from "./macReleaseFeed.ts";
 import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
 import { resolveDefaultDesktopUpdateChannel } from "./updateChannels.ts";
 import {
@@ -438,7 +439,11 @@ export const make = Effect.gen(function* () {
           )(function* (error) {
             const failedAt = yield* currentIsoTimestamp;
             yield* updateState((current) =>
-              reduceDesktopUpdateStateOnCheckFailure(current, error.message, failedAt),
+              reduceDesktopUpdateStateOnCheckFailure(
+                current,
+                plainUpdateFailureMessage(error.cause) ?? error.message,
+                failedAt,
+              ),
             );
             yield* logUpdaterError(error.message, {
               errorTag: error._tag,
@@ -481,7 +486,10 @@ export const make = Effect.gen(function* () {
         ElectronUpdaterDownloadUpdateError: Effect.fn("desktop.updates.handleDownloadFailure")(
           function* (error) {
             yield* updateState((current) =>
-              reduceDesktopUpdateStateOnDownloadFailure(current, error.message),
+              reduceDesktopUpdateStateOnDownloadFailure(
+                current,
+                plainUpdateFailureMessage(error.cause) ?? error.message,
+              ),
             );
             yield* logUpdaterError(error.message, {
               errorTag: error._tag,
@@ -652,7 +660,9 @@ export const make = Effect.gen(function* () {
           Effect.catchTags({
             ElectronUpdaterQuitAndInstallError: Effect.fn("desktop.updates.handleInstallFailure")(
               function* (error) {
-                yield* recoverFailedInstall(error.message);
+                yield* recoverFailedInstall(
+                  plainUpdateFailureMessage(error.cause) ?? error.message,
+                );
                 yield* logUpdaterError(error.message, {
                   errorTag: error._tag,
                   channel: error.channel,
@@ -821,7 +831,7 @@ export const make = Effect.gen(function* () {
       yield* updateState((current) => ({
         ...current,
         status: "error",
-        message: error.message,
+        message: plainUpdateFailureMessage(cause) ?? error.message,
         checkedAt,
         downloadPercent: null,
         errorContext: current.errorContext,

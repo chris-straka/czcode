@@ -1,3 +1,4 @@
+import { DIFFERS_BY_MACHINE } from "./scopedSettings";
 import {
   DEFAULT_SERVER_SETTINGS,
   type ModelSelection,
@@ -26,6 +27,7 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { toastManager } from "../ui/toast";
 import { Switch } from "../ui/switch";
 import type { ProjectSettingsCategory } from "./ProjectSettingsPanel";
+import { DeveloperOnly } from "./DeveloperOnly";
 import { searchableSetting } from "./settingsSearch";
 import { useSettingsScope } from "./SettingsScopeContext";
 import {
@@ -139,8 +141,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       title="Model"
       description={
         isProjectScope
-          ? "Model for new threads in this project."
-          : "Default model for new threads. Projects can override it."
+          ? "The AI model new threads in this project use."
+          : "The AI model new threads use. A project can pick its own."
       }
       status={
         unavailable || mixedModel || modelSource === "project"
@@ -164,7 +166,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               instanceEntries={entries}
               modelOptionsByInstance={modelOptions}
               triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-              {...(mixedModel ? { triggerLabel: "Mixed" } : {})}
+              {...(mixedModel ? { triggerLabel: DIFFERS_BY_MACHINE } : {})}
               getModelDisabledReason={modelDisabledReason}
               onOpenProviderSetup={(instanceId) => {
                 if (representative)
@@ -206,12 +208,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
       settingKeys={["defaultThreadEnvMode"]}
       mixed={mixedWorkspace}
       id={searchableSetting("new-threads").id}
-      title="Workspace"
-      description={
-        isProjectScope
-          ? "Where new threads in this project start."
-          : "Where new threads start. Projects and their cz.json can override it."
-      }
+      title="Where new threads work"
+      description="New worktree gives each thread its own copy of the project, so agents running at the same time don't collide. Current checkout works in the project folder itself."
       resetAction={
         !isProjectScope && settings.defaultThreadEnvMode !== null ? (
           <SettingResetButton
@@ -235,7 +233,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                   ? resolveEnvModeLabel(value)
                   : unavailable
                     ? "Unavailable"
-                    : "Mixed"
+                    : DIFFERS_BY_MACHINE
               }
             </SelectValue>
           </SelectTrigger>
@@ -280,8 +278,8 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             {...searchableSetting("default-permissions")}
             description={
               isProjectScope
-                ? "Permissions for new threads in this project."
-                : "Default permissions for new threads. Projects can override them."
+                ? "How much agents in this project may do without asking you first."
+                : "How much agents may do without asking you first. Full access lets them edit files and run commands on their own."
             }
             resetAction={
               settings.defaultRuntimeMode !== DEFAULT_SERVER_SETTINGS.defaultRuntimeMode ? (
@@ -308,7 +306,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                   )}
                   <SelectValue>
                     {mixedPermissions
-                      ? "Mixed"
+                      ? DIFFERS_BY_MACHINE
                       : runtimeModeConfig[settings.defaultRuntimeMode].label}
                   </SelectValue>
                 </SelectTrigger>
@@ -335,52 +333,54 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             }
           />
           {workspaceRow}
-          <SettingsRow
-            serverScoped
-            settingKeys={["worktreeSubmodules"]}
-            mixed={mixedSubmodules}
-            {...searchableSetting("worktree-submodules")}
-            description={
-              isProjectScope
-                ? "How new worktrees in this project populate git submodules."
-                : "How new worktrees populate git submodules. Projects and their cz.json can override it."
-            }
-            resetAction={
-              !isProjectScope && settings.worktreeSubmodules !== null ? (
-                <SettingResetButton
-                  label="worktree submodules"
-                  onClick={() => updateSettings({ worktreeSubmodules: null })}
-                />
-              ) : null
-            }
-            control={
-              <Select
-                value={mixedSubmodules ? null : (effective?.worktreeSubmodules ?? null)}
-                onValueChange={(value) => {
-                  if (isWorktreeSubmodules(value)) updateSettings({ worktreeSubmodules: value });
-                }}
-              >
-                <SelectTrigger size="sm" aria-label="Worktree submodules">
-                  <SelectValue>
-                    {(value: string | null) =>
-                      isWorktreeSubmodules(value)
-                        ? WORKTREE_SUBMODULES_LABELS[value]
-                        : unavailable
-                          ? "Unavailable"
-                          : "Mixed"
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {WORKTREE_SUBMODULES_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {WORKTREE_SUBMODULES_LABELS[option]}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
-            }
-          />
+          <DeveloperOnly>
+            <SettingsRow
+              serverScoped
+              settingKeys={["worktreeSubmodules"]}
+              mixed={mixedSubmodules}
+              {...searchableSetting("worktree-submodules")}
+              description={
+                isProjectScope
+                  ? "How new worktrees in this project populate git submodules."
+                  : "How new worktrees fill in git submodules. A project or its cz.json can pick its own."
+              }
+              resetAction={
+                !isProjectScope && settings.worktreeSubmodules !== null ? (
+                  <SettingResetButton
+                    label="worktree submodules"
+                    onClick={() => updateSettings({ worktreeSubmodules: null })}
+                  />
+                ) : null
+              }
+              control={
+                <Select
+                  value={mixedSubmodules ? null : (effective?.worktreeSubmodules ?? null)}
+                  onValueChange={(value) => {
+                    if (isWorktreeSubmodules(value)) updateSettings({ worktreeSubmodules: value });
+                  }}
+                >
+                  <SelectTrigger size="sm" aria-label="Worktree submodules">
+                    <SelectValue>
+                      {(value: string | null) =>
+                        isWorktreeSubmodules(value)
+                          ? WORKTREE_SUBMODULES_LABELS[value]
+                          : unavailable
+                            ? "Unavailable"
+                            : DIFFERS_BY_MACHINE
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup align="end" alignItemWithTrigger={false}>
+                    {WORKTREE_SUBMODULES_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {WORKTREE_SUBMODULES_LABELS[option]}
+                      </SelectItem>
+                    ))}
+                  </SelectPopup>
+                </Select>
+              }
+            />
+          </DeveloperOnly>
         </>
       ) : category === "source-control" ? (
         <>
@@ -389,18 +389,16 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             settingKeys={["defaultAutoPull"]}
             mixed={mixedAutoPull}
             id="automatic-pull"
-            title="Automatically pull"
-            description={
-              isProjectScope
-                ? "Keeps this project's default branch current when the checkout has no local changes or commits."
-                : "Keeps the default branch current when the checkout has no local changes or commits. Projects can override it."
-            }
+            title="Keep projects up to date"
+            description="Pulls the latest main when nothing is changed locally."
             resetAction={
-              settings.defaultAutoPull ? (
+              settings.defaultAutoPull !== DEFAULT_SERVER_SETTINGS.defaultAutoPull ? (
                 <SettingResetButton
-                  label="default automatic pull"
-                  tooltip="Reset automatic pull to off"
-                  onClick={() => updateSettings({ defaultAutoPull: false })}
+                  label="keep projects up to date"
+                  tooltip="Reset to on"
+                  onClick={() =>
+                    updateSettings({ defaultAutoPull: DEFAULT_SERVER_SETTINGS.defaultAutoPull })
+                  }
                 />
               ) : null
             }
@@ -413,80 +411,86 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
               />
             }
           />
-          <SettingsRow
-            serverScoped
-            settingKeys={["removeAgentCreditsOnMerge"]}
-            mixed={mixedAgentCredits}
-            {...searchableSetting("remove-agent-credits-on-merge")}
-            description="Remove recognized agent credit lines from GitHub merge and squash messages, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits."
-            resetAction={
-              settings.removeAgentCreditsOnMerge ? (
-                <SettingResetButton
-                  label="agent credit removal"
-                  tooltip="Keep agent credits"
-                  onClick={() => updateSettings({ removeAgentCreditsOnMerge: false })}
+          <DeveloperOnly>
+            <SettingsRow
+              serverScoped
+              settingKeys={["removeAgentCreditsOnMerge"]}
+              mixed={mixedAgentCredits}
+              {...searchableSetting("remove-agent-credits-on-merge")}
+              description="Remove recognized agent credit lines from GitHub merge and squash messages, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits."
+              resetAction={
+                settings.removeAgentCreditsOnMerge ? (
+                  <SettingResetButton
+                    label="agent credit removal"
+                    tooltip="Keep agent credits"
+                    onClick={() => updateSettings({ removeAgentCreditsOnMerge: false })}
+                  />
+                ) : null
+              }
+              control={
+                <Switch
+                  aria-label="Remove agent credits when merging"
+                  mixed={mixedAgentCredits}
+                  checked={mixedAgentCredits ? false : settings.removeAgentCreditsOnMerge}
+                  onCheckedChange={(enabled) =>
+                    updateSettings({ removeAgentCreditsOnMerge: enabled })
+                  }
                 />
-              ) : null
-            }
-            control={
-              <Switch
-                aria-label="Remove agent credits when merging"
-                mixed={mixedAgentCredits}
-                checked={mixedAgentCredits ? false : settings.removeAgentCreditsOnMerge}
-                onCheckedChange={(enabled) =>
-                  updateSettings({ removeAgentCreditsOnMerge: enabled })
-                }
-              />
-            }
-          />
-          <SettingsRow
-            serverScoped
-            settingKeys={["pullRequestMergeMethod"]}
-            mixed={mixedMergeMethod}
-            {...searchableSetting("pull-request-merge-method")}
-            description={
-              isProjectScope
-                ? "Pull requests in this project start with this method."
-                : "Pull requests start with this method. Last selected reuses whatever you chose most recently on this device."
-            }
-            resetAction={
-              settings.pullRequestMergeMethod !== null ? (
-                <SettingResetButton
-                  label="default merge method"
-                  tooltip="Reset to last selected"
-                  onClick={() => updateSettings({ pullRequestMergeMethod: null })}
-                />
-              ) : null
-            }
-            control={
-              <Select
-                value={mixedMergeMethod ? null : (settings.pullRequestMergeMethod ?? "last")}
-                onValueChange={(value) => {
-                  if (value === "last") updateSettings({ pullRequestMergeMethod: null });
-                  else if (value === "merge" || value === "squash" || value === "rebase")
-                    updateSettings({ pullRequestMergeMethod: value });
-                }}
-              >
-                <SelectTrigger size="sm" aria-label="Default pull request merge method">
-                  <SelectValue>
-                    {(value: string | null) =>
-                      value === "merge" || value === "squash" || value === "rebase"
-                        ? PULL_REQUEST_MERGE_METHOD_LABELS[value]
-                        : value === "last"
-                          ? "Last selected"
-                          : "Mixed"
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="last">Last selected</SelectItem>
-                  <SelectItem value="merge">{PULL_REQUEST_MERGE_METHOD_LABELS.merge}</SelectItem>
-                  <SelectItem value="squash">{PULL_REQUEST_MERGE_METHOD_LABELS.squash}</SelectItem>
-                  <SelectItem value="rebase">{PULL_REQUEST_MERGE_METHOD_LABELS.rebase}</SelectItem>
-                </SelectPopup>
-              </Select>
-            }
-          />
+              }
+            />
+            <SettingsRow
+              serverScoped
+              settingKeys={["pullRequestMergeMethod"]}
+              mixed={mixedMergeMethod}
+              {...searchableSetting("pull-request-merge-method")}
+              description={
+                isProjectScope
+                  ? "Pull requests in this project start with this method."
+                  : "Pull requests start with this method. Last selected reuses whatever you chose most recently on this device."
+              }
+              resetAction={
+                settings.pullRequestMergeMethod !== null ? (
+                  <SettingResetButton
+                    label="default merge method"
+                    tooltip="Reset to last selected"
+                    onClick={() => updateSettings({ pullRequestMergeMethod: null })}
+                  />
+                ) : null
+              }
+              control={
+                <Select
+                  value={mixedMergeMethod ? null : (settings.pullRequestMergeMethod ?? "last")}
+                  onValueChange={(value) => {
+                    if (value === "last") updateSettings({ pullRequestMergeMethod: null });
+                    else if (value === "merge" || value === "squash" || value === "rebase")
+                      updateSettings({ pullRequestMergeMethod: value });
+                  }}
+                >
+                  <SelectTrigger size="sm" aria-label="Default pull request merge method">
+                    <SelectValue>
+                      {(value: string | null) =>
+                        value === "merge" || value === "squash" || value === "rebase"
+                          ? PULL_REQUEST_MERGE_METHOD_LABELS[value]
+                          : value === "last"
+                            ? "Last selected"
+                            : DIFFERS_BY_MACHINE
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectPopup align="end" alignItemWithTrigger={false}>
+                    <SelectItem value="last">Last selected</SelectItem>
+                    <SelectItem value="merge">{PULL_REQUEST_MERGE_METHOD_LABELS.merge}</SelectItem>
+                    <SelectItem value="squash">
+                      {PULL_REQUEST_MERGE_METHOD_LABELS.squash}
+                    </SelectItem>
+                    <SelectItem value="rebase">
+                      {PULL_REQUEST_MERGE_METHOD_LABELS.rebase}
+                    </SelectItem>
+                  </SelectPopup>
+                </Select>
+              }
+            />
+          </DeveloperOnly>
         </>
       ) : (
         <>
@@ -499,7 +503,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
             description={
               isProjectScope
                 ? "Allow agents in this project to use the shared browser. Applies when the agent session next starts."
-                : "Allow agents to use the shared browser. Projects can override it."
+                : "Let agents open and use a web browser. A project can pick its own."
             }
             resetAction={
               settings.enableAgentBrowserAccess !==

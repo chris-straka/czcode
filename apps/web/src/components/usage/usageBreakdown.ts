@@ -84,3 +84,14 @@ export function speedCostSegments(cost: SpeedCost): readonly ShareSegment[] {
     { label: "Ultrafast", value: cost.ultrafast, color: ink(100) },
   ];
 }
+
+/**
+ * Newest-first periods split into the `keep` most recent and the rest, which
+ * the Day view sums into one expandable "Earlier" row. A rest of one is not
+ * worth folding.
+ */
+export function foldEarlierPeriods<Period>(periods: readonly Period[], keep: number) {
+  return periods.length <= keep + 1
+    ? { recent: periods, earlier: [] }
+    : { recent: periods.slice(0, keep), earlier: periods.slice(keep) };
+}

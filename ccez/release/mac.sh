@@ -1,14 +1,18 @@
 #!/bin/sh
 # Builds the unsigned arm64 Mac desktop app (no Apple Developer ID: the first
-# launch of a downloaded copy needs right-click → Open; a local build doesn't).
-# It has no update feed, because an unsigned app can't apply updates from
-# one: updating means running this again on a newer main.
+# launch of a browser-downloaded copy needs right-click → Open; a local build
+# or one installed by mac-install.sh doesn't). CI runs this on every push to
+# main and publishes the result (.github/workflows/mac-release.yml); the app
+# checks those releases and updates itself (apps/desktop/src/electron/
+# MacReleaseUpdater.ts), so this is only for testing a local change.
 #
 #   ccez/release/mac.sh [--install]
 #     writes release/<name>-<version>-arm64.{dmg,zip}
 #     --install   replaces /Applications/czcode.app (quit czcode first) and
-#                 points ~/.local/bin/cz at the installed app's server, so
-#                 `cz inbox`, `cz queue`, and `cz serve` match the app
+#                 points ~/.local/bin/cz at its server (mac-install.sh)
+#
+# CZ_DESKTOP_VERSION sets the version; CI uses <package version>-mac.<run>.
+# A build without the -mac.<n> suffix updates to the newest release.
 set -eu
 install=false
 for arg in "$@"; do
@@ -26,7 +30,9 @@ if $install && pgrep -x czcode > /dev/null; then
 fi
 
 started=$(date +%s)
-env -u CZ_DESKTOP_UPDATE_REPOSITORY -u GITHUB_REPOSITORY \
+# The update repository only names the feed in app-update.yml; electron-builder
+# never publishes from here.
+env -u GITHUB_REPOSITORY CZ_DESKTOP_UPDATE_REPOSITORY=chris-straka/czcode \
   node scripts/build-desktop-artifact.ts --platform mac --target dmg --arch arm64
 zip=$(ls -t release/*-arm64.zip | head -1)
 if [ "$(stat -f %m "$zip")" -lt "$started" ]; then
@@ -35,20 +41,4 @@ if [ "$(stat -f %m "$zip")" -lt "$started" ]; then
 fi
 echo "mac: $zip"
 $install || exit 0
-
-staging=$(mktemp -d)
-trap 'rm -rf "$staging"' EXIT
-ditto -x -k "$zip" "$staging"
-rm -rf /Applications/czcode.app
-ditto "$staging/czcode.app" /Applications/czcode.app
-
-mkdir -p "$HOME/.local/bin"
-cat > "$HOME/.local/bin/cz" <<'SHIM'
-#!/bin/sh
-# The cz CLI, run by the installed czcode app's own Node (ccez/release/mac.sh).
-app=/Applications/czcode.app
-ELECTRON_RUN_AS_NODE=1 exec "$app/Contents/MacOS/czcode" \
-  "$app/Contents/Resources/app.asar/apps/server/dist/bin.mjs" "$@"
-SHIM
-chmod +x "$HOME/.local/bin/cz"
-echo "installed: /Applications/czcode.app, $HOME/.local/bin/cz"
+sh ccez/release/mac-install.sh "$zip"

@@ -43,6 +43,10 @@
       "types": "./src/proposedPlan.ts",
       "default": "./src/proposedPlan.ts"
     },
+    "./hostLoad": {
+      "types": "./src/hostLoad.ts",
+      "default": "./src/hostLoad.ts"
+    },
     "./fleet": {
       "types": "./src/fleet.ts",
       "default": "./src/fleet.ts"
@@ -422,6 +426,10 @@
     "./decisions/oneFeed": {
       "types": "./src/decisions/oneFeed.ts",
       "default": "./src/decisions/oneFeed.ts"
+    },
+    "./decisions/threadBoard": {
+      "types": "./src/decisions/threadBoard.ts",
+      "default": "./src/decisions/threadBoard.ts"
     },
     "./decisions/draft": {
       "types": "./src/decisions/draft.ts",

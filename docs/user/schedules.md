@@ -15,7 +15,9 @@ you" means the job ran and found something for you, said in its summary.
 
 ## Adding a job
 
-A timer shows up once it's registered on its machine:
+A timer you set up by hand shows up on its own, described by its service's
+`Description=`. Registering it adds a plain description, a project and where
+its output goes:
 
 ```sh
 cz jobs add --unit nightly-report.timer --description "Build the nightly report"
@@ -24,5 +26,5 @@ cz jobs add --unit nightly-report.timer --description "Build the nightly report"
 `--output` says where the latest output is (a file, folder or URL), and
 `--project` which project it belongs to. `cz jobs list` prints what the view
 shows; `cz jobs remove <name>` unregisters a job without touching the timer.
-Timers nobody registered are listed below the rest, under **Show other
-timers**.
+The timers Linux and its packages install (apt, logrotate, snap...) stay
+hidden under **Show system timers**.

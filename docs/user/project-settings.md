@@ -101,9 +101,13 @@ than** on the task.
 
 ## Defaults and inheritance
 
-General contains the model and workspace for new threads. Integrations controls agent browser
-access. Source Control contains automatic pull, the default pull request merge method and text
-generation. The same rows edit environment defaults or project overrides depending on the
+General contains the model, permissions and workspace for new threads. Integrations controls
+agent browser access. Source Control keeps projects up to date and holds the GitHub account.
+Technical rows (submodules, merge method, worktree location and cleanup, text generation, diff and
+background tuning) appear once **Developer controls** is on in **Settings → General**.
+
+When the selected machines hold different values for a setting, the row says **Differs by
+machine** and lists which machine has which value. Picking a value applies it to all of them. The same rows edit environment defaults or project overrides depending on the
 project crumb.
 
 The Project category, shown while a project is selected, holds the project's name, icon, actions,
@@ -116,8 +120,13 @@ resolve in one order: a project override, then the environment setting, then `cz
 built-in default. Leave a setting on **Inherit** to let the next tier decide.
 Browser access changes apply when an agent session next starts.
 
+New threads start in a **New worktree** by default: each thread gets its own copy of the project,
+so agents running at the same time don't collide. Choose **Current checkout** to work in the project
+folder itself. Folders that aren't git repositories always use the folder itself.
+
 New worktrees initialize git submodules recursively. If that step is slow because the repository
-declares many nested submodules, set **Submodules** in **Settings → General** (with the project
+declares many nested submodules, set **Submodules** in **Settings → General** (with Developer
+controls on) (with the project
 selected to override it there) to **Top level only** to stop at the ones the repository declares
 itself, or **Skip** to leave them for a setup script. It resolves in the same order as the
 workspace default: a `"worktreeSubmodules"` value in the `cz.json` of the branch being checked out
@@ -126,15 +135,17 @@ applies when the project and environment are both on **Inherit**.
 ## Worktree location
 
 New worktrees go in the `worktrees` folder of the cz home directory. To put them somewhere else,
-such as another drive, set **Settings → Storage → Worktree location** to an absolute path like
+such as another drive, set **Settings → Source Control → Worktree location** (with Developer controls on) to an absolute path like
 `D:\worktrees` or `~/worktrees`. The setting is per machine. Existing worktrees stay where they
 are, and cleanup covers both the default folder and the custom one.
 
-## Storage cleanup
+## Worktree cleanup
 
-Open **Settings → Storage** to enable automatic cleanup on one machine or all connected
-environments. Policies are off by default and run on the server at startup, when changed, and
-hourly. Offline machines keep their existing policies.
+Worktrees are cleaned up automatically so parallel threads don't pile up copies: merged ones,
+ones with no commits beyond the default branch, ones whose threads were deleted, and ones whose
+threads have been inactive for 14 days. A worktree with uncommitted changes is always kept. Change
+the rules in **Settings → Source Control → Worktrees** with Developer controls on. Cleanup runs on
+the server at startup, when changed, and hourly. Offline machines keep their existing policies.
 
 Select a project to set **Automatic worktree cleanup** to **Inherit**, **Off**, or **Custom**.
 Inherit follows each machine's rules; Off keeps that project's worktrees until you remove them
@@ -153,7 +164,8 @@ thread is deleted, including archived threads and worktrees left by earlier dele
 server waits for sessions and terminals to stop and retries skipped worktrees after restart.
 Existing prompts for deleting a worktree manually remain available when this policy is off.
 
-Browser captures and rotated logs have separate retention periods. Expired capture links stop
+Browser captures and rotated logs have separate retention periods, set in **Settings → General →
+Artifacts and logs** with Developer controls on. Expired capture links stop
 working. Current logs, message attachments, and browser profiles are kept.
 
 ## Project icons
@@ -170,8 +182,8 @@ from the icon palette, derived from the saved project name. For example, `Nebula
 
 ## Keep the default branch current
 
-In Source Control, enable **Automatically pull** to keep the default-branch checkout up to date
-with its configured upstream. Choose an environment to set the default or a project to override it.
+**Keep projects up to date** in Source Control is on by default: it keeps the default-branch
+checkout current with its configured upstream. Choose an environment to set the default or a project to override it.
 On mobile, use **Settings → Source control** to change selected environment defaults or project overrides.
 
 czcode only pulls when it can fast-forward and the checkout has no changed files, untracked files,
