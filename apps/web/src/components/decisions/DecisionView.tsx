@@ -19,6 +19,7 @@ import {
   UndoIcon,
   UploadIcon,
   XIcon,
+  ZoomInIcon,
 } from "lucide-react";
 import {
   createContext,
@@ -43,6 +44,7 @@ import { Textarea } from "../ui/textarea";
 import { ExpandedImageDialog } from "../chat/ExpandedImageDialog";
 import type { ExpandedImageItem } from "../chat/ExpandedImagePreview";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { WaveformPlayer } from "./WaveformPlayer";
 import {
   DECISION_OPTION_FRAME_CLASS,
   DecisionMedia,
@@ -57,6 +59,8 @@ import {
   emptyDraft,
   unseenMediaProblem,
   VERDICT_BUTTONS,
+  contextMedia,
+  optionMedia,
 } from "@cz/client-runtime/decisions/draft";
 
 export type UploadDecisionMedia = (
@@ -68,6 +72,8 @@ interface DecisionViewProps {
   readonly entry: DecisionEntry;
   readonly position?: { readonly index: number; readonly total: number };
   readonly onSubmit: (answer: DecisionAnswerInput) => void;
+  /** Withdraws it as no longer relevant. */
+  readonly onDismiss: () => void;
   readonly onUpload: UploadDecisionMedia;
   readonly onClose: () => void;
   readonly onSkip?: () => void;
@@ -97,6 +103,7 @@ export function DecisionView({
   entry,
   position,
   onSubmit,
+  onDismiss,
   onUpload,
   onClose,
   onSkip,
@@ -206,8 +213,13 @@ export function DecisionView({
     return () => window.removeEventListener("keydown", listener);
   }, []);
 
+  // Judge a video from the video: it comes first and a long write-up folds
+  // under Details, as does a long text beside pictures.
+  const mediaFirst =
+    item.media.some((media) => media.type === "video") ||
+    (item.body_md.length > 800 && item.media.some((media) => media.type === "image"));
   const keyHints = [
-    "j/k scroll",
+    "j/k scroll · gg/G ends",
     item.kind === "pick" || verdicts
       ? `1-${Math.min(9, item.kind === "pick" ? item.options.length : (verdicts?.length ?? 1))} choose`
       : null,
@@ -270,9 +282,6 @@ export function DecisionView({
               <ChevronRightIcon />
             </Button>
           ) : null}
-          <Button size="icon-xs" variant="ghost" aria-label="Close" onClick={onClose}>
-            <XIcon />
-          </Button>
         </div>
       </WorkspacePageHeader>
 
@@ -288,7 +297,7 @@ export function DecisionView({
               <p className="text-sm text-warning-foreground">{item.cost_note}</p>
             ) : null}
           </div>
-          {item.kind !== "read" && item.body_md ? (
+          {item.kind !== "read" && item.body_md && !mediaFirst ? (
             <div className="max-w-2xl">
               <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
             </div>
@@ -300,6 +309,16 @@ export function DecisionView({
               </DecisionMediaEngagement>
             </FullScreenContext>
           </UploadContext>
+          {item.kind !== "read" && item.body_md && mediaFirst ? (
+            <details className="max-w-2xl rounded-md border border-border px-3 py-2">
+              <summary className="cursor-pointer text-sm text-muted-foreground">
+                Details: script, notes
+              </summary>
+              <div className="pt-2">
+                <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
+              </div>
+            </details>
+          ) : null}
         </div>
       </div>
       {fullScreen ? (
@@ -408,6 +427,9 @@ export function DecisionView({
             {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
               <span className="text-xs text-muted-foreground">{problem}</span>
             ) : null}
+            <Button variant="ghost-muted" size="sm" onClick={onDismiss}>
+              No longer relevant
+            </Button>
             <span className="ms-auto hidden text-2xs text-muted-foreground sm:inline">
               {keyHints.join(" · ")}
             </span>
@@ -477,7 +499,7 @@ function AttachedMedia({
             <button
               type="button"
               aria-label={`Open ${ref.caption ?? ref.name} full screen`}
-              className="block w-full cursor-zoom-in rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="block w-fit max-w-full cursor-zoom-in rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() =>
                 fullScreen.open(
                   images.map((image) => ({
@@ -514,14 +536,12 @@ function PickBody({ entry, draft, update }: BodyProps) {
         : [...draft.optionIds, id],
     });
   };
-  const mediaOf = (option: (typeof item.options)[number]) =>
-    option.media_idx === null ? null : (item.media[option.media_idx] ?? null);
+  const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Options share one frame as soon as any of them has a picture, so tiles,
   // captions and text-only options line up.
   const framed = item.options.some((option) => mediaOf(option) !== null);
   const imageOptions = item.options.filter((option) => mediaOf(option)?.type === "image");
-  const optionMedia = new Set(item.options.map((option) => option.media_idx));
-  const context = item.media.filter((_, index) => !optionMedia.has(index));
+  const context = contextMedia(item);
   return (
     <div className="space-y-4">
       <AttachedMedia entry={entry} media={context} />
@@ -693,7 +713,7 @@ function ListenBody({ entry, draft, update }: BodyProps) {
       ) : null}
       {item.options.map((option) => {
         const reaction = draft.reactions[option.id];
-        const media = option.media_idx === null ? null : item.media[option.media_idx];
+        const media = optionMedia(item, option);
         const verdictButton = (
           verdict: "keep" | "kill" | "favourite",
           icon: ReactNode,
@@ -791,10 +811,32 @@ function ListenPlayer({
 }
 
 function ReviewBody({ entry, draft, update }: BodyProps) {
+  const engage = useContext(DecisionMediaEngagement);
+  const resolveMedia = useDecisionMediaResolver(entry.environmentId);
+  // The waveform player draws the sound itself; a waveform picture beside it is noise.
+  const hasAudio = entry.item.media.some((media) => media.type === "audio");
+  const waveformPicture = (media: DecisionMediaRef) =>
+    hasAudio && /waveform/i.test(`${media.name} ${media.caption ?? ""}`);
   return (
     <div className="space-y-3">
       {entry.item.media.map((media, index) =>
-        media.type === "image" ? (
+        media.type === "audio" && resolveMedia(media) ? (
+          <WaveformPlayer
+            key={media.key}
+            url={resolveMedia(media)!}
+            media={media}
+            marks={draft.marks.filter((mark) => mark.media_idx === index)}
+            onMarks={(marks) =>
+              update({
+                marks: [
+                  ...draft.marks.filter((mark) => mark.media_idx !== index),
+                  ...marks.map((mark) => ({ ...mark, media_idx: index })),
+                ],
+              })
+            }
+            onEngage={() => engage(media.key)}
+          />
+        ) : media.type === "image" && waveformPicture(media) ? null : media.type === "image" ? (
           <RedlineImage
             key={media.key}
             entry={entry}
@@ -831,6 +873,7 @@ function RedlineImage({
   onUndo: () => void;
 }) {
   const url = useDecisionMediaUrl(entry.environmentId, media);
+  const fullScreen = useContext(FullScreenContext);
   const [current, setCurrent] = useState<Array<[number, number]> | null>(null);
   const point = (event: ReactPointerEvent<SVGSVGElement>): [number, number] => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -844,11 +887,12 @@ function RedlineImage({
   if (!url) return <div className="h-48 rounded-md bg-muted" />;
   return (
     <figure className="space-y-1">
-      <div className="relative">
+      {/* Never wider than the file itself: an upscaled screenshot is blurry. */}
+      <div className="relative w-fit max-w-full">
         <img
           src={url}
           alt={media.caption ?? media.name}
-          className="w-full rounded-md"
+          className="block h-auto max-h-[70vh] w-auto max-w-full rounded-md"
           draggable={false}
         />
         <svg
@@ -884,6 +928,14 @@ function RedlineImage({
       </div>
       <figcaption className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="flex-1">Draw to mark what to change.</span>
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => fullScreen.open([{ src: url, name: media.caption ?? media.name }], 0)}
+        >
+          <ZoomInIcon />
+          Zoom
+        </Button>
         {strokes.length > 0 ? (
           <Button size="xs" variant="ghost" onClick={onUndo}>
             <UndoIcon />

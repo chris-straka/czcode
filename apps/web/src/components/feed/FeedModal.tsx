@@ -1,76 +1,104 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
-import { XIcon } from "lucide-react";
+import { ArrowLeftIcon } from "lucide-react";
 
-import { cn } from "~/lib/utils";
+import { mainScroller, useVimKeys } from "~/hooks/useVimKeys";
 import { Button } from "../ui/button";
 
+/** True when Esc should leave the field rather than the view: a text field with something in it. */
+function editingText(target: EventTarget | null): target is HTMLElement {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+    return target.value.length > 0;
+  }
+  return target.isContentEditable && (target.textContent ?? "").trim().length > 0;
+}
+
 /**
- * Everything that isn't the feed opens here, over it: a thread, settings,
- * usage, a decision. Large on desktop, full screen on a phone. Esc closes
- * unless something inside (a menu, the composer) handled it first.
+ * Everything that isn't the feed (a thread, a Decision, settings, usage) is
+ * its own full view on its own route, over the feed: under the top bar on a
+ * desktop, the whole screen on a phone. The feed stays mounted underneath,
+ * so going back finds it where it was. Back and Esc return; Esc in a field
+ * with text leaves the field first, and anything that handled Esc itself (a
+ * menu, a dialog) keeps it. j/k scroll, gg and G jump to the top and bottom.
  */
 export function FeedModal({
   label,
   onClose,
-  showClose = true,
-  className,
   children,
 }: {
   readonly label: string;
   readonly onClose: () => void;
-  /** Off when the content brings its own close button. */
-  readonly showClose?: boolean;
-  readonly className?: string;
   readonly children: ReactNode;
 }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLElement | null>(null);
+  const scroller = () => {
+    const cached = scrollerRef.current;
+    if (cached?.isConnected && cached.scrollHeight > cached.clientHeight) return cached;
+    scrollerRef.current = mainScroller(rootRef.current);
+    return scrollerRef.current;
+  };
+  useVimKeys({
+    down: () => scroller()?.scrollBy({ top: 120 }),
+    up: () => scroller()?.scrollBy({ top: -120 }),
+    top: () => scroller()?.scrollTo({ top: 0 }),
+    bottom: () => {
+      const element = scroller();
+      element?.scrollTo({ top: element.scrollHeight });
+    },
+  });
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented) return;
+    // The composer's editor claims Esc even when empty; an empty one has no
+    // menu open, so Esc there leaves the view before the editor sees it.
+    const onCapture = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing) return;
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
-      )
+        target.isContentEditable &&
+        (target.textContent ?? "").trim() === "" &&
+        rootRef.current?.contains(target)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (editingText(event.target)) {
+        event.target.blur();
         return;
+      }
       onClose();
     };
+    window.addEventListener("keydown", onCapture, true);
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onCapture, true);
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-40" data-feed-modal="">
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-black/55 max-sm:hidden"
+    <div
+      ref={rootRef}
+      role="region"
+      aria-label={label}
+      data-feed-modal=""
+      className="fixed inset-0 z-40 flex min-h-0 flex-col overflow-hidden bg-background [transform:translateZ(0)] [--workspace-controls-top:0px] [--workspace-gutter-start:3.25rem] [--workspace-titlebar-content-left:3.25rem] sm:top-[var(--workspace-topbar-height)] sm:border-t sm:border-border"
+    >
+      {children}
+      <Button
+        size="icon-sm"
+        variant="ghost"
+        aria-label="Back"
+        className="absolute top-[calc((var(--workspace-topbar-height)-2rem)/2)] left-3 z-50 [-webkit-app-region:no-drag]"
         onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        className={cn(
-          // On desktop the modal sits below the feed's bar, clear of the macOS
-          // window buttons, so headers inside it drop that inset; full screen
-          // on a phone keeps it.
-          "absolute inset-0 flex min-h-0 flex-col overflow-hidden bg-background [transform:translateZ(0)] [--workspace-controls-top:0px] [--workspace-controls-right:3.25rem] [--workspace-gutter-end:3.5rem] sm:[--workspace-titlebar-content-left:var(--workspace-gutter-start)] sm:inset-x-[max(1.5rem,calc((100vw-72rem)/2))] sm:top-[var(--workspace-topbar-height)] sm:bottom-4 sm:rounded-xl sm:border sm:border-border sm:shadow-2xl",
-          className,
-        )}
       >
-        {children}
-        {showClose ? (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label="Close"
-            className="absolute top-2.5 right-3 z-50"
-            onClick={onClose}
-          >
-            <XIcon />
-          </Button>
-        ) : null}
-      </div>
+        <ArrowLeftIcon />
+      </Button>
     </div>
   );
 }

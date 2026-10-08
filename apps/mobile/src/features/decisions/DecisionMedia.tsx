@@ -1,4 +1,4 @@
-import { resolveAssetUrl } from "@cz/client-runtime/state/assets";
+import { decisionMediaUrl } from "@cz/client-runtime/decisions/mediaUrl";
 import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
@@ -18,8 +18,8 @@ export function useDecisionMediaUrl(
   media: DecisionMediaRef | null | undefined,
 ): string | null {
   const connection = usePreparedConnection(environmentId);
-  if (!media?.url || connection._tag !== "Some") return null;
-  return resolveAssetUrl(connection.value.httpBaseUrl, media.url);
+  if (connection._tag !== "Some") return null;
+  return decisionMediaUrl(connection.value.httpBaseUrl, media, Date.now());
 }
 
 /** Resolves any of a host's decision media to a loadable URL. */
@@ -28,8 +28,8 @@ export function useDecisionMediaResolver(
 ): (media: DecisionMediaRef | null | undefined) => string | null {
   const connection = usePreparedConnection(environmentId);
   return (media) =>
-    media?.url && connection._tag === "Some"
-      ? resolveAssetUrl(connection.value.httpBaseUrl, media.url)
+    connection._tag === "Some"
+      ? decisionMediaUrl(connection.value.httpBaseUrl, media, Date.now())
       : null;
 }
 

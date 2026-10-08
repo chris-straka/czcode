@@ -74,6 +74,7 @@ import * as Keybindings from "./keybindings.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as AgentAwarenessRelay from "./relay/AgentAwarenessRelay.ts";
 import * as DecisionFollowUps from "./decisions/DecisionFollowUps.ts";
+import * as ThreadAutoArchive from "./threadAutoArchive/ThreadAutoArchive.ts";
 import * as DecisionService from "./decisions/DecisionService.ts";
 import * as ForkDatabase from "./forkDatabase/ForkDatabase.ts";
 import * as ResetQueueService from "./resetQueue/ResetQueueService.ts";
@@ -671,7 +672,10 @@ const layerRuntimeServices = layerRuntimeCoreDependencies.pipe(
 );
 
 // The reset queue starts threads, so it sits above everything it launches with.
-const layerRuntimeDependencies = DecisionFollowUps.layer.pipe(
+const layerRuntimeDependencies = Layer.mergeAll(
+  DecisionFollowUps.layer,
+  ThreadAutoArchive.layer.pipe(Layer.provide(ProjectionStoreV2.layer)),
+).pipe(
   // Sleeps a spare host when idle; reads the queue to wake for its next run.
   Layer.provideMerge(HostSleepService.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   Layer.provideMerge(AgentScopesService.layer),

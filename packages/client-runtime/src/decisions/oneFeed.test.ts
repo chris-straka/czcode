@@ -4,6 +4,8 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   buildOneFeed,
   feedFolderLabel,
+  feedProjectGroup,
+  feedProjectKey,
   waitingOnOtherDevice,
   oneFeedBadgeCount,
   shortMachineLabel,
@@ -139,5 +141,24 @@ describe("card labels", () => {
     expect(shortModelLabel("Claude Opus 5.5")).toBe("Opus 5.5");
     expect(shortModelLabel("GPT-5.5 Codex")).toBe("GPT-5.5 Codex");
     expect(shortMachineLabel("f-ms-7917")).toBe("f");
+  });
+});
+
+describe("project groups", () => {
+  it("keeps only games, matching threads by their folder when they asked nothing", () => {
+    const folders: Record<string, string> = { t1: "games/blackout", t2: "czcode" };
+    const cards = buildOneFeed({
+      threads: [thread("t1"), thread("t2")],
+      decisions: [decision("d1", { project: "hll" }), decision("d2", { project: "czcode" })],
+      filter: {
+        ...all,
+        group: "games",
+        groupOf: (project) => (project === "hll" || project === "blackout" ? "games" : "software"),
+        threadProject: (candidate) => feedProjectKey(folders[candidate.id] ?? ""),
+      },
+    });
+    expect(cards.map((card) => card.key.split("\u0000").pop())).toEqual(["d1", "t1"]);
+    expect(feedProjectGroup("games/blackout")).toBe("games");
+    expect(feedProjectGroup("software/gamesdb")).toBe("software");
   });
 });

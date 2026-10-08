@@ -1,4 +1,4 @@
-import { resolveAssetUrl } from "@cz/client-runtime/state/assets";
+import { decisionMediaUrl } from "@cz/client-runtime/decisions/mediaUrl";
 import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { BoxIcon, DownloadIcon, FileIcon } from "lucide-react";
 import { createContext, createElement, useContext, useEffect, useRef, useState } from "react";
@@ -7,6 +7,7 @@ import { cn } from "~/lib/utils";
 import { usePreparedConnection } from "~/state/session";
 import { Button } from "../ui/button";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
+import { WaveformPlayer } from "./WaveformPlayer";
 
 /**
  * Told when the owner plays, scrubs, or installs a media item, so a decision
@@ -20,8 +21,8 @@ export function useDecisionMediaResolver(
 ): (media: DecisionMediaRef | null | undefined) => string | null {
   const connection = usePreparedConnection(environmentId);
   return (media) =>
-    media?.url && connection._tag === "Some"
-      ? resolveAssetUrl(connection.value.httpBaseUrl, media.url)
+    connection._tag === "Some"
+      ? decisionMediaUrl(connection.value.httpBaseUrl, media, Date.now())
       : null;
 }
 
@@ -31,8 +32,8 @@ export function useDecisionMediaUrl(
   media: DecisionMediaRef | null | undefined,
 ): string | null {
   const connection = usePreparedConnection(environmentId);
-  if (!media?.url || connection._tag !== "Some") return null;
-  return resolveAssetUrl(connection.value.httpBaseUrl, media.url);
+  if (connection._tag !== "Some") return null;
+  return decisionMediaUrl(connection.value.httpBaseUrl, media, Date.now());
 }
 
 interface ModelViewerElement extends HTMLElement {
@@ -230,9 +231,10 @@ export function DecisionMedia({
           alt={media.caption ?? media.name}
           src={url}
           loading="lazy"
+          // Never wider than the file itself: an upscaled screenshot is blurry.
           className={cn(
-            "w-full rounded-md bg-muted object-contain",
-            compact ? "h-24 object-cover" : "max-h-[70vh]",
+            "rounded-md bg-muted",
+            compact ? "h-24 w-full object-cover" : "h-auto max-h-[60vh] w-auto max-w-full",
             className,
           )}
         />
@@ -240,17 +242,14 @@ export function DecisionMedia({
     case "audio":
     case "voice":
       return (
-        <audio
-          controls
-          preload="none"
-          src={url}
-          onPlay={() => engage(media.key)}
-          onTimeUpdate={(event) => {
-            // Scrubbing moves the playhead; a load can report a seek without one.
-            if (event.currentTarget.currentTime > 0.5) engage(media.key);
-          }}
-          className={cn("w-full", className)}
-        />
+        <div className={cn("w-full", className)}>
+          <WaveformPlayer
+            url={url}
+            media={media}
+            compact={compact}
+            onEngage={() => engage(media.key)}
+          />
+        </div>
       );
     case "video":
       return (

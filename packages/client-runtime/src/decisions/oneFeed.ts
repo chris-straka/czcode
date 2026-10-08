@@ -63,13 +63,44 @@ export interface OneFeedFilter {
   readonly projects?: ReadonlySet<string>;
   /** Decision kinds to keep; empty keeps all. */
   readonly kinds?: ReadonlySet<string>;
+  /** Games or software only, by `groupOf`; omitted keeps both. */
+  readonly group?: FeedProjectGroup;
+  readonly groupOf?: (project: string) => FeedProjectGroup;
+  /** The project a thread belongs to, so project and group filters keep or drop threads too. */
+  readonly threadProject?: (thread: OneFeedThread) => string | null;
+}
+
+export type FeedProjectGroup = "games" | "software";
+
+/** A project is a game when its folder sits under a `games` folder (~/SWE/games/hll). */
+export function feedProjectGroup(folder: string): FeedProjectGroup {
+  return /(^|\/)games(\/|$)/.test(folder) ? "games" : "software";
+}
+
+/** The project a thread's folder names: "games/blackout" is "blackout". */
+export function feedProjectKey(folder: string): string {
+  return folder.replace(/\/+$/, "").split("/").pop() || folder;
+}
+
+function projectMatches(filter: OneFeedFilter, project: string): boolean {
+  return (
+    (!filter.projects?.size || filter.projects.has(project)) &&
+    (!filter.group || (filter.groupOf?.(project) ?? "software") === filter.group)
+  );
 }
 
 function chipsMatch(filter: OneFeedFilter, item: DecisionItem): boolean {
   return (
-    (!filter.projects?.size || filter.projects.has(item.project)) &&
-    (!filter.kinds?.size || filter.kinds.has(item.kind))
+    projectMatches(filter, item.project) && (!filter.kinds?.size || filter.kinds.has(item.kind))
   );
+}
+
+/** True when a thread with no matching decision still belongs under the filter's projects. */
+function threadMatchesFilter(filter: OneFeedFilter, thread: OneFeedThread): boolean {
+  if (filter.kinds?.size) return false;
+  if (!filter.projects?.size && !filter.group) return true;
+  const project = filter.threadProject?.(thread) ?? null;
+  return project !== null && projectMatches(filter, project);
 }
 
 function machineMatches(filter: MachineFilter, environmentId: EnvironmentId): boolean {
@@ -145,7 +176,7 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
   for (const [key, thread] of threadsByKey) {
     const threadDecisions = asked.get(key) ?? [];
     const waiting = thread.hasPendingApprovals || thread.hasPendingUserInput;
-    if ((filter.projects?.size || filter.kinds?.size) && threadDecisions.length === 0) continue;
+    if (threadDecisions.length === 0 && !threadMatchesFilter(filter, thread)) continue;
     const card = {
       kind: "thread",
       key: `thread\u0000${key}`,

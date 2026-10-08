@@ -2,15 +2,22 @@ import {
   answerSummary,
   canAnswerFromCard,
   VERDICT_BUTTONS,
+  optionMedia,
+  unseenMediaProblem,
 } from "@cz/client-runtime/decisions/draft";
-import { filterChips } from "@cz/client-runtime/decisions/feed";
 import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
-import { buildOneFeed, feedFolderLabel } from "@cz/client-runtime/decisions/oneFeed";
+import {
+  buildOneFeed,
+  type FeedProjectGroup,
+  feedFolderLabel,
+  feedProjectGroup,
+  feedProjectKey,
+} from "@cz/client-runtime/decisions/oneFeed";
 import type { EnvironmentThreadShell } from "@cz/client-runtime/state/models";
-import type { DecisionAnswerInput, DecisionMediaRef, DecisionProjectBlurb } from "@cz/contracts";
+import type { DecisionAnswerInput, DecisionMediaRef } from "@cz/contracts";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { CheckIcon, InboxIcon, PencilIcon } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useFeedFilterStore } from "~/feedFilterStore";
 import { cn } from "~/lib/utils";
@@ -27,8 +34,14 @@ import {
 import { useProjects, useThreadShells } from "~/state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
 import { useJobsOn } from "~/state/jobs";
+import { useNavigateBack } from "~/hooks/useNavigateBack";
+import { useVimKeys } from "~/hooks/useVimKeys";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
+import {
+  DECISION_OPTION_FRAME_CLASS,
+  DecisionMedia,
+  DecisionMediaEngagement,
+} from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
 import { NoProjectsHero } from "../NoProjectsHero";
 import { SidebarUpdateArchitectureWarning } from "../sidebar/SidebarUpdatePill";
@@ -39,11 +52,31 @@ import { Input } from "../ui/input";
 import { Skeleton } from "../ui/skeleton";
 import { toastManager } from "../ui/toast";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { FeedModal } from "./FeedModal";
-import { FeedMeta, FeedThreadCard, FeedThreadRow, feedThreadStatus } from "./FeedThreadCard";
+import { FeedMeta, FeedThreadCard } from "./FeedThreadCard";
+import { FeedGroupToggle, type FeedProjectChoice, FeedProjectsMenu } from "./FeedFilters";
+import { FeedThreadGroups } from "./FeedThreadGroups";
 import { FeedTopBar } from "./FeedTopBar";
 import { MorningBriefCard } from "./MorningBriefCard";
+
+/** Moves focus to the next, previous, first, or last card, row or group in the feed. */
+function focusFeedItem(step: 1 | -1 | "first" | "last") {
+  const items = [
+    ...document.querySelectorAll<HTMLElement>("[data-feed-page] [data-feed-item]"),
+  ].filter((item) => item.offsetParent !== null);
+  if (items.length === 0) return;
+  const current = items.indexOf(document.activeElement as HTMLElement);
+  const next =
+    step === "first"
+      ? items[0]
+      : step === "last"
+        ? items.at(-1)
+        : current === -1
+          ? items[step === 1 ? 0 : items.length - 1]
+          : items[Math.min(items.length - 1, Math.max(0, current + step))];
+  next?.focus();
+  next?.scrollIntoView({ block: "nearest" });
+}
 
 /** How long an answer can be undone before it is sent. */
 const UNDO_WINDOW_MS = 5_000;
@@ -53,7 +86,8 @@ const entryKey = (entry: Pick<DecisionEntry, "environmentId" | "item">) =>
 
 interface PendingAnswer {
   readonly entry: DecisionEntry;
-  readonly answer: DecisionAnswerInput;
+  /** null: "No longer relevant", which withdraws the Decision. */
+  readonly answer: DecisionAnswerInput | null;
   readonly timer: ReturnType<typeof setTimeout>;
 }
 
@@ -64,10 +98,8 @@ function ageLabel(createdAt: number, now: number): string {
   return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`;
 }
 
-/** How many thread digests (result excerpt, folder) the feed reads at once. */
-const DIGEST_PAGE = 60;
-/** Thread rows shown at first and per "Show more"; the list can run to hundreds. */
-const ROW_PAGE = 40;
+/** How many threads' digests (summary line, folder) the feed reads: the most recent ones. */
+const DIGEST_LIMIT = 200;
 
 /**
  * The one feed (layout A): a slim top bar, then one column. Threads and
@@ -87,24 +119,33 @@ export function FeedPage() {
   const { presentationById } = useEnvironments();
   const answerCommand = useAtomCommand(decisionEnvironment.answer, "answer decision");
   const uploadCommand = useAtomCommand(decisionEnvironment.upload, "upload decision media");
+  const withdrawCommand = useAtomCommand(decisionEnvironment.withdraw, "dismiss decision");
   const selectedProjects = useFeedFilterStore((state) => state.projects);
-  const kinds = useFeedFilterStore((state) => state.kinds);
-  const setProjects = useFeedFilterStore((state) => state.setProjects);
-  const setKinds = useFeedFilterStore((state) => state.setKinds);
-  const [tab, setTab] = useState<"open" | "answered">("open");
-  const [rowLimit, setRowLimit] = useState(ROW_PAGE);
+  const group = useFeedFilterStore((state) => state.group);
+  const [tabChoice, setTab] = useState<"needs" | "threads" | null>(null);
+  const [showAnswered, setShowAnswered] = useState(false);
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
   });
-  const searchOpen =
-    location.pathname === "/decisions" && typeof location.search.open === "string"
-      ? location.search.open
-      : null;
-  const [openKey, setOpenKey] = useState<string | null>(searchOpen);
-  useEffect(() => {
-    if (searchOpen) setOpenKey(searchOpen);
-  }, [searchOpen]);
-  const [session, setSession] = useState(false);
+  // The open Decision lives in the URL (/decisions?open=…), so Back closes it.
+  const onDecisions = location.pathname === "/decisions";
+  const openKey =
+    onDecisions && typeof location.search.open === "string" ? location.search.open : null;
+  const session = onDecisions && location.search.session === "1";
+  const navigateBack = useNavigateBack();
+  /** Opens a Decision; inside Review all, stepping replaces the entry so Back leaves the session. */
+  const showDecision = (key: string | null, options: { session?: boolean } = {}) => {
+    const inSession = options.session ?? session;
+    if (key === null) {
+      navigateBack();
+      return;
+    }
+    void navigate({
+      to: "/decisions",
+      search: { open: key, ...(inSession ? { session: "1" as const } : {}) },
+      replace: openKey !== null,
+    });
+  };
   const [pending, setPending] = useState<ReadonlyMap<string, PendingAnswer>>(new Map());
   const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const pendingRef = useRef(pending);
@@ -127,9 +168,8 @@ export function FeedPage() {
     [projects],
   );
 
-  // Chips come from what this machine filter and device could show, so a
-  // chip never leads to an empty feed.
-  // The Morning brief reads the same set: the whole night, not just the picked chips.
+  // What this machine filter and device could show, whatever projects are
+  // picked: the project menu offers these, and the Morning brief reads them.
   const reachable = useMemo(
     () =>
       buildOneFeed({
@@ -142,9 +182,65 @@ export function FeedPage() {
       }).flatMap((card) => (card.kind === "decision" ? [card.decision] : [])),
     [feed.entries, filtered.filter.machine, filtered.filter.device],
   );
-  const chips = useMemo(() => filterChips(reachable.map((entry) => entry.item)), [reachable]);
-
   const machine = filtered.filter.machine;
+  // Every listed thread, with the folder it works in: its project and group.
+  const listedThreads = useMemo(
+    () =>
+      threads.filter(
+        (thread) =>
+          thread.archivedAt === null &&
+          thread.deletedAt === null &&
+          thread.lineage.relationshipToParent !== "subagent" &&
+          (machine.type === "all" || thread.environmentId === machine.environmentId),
+      ),
+    [threads, machine],
+  );
+  const digests = useThreadDigests(
+    useMemo(
+      () =>
+        [...listedThreads]
+          .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+          .slice(0, DIGEST_LIMIT),
+      [listedThreads],
+    ),
+  );
+  const folderOf = useCallback(
+    (thread: EnvironmentThreadShell) =>
+      feedFolderLabel(
+        projectById.get(`${thread.environmentId}:${thread.projectId}`)?.title ?? "",
+        digests.get(`${thread.environmentId}:${thread.id}`)?.workingSubpath,
+      ),
+    [projectById, digests],
+  );
+  const threadGroupOf = useCallback(
+    (thread: EnvironmentThreadShell) =>
+      feedProjectGroup(
+        `${projectById.get(`${thread.environmentId}:${thread.projectId}`)?.workspaceRoot ?? ""}/${folderOf(thread)}`,
+      ),
+    [projectById, folderOf],
+  );
+  const groupOf = useMemo(() => {
+    const fromThreads = new Map(
+      listedThreads.map((thread) => [feedProjectKey(folderOf(thread)), threadGroupOf(thread)]),
+    );
+    return (project: string): FeedProjectGroup =>
+      blurbs.get(project)?.group ?? fromThreads.get(project) ?? "software";
+  }, [listedThreads, folderOf, threadGroupOf, blurbs]);
+  const projectChoices = useMemo((): FeedProjectChoice[] => {
+    const names = new Set([
+      ...reachable.map((entry) => entry.item.project),
+      ...listedThreads.map((thread) => feedProjectKey(folderOf(thread))),
+    ]);
+    return [...names]
+      .filter((name) => name !== "")
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({
+        name,
+        group: groupOf(name),
+        description: blurbs.get(name)?.description ?? null,
+      }));
+  }, [reachable, listedThreads, folderOf, groupOf, blurbs]);
+
   const shownMachineIds = useMemo(
     () => (machine.type === "all" ? [...presentationById.keys()] : [machine.environmentId]),
     [machine, presentationById],
@@ -180,17 +276,39 @@ export function FeedPage() {
         decisions: feed.entries.filter(
           (entry) => !pending.has(entryKey(entry)) && !sent.has(entryKey(entry)),
         ),
-        filter: filtered.filter,
+        filter: {
+          ...filtered.filter,
+          ...(group ? { groupOf } : {}),
+          threadProject: (thread) => feedProjectKey(folderOf(thread as EnvironmentThreadShell)),
+        },
       }),
-    [threads, feed.entries, filtered.filter, pending, sent],
+    [threads, feed.entries, filtered.filter, pending, sent, group, groupOf, folderOf],
   );
   const needsYou = cards.filter((card) => card.needsYou);
-  const rest = cards.filter((card) => !card.needsYou);
-  const rows = rest.slice(0, rowLimit);
-  const shownThreads = [...needsYou, ...rows]
-    .flatMap((card) => (card.kind === "thread" ? [card.thread] : []))
-    .slice(0, DIGEST_PAGE);
-  const digests = useThreadDigests(shownThreads);
+  const waitingThreads = useMemo(
+    () =>
+      new Set(
+        needsYou.flatMap((card) =>
+          card.kind === "thread" ? [`${card.thread.environmentId}:${card.thread.id}`] : [],
+        ),
+      ),
+    [needsYou],
+  );
+  // The Threads tab: every listed thread under the picked projects and group.
+  const groupedThreads = listedThreads.filter((thread) => {
+    const project = feedProjectKey(folderOf(thread));
+    return (
+      (selectedProjects.length === 0 || selectedProjects.includes(project)) &&
+      (group === null || threadGroupOf(thread) === group)
+    );
+  });
+  const tab = tabChoice ?? (needsYou.length > 0 ? "needs" : "threads");
+  const answeredShown = answered.entries.filter(
+    (entry) =>
+      (machine.type === "all" || entry.environmentId === machine.environmentId) &&
+      (selectedProjects.length === 0 || selectedProjects.includes(entry.item.project)) &&
+      (group === null || groupOf(entry.item.project) === group),
+  );
 
   // Decisions in feed order, for Review all and the modal's position.
   const visible = useMemo(
@@ -207,13 +325,19 @@ export function FeedPage() {
         next.delete(key);
         return next;
       });
-      const result = await answerCommand({
-        environmentId: item.entry.environmentId,
-        input: { id: item.entry.item.id, answer: item.answer },
-      });
+      const result =
+        item.answer === null
+          ? await withdrawCommand({
+              environmentId: item.entry.environmentId,
+              input: { id: item.entry.item.id },
+            })
+          : await answerCommand({
+              environmentId: item.entry.environmentId,
+              input: { id: item.entry.item.id, answer: item.answer },
+            });
       if (result._tag === "Success") setSent((current) => new Set(current).add(key));
     },
-    [answerCommand],
+    [answerCommand, withdrawCommand],
   );
 
   useEffect(
@@ -234,30 +358,23 @@ export function FeedPage() {
     });
   };
 
-  const closeDecision = () => {
-    setOpenKey(null);
-    setSession(false);
-    if (location.pathname === "/decisions") void navigate({ to: "/", replace: true });
-  };
+  const closeDecision = () => showDecision(null);
 
-  const answer = (entry: DecisionEntry, value: DecisionAnswerInput) => {
+  /** Answers, or with null dismisses as no longer relevant, after an undo window. */
+  const answer = (entry: DecisionEntry, value: DecisionAnswerInput | null) => {
     const key = entryKey(entry);
     const timer = setTimeout(() => void send(key), UNDO_WINDOW_MS);
     setPending((current) => new Map(current).set(key, { entry, answer: value, timer }));
     toastManager.add({
       type: "success",
       title: entry.item.title || entry.item.question,
-      description: answerSummary(entry.item, value),
+      description:
+        value === null ? "Dismissed: no longer relevant" : answerSummary(entry.item, value),
       timeout: UNDO_WINDOW_MS,
       actionProps: { children: "Undo", onClick: () => undo(key) },
     });
-    if (session) {
-      const next = visible.find((candidate) => entryKey(candidate) !== key);
-      setOpenKey(next ? entryKey(next) : null);
-      if (!next) closeDecision();
-    } else {
-      closeDecision();
-    }
+    const next = session ? visible.find((candidate) => entryKey(candidate) !== key) : undefined;
+    showDecision(next ? entryKey(next) : null);
   };
   const quickAnswer = (entry: DecisionEntry, patch: Partial<DecisionAnswerInput>) =>
     answer(entry, {
@@ -288,9 +405,11 @@ export function FeedPage() {
   const threadPlacement = (thread: EnvironmentThreadShell) => {
     const project = projectById.get(`${thread.environmentId}:${thread.projectId}`);
     const digest = digests.get(`${thread.environmentId}:${thread.id}`);
+    const folder = feedFolderLabel(project?.title ?? "", digest?.workingSubpath);
     return {
       machine: machineLabel(thread.environmentId),
-      folder: feedFolderLabel(project?.title ?? "", digest?.workingSubpath),
+      folder,
+      project: feedProjectKey(folder),
       excerpt: digest?.excerpt ?? null,
       age: ageLabel(Date.parse(thread.updatedAt), now),
     };
@@ -301,9 +420,28 @@ export function FeedPage() {
       entry={entry}
       embedded={embedded}
       age={ageLabel(entry.item.created_at, now)}
-      onOpen={() => setOpenKey(entryKey(entry))}
+      onOpen={() => showDecision(entryKey(entry), { session: false })}
       onQuickAnswer={(patch) => quickAnswer(entry, patch)}
+      onDismiss={() => answer(entry, null)}
     />
+  );
+
+  // j/k step through cards, rows and groups; gg and G jump to the ends; Enter opens.
+  useVimKeys(
+    {
+      down: () => focusFeedItem(1),
+      up: () => focusFeedItem(-1),
+      top: () => focusFeedItem("first"),
+      bottom: () => focusFeedItem("last"),
+    },
+    (location.pathname === "/" || location.pathname === "/decisions") && openKey === null,
+  );
+
+  const filters = (
+    <>
+      <FeedGroupToggle />
+      <FeedProjectsMenu projects={projectChoices} />
+    </>
   );
 
   return (
@@ -312,15 +450,37 @@ export function FeedPage() {
         badge={filtered.entries.length}
         reviewing={visible.length > 0}
         onReviewAll={() => {
-          setSession(true);
-          setOpenKey(visible[0] ? entryKey(visible[0]) : null);
+          if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
         }}
+        filters={filters}
       />
       {/* The page never scrolls sideways; only the chip row does. */}
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4">
           <SidebarUpdateArchitectureWarning />
-          {briefDay && brief ? (
+          <ToggleGroup
+            aria-label="Feed"
+            value={[tab]}
+            onValueChange={(value) => {
+              const next = value[0];
+              if (next === "needs" || next === "threads") setTab(next);
+            }}
+          >
+            <Toggle size="sm" value="needs">
+              Needs you
+              <span className="tabular-nums text-warning-foreground">{needsYou.length}</span>
+            </Toggle>
+            <Toggle size="sm" value="threads">
+              Threads
+              <span className="tabular-nums text-muted-foreground">{groupedThreads.length}</span>
+            </Toggle>
+          </ToggleGroup>
+          {/* Beside the search bar on wider screens; here on a phone. */}
+          <div className="flex flex-wrap items-center gap-1.5 md:hidden">{filters}</div>
+          {selectedBlurbs.map(({ project, description }) => (
+            <ProjectBlurbLine key={project} project={project} description={description} />
+          ))}
+          {tab === "needs" && briefDay && brief ? (
             <MorningBriefCard
               day={briefDay.day}
               brief={brief}
@@ -328,70 +488,53 @@ export function FeedPage() {
                 excerpt: briefDigests.get(`${thread.environmentId}:${thread.id}`)?.excerpt ?? null,
               })}
               machineLabel={machineLabel}
-              onOpenDecision={(entry) => setOpenKey(entryKey(entry))}
+              onOpenDecision={(entry) => showDecision(entryKey(entry), { session: false })}
               onReviewAll={() => {
-                setSession(true);
-                setOpenKey(visible[0] ? entryKey(visible[0]) : null);
+                if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
               }}
             />
           ) : null}
-          <div className="flex items-center gap-2">
-            <ToggleGroup
-              value={[tab]}
-              onValueChange={(value) => setTab((value[0] as "open" | "answered") ?? "open")}
-            >
-              <Toggle size="sm" value="open">
-                Feed
-              </Toggle>
-              <Toggle size="sm" value="answered">
-                Answered
-              </Toggle>
-            </ToggleGroup>
-          </div>
-          {tab === "open" && chips.projects.length + chips.kinds.length > 1 ? (
-            <ChipRow
-              projects={chips.projects}
-              kinds={chips.kinds}
-              selectedProjects={selectedProjects}
-              selectedKinds={kinds}
-              blurbs={blurbs}
-              onProjects={setProjects}
-              onKinds={setKinds}
-            />
-          ) : null}
-          {tab === "open"
-            ? selectedBlurbs.map(({ project, description }) => (
-                <ProjectBlurbLine key={project} project={project} description={description} />
-              ))
-            : null}
 
-          {tab === "answered" ? (
-            <AnsweredList feed={answered} now={now} />
+          {tab === "threads" ? (
+            groupedThreads.length === 0 ? (
+              projects.length === 0 ? (
+                <NoProjectsHero />
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">No threads here.</p>
+              )
+            ) : (
+              <FeedThreadGroups
+                threads={groupedThreads}
+                place={threadPlacement}
+                needsYou={(thread) =>
+                  waitingThreads.has(`${thread.environmentId}:${thread.id}`) ||
+                  thread.hasPendingApprovals ||
+                  thread.hasPendingUserInput
+                }
+                now={now}
+              />
+            )
           ) : feed.isPending && threads.length === 0 ? (
             <>
               <Skeleton className="h-28 w-full" />
               <Skeleton className="h-28 w-full" />
             </>
-          ) : cards.length === 0 && pending.size === 0 ? (
-            projects.length === 0 ? (
-              <NoProjectsHero />
-            ) : (
-              <Empty className="min-h-64">
-                <EmptyMedia variant="icon">
-                  <InboxIcon />
-                </EmptyMedia>
-                <EmptyHeader>
-                  <EmptyTitle>All clear</EmptyTitle>
-                  <EmptyDescription>Threads and agents' questions show up here.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )
           ) : (
             <>
-              {needsYou.length > 0 ? (
-                <h2 className="pt-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  Needs you <span className="text-warning-foreground">{needsYou.length}</span>
-                </h2>
+              {needsYou.length === 0 && pending.size === 0 ? (
+                projects.length === 0 ? (
+                  <NoProjectsHero />
+                ) : (
+                  <Empty className="min-h-48">
+                    <EmptyMedia variant="icon">
+                      <InboxIcon />
+                    </EmptyMedia>
+                    <EmptyHeader>
+                      <EmptyTitle>Nothing needs you</EmptyTitle>
+                      <EmptyDescription>Agents' questions show up here.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                )
               ) : null}
               {needsYou.map((card) => {
                 if (card.kind === "decision") return decisionCard(card.decision);
@@ -409,36 +552,16 @@ export function FeedPage() {
                   </FeedThreadCard>
                 );
               })}
-              {rest.length > 0 ? (
-                <>
-                  <h2 className="pt-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    Threads
-                  </h2>
-                  <div className="overflow-hidden rounded-lg border border-border bg-card">
-                    {rows.flatMap((card) =>
-                      card.kind === "thread"
-                        ? [
-                            <FeedThreadRow
-                              key={card.key}
-                              thread={card.thread}
-                              {...threadPlacement(card.thread)}
-                              status={feedThreadStatus(card.thread, false)}
-                            />,
-                          ]
-                        : [],
-                    )}
-                  </div>
-                </>
-              ) : null}
-              {rest.length > rowLimit ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => setRowLimit((limit) => limit + ROW_PAGE)}
-                >
-                  Show {Math.min(ROW_PAGE, rest.length - rowLimit)} more
-                </Button>
+              <Button
+                size="xs"
+                variant="ghost-muted"
+                className="self-start"
+                onClick={() => setShowAnswered((shown) => !shown)}
+              >
+                {showAnswered ? "Hide answered" : `Answered (${answeredShown.length})`}
+              </Button>
+              {showAnswered ? (
+                <AnsweredList feed={{ ...answered, entries: answeredShown }} now={now} />
               ) : null}
             </>
           )}
@@ -452,11 +575,7 @@ export function FeedPage() {
         </div>
       </div>
       {opened && upload ? (
-        <FeedModal
-          label={opened.item.title || opened.item.question}
-          onClose={closeDecision}
-          showClose={false}
-        >
+        <FeedModal label={opened.item.title || opened.item.question} onClose={closeDecision}>
           <DecisionView
             key={openKey}
             entry={opened}
@@ -466,16 +585,17 @@ export function FeedPage() {
                   onSkip: () => {
                     const index = visible.indexOf(opened);
                     const next = visible[index + 1] ?? visible[0];
-                    setOpenKey(next ? entryKey(next) : null);
+                    if (next) showDecision(entryKey(next));
                   },
                   onPrevious: () => {
                     const index = visible.indexOf(opened);
                     const previous = visible[index - 1] ?? visible.at(-1);
-                    setOpenKey(previous ? entryKey(previous) : null);
+                    if (previous) showDecision(entryKey(previous));
                   },
                 }
               : {})}
             onSubmit={(value) => answer(opened, value)}
+            onDismiss={() => answer(opened, null)}
             onUpload={upload}
             onClose={closeDecision}
           />
@@ -485,127 +605,7 @@ export function FeedPage() {
   );
 }
 
-/** A row of chips that scrolls on its own with faded edges, inside the card column. */
-function ScrollingChips({
-  label,
-  children,
-}: {
-  readonly label: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <div
-      aria-label={label}
-      className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {children}
-    </div>
-  );
-}
-
-/**
- * Project chips in two sections, Games and Software (grouped by where each
- * project's folder lives), each led by a toggle that picks the whole group;
- * then decision kinds. A project chip's tooltip says what the project is.
- */
-function ChipRow(props: {
-  readonly projects: readonly string[];
-  readonly kinds: readonly string[];
-  readonly selectedProjects: readonly string[];
-  readonly selectedKinds: readonly string[];
-  readonly blurbs: ReadonlyMap<string, DecisionProjectBlurb>;
-  readonly onProjects: (projects: string[]) => void;
-  readonly onKinds: (kinds: string[]) => void;
-}) {
-  const groups = (["games", "software"] as const)
-    .map((group) => ({
-      group,
-      label: group === "games" ? "Games" : "Software",
-      projects: props.projects.filter(
-        (project) => (props.blurbs.get(project)?.group ?? "software") === group,
-      ),
-    }))
-    .filter((section) => section.projects.length > 0);
-  const selected = new Set(props.selectedProjects);
-  return (
-    <div className="space-y-2" aria-label="Filters">
-      {groups.map((section) => {
-        const all = section.projects.every((project) => selected.has(project));
-        return (
-          <ScrollingChips key={section.group} label={`${section.label} projects`}>
-            <Toggle
-              size="sm"
-              variant="outline"
-              className="shrink-0"
-              pressed={all}
-              aria-label={`All ${section.label.toLowerCase()} projects`}
-              onPressedChange={(pressed) =>
-                props.onProjects(
-                  pressed
-                    ? [...new Set([...props.selectedProjects, ...section.projects])]
-                    : props.selectedProjects.filter(
-                        (project) => !section.projects.includes(project),
-                      ),
-                )
-              }
-            >
-              {section.label}
-            </Toggle>
-            <ToggleGroup
-              multiple
-              className="shrink-0"
-              value={section.projects.filter((project) => selected.has(project))}
-              onValueChange={(value) =>
-                props.onProjects([
-                  ...props.selectedProjects.filter(
-                    (project) => !section.projects.includes(project),
-                  ),
-                  ...(value as string[]),
-                ])
-              }
-            >
-              {section.projects.map((project) => {
-                const description = props.blurbs.get(project)?.description;
-                return description ? (
-                  <Tooltip key={project}>
-                    <TooltipTrigger render={<Toggle size="sm" value={project} />}>
-                      {project}
-                    </TooltipTrigger>
-                    <TooltipPopup side="bottom" className="max-w-xs">
-                      {description}
-                    </TooltipPopup>
-                  </Tooltip>
-                ) : (
-                  <Toggle key={project} size="sm" value={project}>
-                    {project}
-                  </Toggle>
-                );
-              })}
-            </ToggleGroup>
-          </ScrollingChips>
-        );
-      })}
-      {props.kinds.length > 1 ? (
-        <ScrollingChips label="Kinds">
-          <ToggleGroup
-            multiple
-            className="shrink-0"
-            value={[...props.selectedKinds]}
-            onValueChange={(value) => props.onKinds(value as string[])}
-          >
-            {props.kinds.map((kind) => (
-              <Toggle key={kind} size="sm" value={kind}>
-                {kind}
-              </Toggle>
-            ))}
-          </ToggleGroup>
-        </ScrollingChips>
-      ) : null}
-    </div>
-  );
-}
-
-/** "courtroom: trial adventure…" under the chips, with the owner's own line editable. */
+/** "courtroom: trial adventure…" under the tabs for a picked project, with the owner's own line editable. */
 function ProjectBlurbLine({
   project,
   description,
@@ -674,7 +674,7 @@ function AnsweredList({ feed, now }: { readonly feed: DecisionFeed; readonly now
     const { item, answer } = entry;
     const chosen = item.options.filter((option) => answer?.option_ids?.includes(option.id));
     const pictures = chosen.flatMap((option) => {
-      const media = option.media_idx === null ? undefined : item.media[option.media_idx];
+      const media = optionMedia(item, option);
       return media?.type === "image" ? [media] : [];
     });
     return (
@@ -747,22 +747,31 @@ function DecisionCard({
   embedded = false,
   onOpen,
   onQuickAnswer,
+  onDismiss,
 }: {
   entry: DecisionEntry;
   age: string;
   embedded?: boolean;
   onOpen: () => void;
   onQuickAnswer: (patch: Partial<DecisionAnswerInput>) => void;
+  /** Withdraws it as no longer relevant. */
+  onDismiss: () => void;
 }) {
   const { item } = entry;
-  // A card answers in place only when nothing on it needs watching, hearing,
-  // or installing first; otherwise it offers Open.
+  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
+  // A sound or a video plays right on the card, the thing itself before any text.
+  const preview =
+    item.kind === "pick" || item.kind === "rank"
+      ? undefined
+      : item.media.find((media) => media.type === "audio" || media.type === "video");
+  // A card answers in place once nothing on it still needs watching, hearing,
+  // or installing; otherwise it offers Open.
   const quick =
-    (item.kind === "review" || item.kind === "pitch") && canAnswerFromCard(item)
+    (item.kind === "review" || item.kind === "pitch") &&
+    (canAnswerFromCard(item) || unseenMediaProblem(item, engaged) === null)
       ? VERDICT_BUTTONS[item.kind]
       : null;
-  const mediaOf = (option: (typeof item.options)[number]) =>
-    option.media_idx === null ? undefined : item.media[option.media_idx];
+  const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Only single-choice picks answer from the card; the rest open the full view.
   const inlinePick = item.kind === "pick" && item.max_choices === 1 && item.options.length > 0;
   const pictures = inlinePick && item.options.some((option) => mediaOf(option)?.type === "image");
@@ -778,7 +787,12 @@ function DecisionCard({
       )}
       data-decision-card={item.kind}
     >
-      <button type="button" className="block w-full text-left" onClick={onOpen}>
+      <button
+        type="button"
+        data-feed-item=""
+        className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={onOpen}
+      >
         <div className="flex items-center gap-1.5">
           {embedded ? null : (
             <FeedMeta machine={entry.environmentLabel} folder={item.project} model={null} />
@@ -807,6 +821,20 @@ function DecisionCard({
           <p className="text-xs text-warning-foreground">{item.cost_note}</p>
         ) : null}
       </button>
+      {preview ? (
+        <DecisionMediaEngagement
+          value={(key) =>
+            setEngaged((current) => (current.has(key) ? current : new Set(current).add(key)))
+          }
+        >
+          <DecisionMedia
+            environmentId={entry.environmentId}
+            media={preview}
+            compact={preview.type === "audio"}
+            {...(preview.type === "video" ? { className: "max-h-72" } : {})}
+          />
+        </DecisionMediaEngagement>
+      ) : null}
       {inlinePick ? (
         pictures ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -877,11 +905,16 @@ function DecisionCard({
           ))}
         </div>
       ) : null}
-      {inlinePick || quick ? null : (
-        <Button size="sm" variant="outline" onClick={onOpen}>
-          Open
+      <div className="flex flex-wrap items-center gap-2">
+        {inlinePick || quick ? null : (
+          <Button size="sm" variant="outline" onClick={onOpen}>
+            Open
+          </Button>
+        )}
+        <Button size="xs" variant="ghost-muted" className="ms-auto" onClick={onDismiss}>
+          No longer relevant
         </Button>
-      )}
+      </div>
     </article>
   );
 }

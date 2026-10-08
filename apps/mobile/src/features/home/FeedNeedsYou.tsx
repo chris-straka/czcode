@@ -3,6 +3,7 @@ import {
   shortMachineLabel,
   shortModelLabel,
 } from "@cz/client-runtime/decisions/oneFeed";
+import { optionMedia } from "@cz/client-runtime/decisions/draft";
 import { formatModelSlugName } from "@cz/shared/model";
 import { useNavigation } from "@react-navigation/native";
 import { useMemo } from "react";
@@ -56,8 +57,7 @@ export function FeedNeedsYou() {
             {decisions.map((entry) => {
               // Keyed by option: two options can show the same image.
               const pictures = entry.item.options.flatMap((option) => {
-                const media =
-                  option.media_idx === null ? undefined : entry.item.media[option.media_idx];
+                const media = optionMedia(entry.item, option);
                 return entry.item.kind === "pick" && media?.type === "image"
                   ? [{ key: option.id, media }]
                   : [];

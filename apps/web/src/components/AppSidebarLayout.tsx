@@ -23,6 +23,7 @@ import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
 import { useProjects } from "../state/entities";
 import { SidebarProvider } from "./ui/sidebar";
+import { useNavigateBack } from "../hooks/useNavigateBack";
 import { FeedModal } from "./feed/FeedModal";
 import { FeedPage } from "./feed/FeedPage";
 
@@ -86,18 +87,18 @@ function ProjectProjectionRetention() {
   return null;
 }
 
-/** Routes the feed itself answers; everything else opens over it in a modal. */
+/** Routes the feed itself answers; everything else opens over it as its own view. */
 function isFeedRoute(pathname: string): boolean {
   return pathname === "/" || pathname === "/decisions";
 }
 
 /**
  * The one feed stays mounted under every route, keeping its scroll and state;
- * any other page (a thread, a draft, settings, usage, pull requests) opens in
- * a modal over it, and closing goes back to the feed.
+ * any other page (a thread, a draft, settings, usage, pull requests) opens as
+ * a full view over it, and Back returns to where the owner came from.
  */
 function OneFeedShell({ pathname, children }: { pathname: string; children: ReactNode }) {
-  const navigate = useNavigate();
+  const navigateBack = useNavigateBack();
   if (pathname === "/welcome") return children;
   const isSettings = pathname === "/settings" || pathname.startsWith("/settings/");
   return (
@@ -106,10 +107,7 @@ function OneFeedShell({ pathname, children }: { pathname: string; children: Reac
       {isFeedRoute(pathname) ? (
         children
       ) : (
-        <FeedModal
-          label={isSettings ? "Settings" : "Thread"}
-          onClose={() => void navigate({ to: "/" })}
-        >
+        <FeedModal label={isSettings ? "Settings" : "Thread"} onClose={navigateBack}>
           {isSettings ? (
             <div className="flex min-h-0 flex-1">
               <nav

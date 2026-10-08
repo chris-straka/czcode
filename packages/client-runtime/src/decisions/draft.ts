@@ -1,5 +1,6 @@
 import type {
   DecisionAnswerInput,
+  DecisionAudioMark,
   DecisionItem,
   DecisionMediaRef,
   DecisionPassageComment,
@@ -16,6 +17,8 @@ export interface DecisionDraft {
   readonly reactions: Readonly<Record<string, DecisionReaction>>;
   readonly moreLikeThese: boolean;
   readonly redlines: readonly DecisionRedline[];
+  /** Stretches marked on audio waveforms (review, listen). */
+  readonly marks: readonly DecisionAudioMark[];
   readonly passageComments: readonly DecisionPassageComment[];
   readonly playtest: DecisionPlaytestForm;
   readonly uploads: readonly DecisionMediaRef[];
@@ -32,6 +35,7 @@ export function emptyDraft(item: DecisionItem): DecisionDraft {
     reactions: {},
     moreLikeThese: false,
     redlines: [],
+    marks: [],
     passageComments: [],
     playtest: { good: "", bad: "", bugs: "" },
     uploads: [],
@@ -126,6 +130,7 @@ export function draftToAnswer(
           (reaction) => reaction.verdict !== null || reaction.note,
         ),
         more_like_these: draft.moreLikeThese,
+        ...(draft.marks.length > 0 ? { marks: draft.marks } : {}),
       };
     case "request":
       return { ...base, uploads: draft.uploads };
@@ -134,7 +139,12 @@ export function draftToAnswer(
     case "timeline":
       return { ...base, choice: draft.choice, redo_from: draft.redoFrom };
     case "review":
-      return { ...base, choice: draft.choice, redlines: draft.redlines };
+      return {
+        ...base,
+        choice: draft.choice,
+        redlines: draft.redlines,
+        ...(draft.marks.length > 0 ? { marks: draft.marks } : {}),
+      };
     case "read":
       return { ...base, choice: draft.choice, passage_comments: draft.passageComments };
     default:
@@ -155,7 +165,8 @@ export function answerSummary(item: DecisionItem, answer: DecisionAnswerInput): 
   if (answer.uploads?.length) return `${answer.uploads.length} file(s)`;
   if (answer.choice === "redo") return `Redo from ${answer.redo_from}`;
   const verdict = VERDICT_BUTTONS[item.kind]?.find((button) => button.value === answer.choice);
-  return verdict?.label ?? answer.choice ?? "Answered";
+  const marks = answer.marks?.length ? ` · ${answer.marks.length} marked` : "";
+  return `${verdict?.label ?? answer.choice ?? "Answered"}${marks}`;
 }
 
 /**
@@ -196,4 +207,33 @@ export function canAnswerFromCard(item: Pick<DecisionItem, "kind" | "media">): b
     mediaToEngage(item).length === 0 &&
     !item.media.some((media) => media.type === "image" && item.kind !== "pick")
   );
+}
+
+/**
+ * The picture an option shows: its own media, or none. Media several options
+ * point at (one overview image on every option) or media with no file
+ * belongs to no option; `contextMedia` shows it once above them instead.
+ */
+export function optionMedia(
+  item: Pick<DecisionItem, "options" | "media">,
+  option: DecisionItem["options"][number],
+): DecisionMediaRef | null {
+  if (option.media_idx === null) return null;
+  const media = item.media[option.media_idx];
+  if (!media?.url) return null;
+  const sharing = item.options.filter((other) => other.media_idx === option.media_idx).length;
+  return sharing === 1 ? media : null;
+}
+
+/** A pick's media that belongs to no single option, shown once above the options. */
+export function contextMedia(
+  item: Pick<DecisionItem, "options" | "media">,
+): ReadonlyArray<DecisionMediaRef> {
+  const owned = new Set(
+    item.options.flatMap((option) => {
+      const media = optionMedia(item, option);
+      return media ? [media.key] : [];
+    }),
+  );
+  return item.media.filter((media) => media.url && !owned.has(media.key));
 }

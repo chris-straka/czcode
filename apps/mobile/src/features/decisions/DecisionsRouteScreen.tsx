@@ -2,6 +2,7 @@ import {
   answerSummary,
   canAnswerFromCard,
   VERDICT_BUTTONS,
+  optionMedia,
 } from "@cz/client-runtime/decisions/draft";
 import { filterChips } from "@cz/client-runtime/decisions/feed";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
@@ -194,10 +195,9 @@ export function DecisionsRouteScreen() {
             answeredFeed.entries.map((entry) => {
               const { item, answer } = entry;
               const pictures = item.options.flatMap((option) => {
-                const media =
-                  answer?.option_ids?.includes(option.id) && option.media_idx !== null
-                    ? item.media[option.media_idx]
-                    : undefined;
+                const media = answer?.option_ids?.includes(option.id)
+                  ? optionMedia(item, option)
+                  : null;
                 return media?.type === "image" ? [media] : [];
               });
               return (
@@ -247,7 +247,7 @@ export function DecisionsRouteScreen() {
                 ? VERDICT_BUTTONS[item.kind]
                 : null;
             const thumbs = item.options.flatMap((option) => {
-              const media = option.media_idx === null ? undefined : item.media[option.media_idx];
+              const media = optionMedia(item, option);
               return item.kind === "pick" && media?.type === "image" ? [media] : [];
             });
             const apk =

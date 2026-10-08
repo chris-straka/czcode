@@ -6,6 +6,8 @@
  *
  * Each decision gets one run at most (the queue keys runs by decision), and
  * the last day's answers are re-checked on boot so a restart loses none.
+ * When the asking thread is archived or deleted, its open questions are
+ * withdrawn: nobody is left to act on the answer.
  *
  * @module DecisionFollowUps
  */
@@ -71,6 +73,10 @@ export function followUpFor(item: DecisionItem, answer: DecisionAnswer): FollowU
   };
 }
 
+/** 83.4 reads "1:23". */
+const seconds = (value: number) =>
+  `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
+
 function describeAnswer(item: DecisionItem, answer: DecisionAnswer): string {
   const label = (id: string) => item.options.find((option) => option.id === id)?.label ?? id;
   const parts = [
@@ -78,6 +84,14 @@ function describeAnswer(item: DecisionItem, answer: DecisionAnswer): string {
     answer.rank?.length ? `ranked ${answer.rank.map(label).join(" > ")}` : null,
     answer.choice,
     answer.retry ? "none of these, try again" : null,
+    answer.marks?.length
+      ? `marked ${answer.marks
+          .map(
+            (mark) =>
+              `${mark.tag === "like" ? "liked" : "change"} ${seconds(mark.start)}-${seconds(mark.end)}${mark.note ? ` (${mark.note})` : ""}`,
+          )
+          .join(", ")}`
+      : null,
     answer.comment ? `comment: ${answer.comment}` : null,
   ].filter((part) => part !== null && part !== "");
   return parts.length > 0 ? parts.join("; ") : "see the decision";
@@ -214,6 +228,29 @@ const make = Effect.gen(function* () {
       }
       yield* Stream.runForEach(decisions.changes, safely);
     }),
+  );
+
+  // A thread that was archived or deleted moved on: its open questions go too.
+  yield* Effect.forkScoped(
+    Stream.runForEach(orchestrator.streamDomainEvents, (event) =>
+      event.type === "thread.archived" || event.type === "thread.deleted"
+        ? decisions.withdrawForThread(event.payload.id).pipe(
+            Effect.tap((count) =>
+              count > 0
+                ? Effect.logInfo("Withdrew a moved-on thread's decisions.", {
+                    thread: event.payload.id,
+                    count,
+                  })
+                : Effect.void,
+            ),
+            Effect.catchCause((cause) =>
+              Effect.logWarning("Withdrawing a thread's decisions failed.", { cause }),
+            ),
+          )
+        : Effect.void,
+    ).pipe(
+      Effect.catchCause((cause) => Effect.logWarning("Decision thread watch stopped.", { cause })),
+    ),
   );
 });
 
