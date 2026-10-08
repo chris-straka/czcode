@@ -411,6 +411,10 @@
       "types": "./src/state/decisions.ts",
       "default": "./src/state/decisions.ts"
     },
+    "./decisions/morningBrief": {
+      "types": "./src/decisions/morningBrief.ts",
+      "default": "./src/decisions/morningBrief.ts"
+    },
     "./decisions/oneFeed": {
       "types": "./src/decisions/oneFeed.ts",
       "default": "./src/decisions/oneFeed.ts"

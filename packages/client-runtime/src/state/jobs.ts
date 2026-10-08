@@ -4,7 +4,12 @@
  *
  * @module state/jobs
  */
-import { type ScheduleJob, type ScheduleJobRun, scheduleJobFailing } from "@cz/contracts";
+import {
+  type EnvironmentId,
+  type ScheduleJob,
+  type ScheduleJobRun,
+  scheduleJobFailing,
+} from "@cz/contracts";
 import { formatDuration } from "@cz/shared/usageLimits";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -12,7 +17,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { HttpClient } from "effect/http";
-import { Atom } from "effect/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 
 import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
 import type { PreparedConnection } from "../connection/model.ts";
@@ -70,26 +75,47 @@ export const layer: Layer.Layer<JobsHttpClient, never, HttpClient.HttpClient> = 
 export function createJobsEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | JobsHttpClient | R, E>,
 ) {
+  const list = createEnvironmentQueryAtomFamily(runtime, {
+    label: "environment-data:jobs:list",
+    staleTimeMs: 60_000,
+    refreshIntervalMs: JOBS_REFRESH_INTERVAL_MS,
+    execute: (_: null) =>
+      Effect.gen(function* () {
+        const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
+        const client = yield* JobsHttpClient;
+        const prepared = yield* SubscriptionRef.get(supervisor.prepared);
+        if (Option.isNone(prepared)) {
+          return yield* new EnvironmentHttpConnectionNotReadyError({
+            message: "The environment HTTP connection is not ready.",
+          });
+        }
+        return yield* client.list(prepared.value);
+      }),
+  });
   return {
-    list: createEnvironmentQueryAtomFamily(runtime, {
-      label: "environment-data:jobs:list",
-      staleTimeMs: 60_000,
-      refreshIntervalMs: JOBS_REFRESH_INTERVAL_MS,
-      execute: (_: null) =>
-        Effect.gen(function* () {
-          const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
-          const client = yield* JobsHttpClient;
-          const prepared = yield* SubscriptionRef.get(supervisor.prepared);
-          if (Option.isNone(prepared)) {
-            return yield* new EnvironmentHttpConnectionNotReadyError({
-              message: "The environment HTTP connection is not ready.",
-            });
-          }
-          return yield* client.list(prepared.value);
-        }),
-    }),
+    list,
+    /** Jobs on several machines at once, as far as each has answered; key "id,id" (sorted). */
+    across: Atom.family((key: string) =>
+      Atom.make((get) =>
+        key
+          .split(",")
+          .filter(Boolean)
+          .flatMap((id) => {
+            const environmentId = id as EnvironmentId;
+            const result = get(list({ environmentId, input: null }));
+            return Option.getOrElse(
+              AsyncResult.value(result),
+              (): ReadonlyArray<ScheduleJob> => [],
+            ).map((job) => ({ environmentId, job }));
+          }),
+      ),
+    ),
   };
 }
+
+/** The `across` key for a set of machines. */
+export const jobsAcrossKey = (environmentIds: ReadonlyArray<EnvironmentId>) =>
+  [...environmentIds].sort().join(",");
 
 /**
  * Jobs in the order the owner reads them: failing first, then needing

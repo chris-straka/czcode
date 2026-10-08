@@ -67,6 +67,7 @@ import { createSwipeRowActivation } from "./swipe-row-activation";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-swipe-actions";
 import { useMaterialFabScroll } from "./MaterialFabScrollContext";
 import { FeedNeedsYou } from "./FeedNeedsYou";
+import { MorningBrief } from "./MorningBrief";
 import { useThreadDigests } from "../../state/decisions";
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
@@ -930,6 +931,7 @@ export function HomeScreen(props: HomeScreenProps) {
   ) : (
     <>
       {listHeader}
+      <MorningBrief />
       <FeedNeedsYou />
     </>
   );
