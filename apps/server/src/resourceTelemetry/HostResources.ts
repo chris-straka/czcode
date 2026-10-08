@@ -15,6 +15,7 @@ import {
   parseDarwinMemoryPressure,
   parseDarwinSwapUsage,
   parseLinuxDiskMounts,
+  sameDiskOnce,
   parseProcSwaps,
   parseZramMemoryBytes,
   swapFromDevices,
@@ -135,8 +136,10 @@ const make = Effect.fn("makeHostResources")(function* () {
     } else if (platform === "win32") {
       mounts = "CDEFGHIJ".split("").map((letter) => `${letter}:\\`);
     }
-    const disks = (yield* Effect.forEach(mounts, statDisk, { concurrency: 4 })).filter(
-      (disk): disk is NonNullable<typeof disk> => disk !== null && disk.totalBytes > 0,
+    const disks = sameDiskOnce(
+      (yield* Effect.forEach(mounts, statDisk, { concurrency: 4 })).filter(
+        (disk): disk is NonNullable<typeof disk> => disk !== null && disk.totalBytes > 0,
+      ),
     );
     const loadAverage = platform === "win32" ? undefined : NodeOS.loadavg();
     return {
