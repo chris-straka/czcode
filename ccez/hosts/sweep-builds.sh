@@ -58,7 +58,7 @@ in_busy_project() {
 
 # Whether anything in the folder changed within the last $1 days.
 touched_within() {
-  [ "$1" -gt 0 ] && find "$2" -newermt "-$1 days" -print -quit 2> /dev/null | grep -q .
+  [ "$1" -gt 0 ] && find "$2" -newermt "$(date -d "-$1 days" -Iseconds)" -print -quit 2> /dev/null | grep -q .
 }
 
 candidates() {
@@ -127,7 +127,7 @@ while read -r top; do
       [ "$age" -lt 1 ] && age=1
       # Its own files, not build output or caches inside it.
       [ -n "$(find "$tree/" \( -name node_modules -o -name target -o -name build -o -name .git \) -prune -o \
-        -newermt "-$age days" -print -quit 2> /dev/null)" ] && continue
+        -type f -newermt "$(date -d "-$age days" -Iseconds)" -print -quit 2> /dev/null)" ] && continue
       [ -z "$(git -C "$tree" status --porcelain 2> /dev/null)" ] || continue
       git -C "$tree" branch -r --contains HEAD 2> /dev/null | grep -q . || continue
       if sqlite3 "file:$db?mode=ro" "SELECT 1 FROM orchestration_v2_projection_threads WHERE deleted_at IS NULL AND payload_json LIKE '%\"worktreePath\":\"$tree\"%' LIMIT 1" 2> /dev/null | grep -q 1; then
