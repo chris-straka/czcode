@@ -110,7 +110,7 @@ const listCommand = Command.make("list", {
   host: hostFlag,
   json: Flag.Boolean("json").pipe(Flag.withDefault(false)),
   all: Flag.Boolean("all").pipe(
-    Flag.withDescription("Include timers that aren't registered."),
+    Flag.withDescription("Include the timers the OS and packages installed."),
     Flag.withDefault(false),
   ),
 }).pipe(
@@ -121,9 +121,11 @@ const listCommand = Command.make("list", {
       ({ client, headers }) =>
         Effect.gen(function* () {
           const { jobs } = yield* client.jobs.list({ headers });
-          const shown = flags.all ? jobs : jobs.filter((job) => job.registered);
+          const shown = flags.all
+            ? jobs
+            : jobs.filter((job) => job.registered || job.system === false);
           if (flags.json) return yield* Console.log(encodeJson({ jobs: shown }));
-          if (shown.length === 0) return yield* Console.log("No recurring jobs registered.");
+          if (shown.length === 0) return yield* Console.log("No recurring jobs.");
           for (const job of shown) yield* Console.log(describeJob(job));
         }),
     ),

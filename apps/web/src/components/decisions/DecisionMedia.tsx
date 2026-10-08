@@ -158,11 +158,10 @@ function ModelView({ src, className }: { src: string; className?: string }) {
 
 /**
  * The one frame every option's media shares, so options of different shapes
- * (a 2:1 floor plan next to a 16:9 render) line up: fixed aspect, contained,
- * on a neutral letterbox.
+ * line up. Pictures fill it (most are 16:9 thumbnails); videos stay whole.
  */
 export const DECISION_OPTION_FRAME_CLASS =
-  "aspect-[4/3] w-full overflow-hidden rounded-md bg-muted/60";
+  "aspect-video w-full overflow-hidden rounded-md bg-muted/60";
 
 /**
  * One media attachment, sized for a card (`compact`), an option tile
@@ -204,7 +203,7 @@ export function DecisionMedia({
             alt={media.caption ?? media.name}
             src={url}
             loading="lazy"
-            className="size-full object-contain"
+            className="size-full object-cover"
           />
         ) : media.type === "video" ? (
           <video

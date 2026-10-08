@@ -296,6 +296,7 @@ import {
   ResourceTelemetryRetryResult,
   ResourceTelemetrySnapshot,
 } from "./resourceTelemetry.ts";
+import { OnlinePeers } from "./hostWake.ts";
 import {
   UsageLimitSourceError,
   ProviderConsumeResetCreditInput,
@@ -463,6 +464,7 @@ export const WS_METHODS = {
   serverGetProcessDiagnostics: "server.getProcessDiagnostics",
   serverGetHostResources: "server.getHostResources",
   serverGetHostLoadHistory: "server.getHostLoadHistory",
+  serverGetOnlinePeers: "server.getOnlinePeers",
   serverGetProcessResourceHistory: "server.getProcessResourceHistory",
   serverGetResourceTelemetryHistory: "server.getResourceTelemetryHistory",
   serverRetryResourceTelemetry: "server.retryResourceTelemetry",
@@ -822,6 +824,12 @@ const WsServerGetHostResourcesRpc = Rpc.make(WS_METHODS.serverGetHostResources, 
 const WsServerGetHostLoadHistoryRpc = Rpc.make(WS_METHODS.serverGetHostLoadHistory, {
   payload: HostLoadHistoryInput,
   success: HostLoadHistory,
+  error: EnvironmentAuthorizationError,
+});
+
+const WsServerGetOnlinePeersRpc = Rpc.make(WS_METHODS.serverGetOnlinePeers, {
+  payload: Schema.Struct({}),
+  success: OnlinePeers,
   error: EnvironmentAuthorizationError,
 });
 
@@ -1784,6 +1792,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetProcessDiagnosticsRpc,
   WsServerGetHostResourcesRpc,
   WsServerGetHostLoadHistoryRpc,
+  WsServerGetOnlinePeersRpc,
   WsServerGetProcessResourceHistoryRpc,
   WsServerGetResourceTelemetryHistoryRpc,
   WsServerRetryResourceTelemetryRpc,

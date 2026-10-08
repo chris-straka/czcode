@@ -118,6 +118,14 @@ export const jobsAcrossKey = (environmentIds: ReadonlyArray<EnvironmentId>) =>
   [...environmentIds].sort().join(",");
 
 /**
+ * A timer the OS or a package installed, shown only on request. Older
+ * servers don't tell these apart, so every unregistered timer of theirs counts.
+ */
+export function isSystemTimer(job: ScheduleJob): boolean {
+  return !job.registered && job.system !== false;
+}
+
+/**
  * Jobs in the order the owner reads them: failing first, then needing
  * attention, then the rest by next run.
  */

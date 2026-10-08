@@ -1,7 +1,7 @@
 # Fleet
 
 **Fleet** shows every machine you've paired at once and keeps it live: whether each is awake,
-asleep, or unreachable, its CPU, memory, swap (with what zram costs in RAM), and free space on
+busy, asleep, or unreachable, its CPU, memory, swap (with what zram costs in RAM), and free space on
 each disk, and the agents working there right now with what each is doing and for how long.
 Totals for the whole fleet sit at the top.
 
@@ -14,6 +14,11 @@ server-rack button on the phone's thread list, or tab 5 in the terminal app (`cz
 - **Asleep** means the machine isn't answering but has an address another connected machine can
   send a wake packet to, as a host that sleeps when idle does. **Wake** sends it; the machine
   reconnects in about 30 seconds. **Unreachable** machines have nothing that can wake them.
+- **Busy, not responding** means the machine's cz isn't answering, but another of your machines
+  sees it online on your tailnet: it's on and overloaded, so there's no Wake. It shows its last
+  load until it answers again.
+- An agent still starting after 15 minutes reads **stuck starting** in red and isn't counted as
+  working. cz fails that run with the reason shortly after; send the message again to retry.
 - Readings of a machine that stopped answering stay on its card, greyed, with their age.
 - Open an agent's thread from its row, or stop it there.
 

@@ -26,6 +26,7 @@ import * as Schema from "effect/Schema";
 import * as ForkDatabase from "../forkDatabase/ForkDatabase.ts";
 import * as ThreadLaunchService from "../orchestration-v2/ThreadLaunchService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import { forkParked } from "../serverActivation.ts";
 
 const POLL_INTERVAL = Duration.seconds(30);
 
@@ -291,7 +292,9 @@ export const serviceLayer = Layer.effect(ResetQueueService, make);
 
 const poller = Effect.gen(function* () {
   const queue = yield* ResetQueueService;
-  yield* Effect.forkScoped(
+  // Parked until startup recovery is done, which would retire a start it
+  // raced with (see DecisionFollowUps).
+  yield* forkParked(
     Effect.forever(
       Effect.sleep(POLL_INTERVAL).pipe(
         Effect.andThen(queue.startDue),

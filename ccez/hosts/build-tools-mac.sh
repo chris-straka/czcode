@@ -208,6 +208,12 @@ if want android; then
   run "$sdkm" --install $ANDROID_PACKAGES "${ndk_pkgs[@]}"
 fi
 
+step "Gradle daemons stop after 10 idle minutes"
+# Agents build once and move on; Gradle's default keeps each daemon (about
+# 1 GB) alive for 3 hours after the last build.
+already grep -q '^org.gradle.daemon.idletimeout=' "$HOME/.gradle/gradle.properties" ||
+  run_sh "mkdir -p '$HOME/.gradle' && echo org.gradle.daemon.idletimeout=600000 >> '$HOME/.gradle/gradle.properties'"
+
 step "Environment for shells and the cz service"
 # mac.sh's launchd agent sources this file before starting cz.
 tool_path="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/go/bin:$HOME/.bun/bin:$HOME/.dotnet:$java_home/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$brew_prefix/opt/libpq/bin"

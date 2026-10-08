@@ -10,6 +10,7 @@ import {
   emptyDraft,
   optionMedia,
   unseenMediaProblem,
+  toggleOptionId,
 } from "./draft.ts";
 
 const item = (overrides: Partial<DecisionItem>): DecisionItem => ({
@@ -140,12 +141,22 @@ describe("option pictures", () => {
 });
 
 describe("none of these", () => {
-  it("turns a pick down with or without asking for another round, note optional", () => {
+  it("sends only the note and asks for new options", () => {
     const pick = item({});
-    const draft = emptyDraft(pick);
-    expect(draftToAnswer(pick, draft, "none")).toMatchObject({ declined: true, option_ids: null });
-    expect(draftToAnswer(pick, draft, "retry")).toMatchObject({ retry: true });
-    expect(draftToAnswer(pick, draft, true)).toMatchObject({ retry: true });
-    expect(answerSummary(pick, draftToAnswer(pick, draft, "none"))).toBe("None of these");
+    const draft = { ...emptyDraft(pick), optionIds: ["a"], comment: " darker " };
+    const answer = draftToAnswer(pick, draft, true);
+    expect(answer).toMatchObject({ retry: true, option_ids: null, comment: "darker" });
+    expect(answerSummary(pick, answer)).toBe("None of these");
+  });
+});
+
+describe("toggleOptionId", () => {
+  it("clears a selected option and replaces or adds the rest", () => {
+    const single = item({});
+    expect(toggleOptionId(single, ["a"], "a")).toEqual([]);
+    expect(toggleOptionId(single, ["a"], "b")).toEqual(["b"]);
+    const multi = item({ max_choices: 2 });
+    expect(toggleOptionId(multi, ["a"], "b")).toEqual(["a", "b"]);
+    expect(toggleOptionId(multi, ["a", "b"], "a")).toEqual(["b"]);
   });
 });
