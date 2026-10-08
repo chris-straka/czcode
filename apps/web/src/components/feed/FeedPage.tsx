@@ -947,18 +947,14 @@ function DecisionCard({
           </Button>
         )}
         {item.kind === "pick" ? (
-          <>
-            <Button
-              size="xs"
-              variant="ghost-muted"
-              onClick={() => onQuickAnswer({ declined: true })}
-            >
-              None of these
-            </Button>
-            <Button size="xs" variant="ghost-muted" onClick={() => onQuickAnswer({ retry: true })}>
-              Try again
-            </Button>
-          </>
+          <Button
+            size="xs"
+            variant="ghost-muted"
+            title="Asks for new options"
+            onClick={() => onQuickAnswer({ retry: true })}
+          >
+            None of these
+          </Button>
         ) : null}
         <Button size="xs" variant="ghost-muted" onClick={onDismiss}>
           No longer relevant

@@ -40,7 +40,7 @@ const PLAYTEST_LABEL = { good: "What felt good", bad: "What felt bad", bugs: "Bu
 /**
  * One decision, answered from the keyboard. Every kind shares: j/k scroll,
  * 1-9 pick an option (or a verdict), ]/[ move between options, Enter send,
- * c note, N "none of these, try again", n/p (or J/K) next/previous decision,
+ * c note, N "none of these" (asks for new options), n/p (or J/K) next/previous decision,
  * o open the focused media full screen, t open the thread, Esc or q back.
  * Kinds add: pick 1-9 toggles · rank </> move · listen space play, y keep,
  * x kill, f favourite, l loop, m more · look ←→ turn, C clay · read p comment

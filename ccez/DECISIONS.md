@@ -41,8 +41,8 @@ back to its thread.
 
 Each type has its own full-screen view. Every type has a free-text note and a
 voice note. Every type with options also offers **"none of these"**
-(`declined: true`: none of them, and no new round) and **"none of these, try
-again"** (`retry: true`: make new options; the note, if any, says how).
+(`retry: true`: make new options; the note, if any, says how). Answers from
+older clients may carry `declined: true` instead: none of them, no new round.
 
 1. **Pick:** choose one (or several, if the agent allows) from options that
    can be images, 3D models, sounds, or clips. Example: 4 Andras concepts.
@@ -129,7 +129,9 @@ How to ask:
 - **Don't block if anything else can be done.** Submit, then continue other
   work or end the thread with a resume plan.
 - Give a recommendation when there is one (marked on the option), and say
-  why in one line.
+  why in one line. Keep the options in your own order; don't move the
+  recommended one first. If labels are numbered ("1 · …"), the server shows
+  them in number order.
 - Start with a one-line question that says exactly what is being chosen.
 - Each option gets its own distinct image (for a video: a thumbnail mock of
   that video), or no option gets one. Never attach the same image to every

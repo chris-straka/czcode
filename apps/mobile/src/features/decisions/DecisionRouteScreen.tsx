@@ -3,6 +3,7 @@ import {
   answerSummary,
   draftProblem,
   draftToAnswer,
+  toggleOptionId,
   emptyDraft,
   unseenMediaProblem,
   VERDICT_BUTTONS,
@@ -202,7 +203,7 @@ function DecisionAnswerForm({
   const [draft, setDraft] = useState<DecisionDraft>(() => emptyDraft(item));
   const update = (patch: Partial<DecisionDraft>) =>
     setDraft((current) => ({ ...current, ...patch }));
-  const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: "retry" | "none") =>
+  const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: boolean) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
   const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
   const engage = useCallback(
@@ -296,21 +297,13 @@ function DecisionAnswerForm({
               onPress={() => submit()}
             />
           )}
-          {item.options.length > 0 && item.kind !== "rank" ? (
-            <>
-              {item.kind === "pick" ? (
-                <MaterialButton
-                  tone="secondary"
-                  label="None of these"
-                  onPress={() => submit({}, "none")}
-                />
-              ) : null}
-              <MaterialButton
-                tone="text"
-                label="None of these, try again"
-                onPress={() => submit({}, "retry")}
-              />
-            </>
+          {item.kind === "pick" && item.options.length > 0 ? (
+            // Sends the note and asks for new options.
+            <MaterialButton
+              tone="secondary"
+              label="None of these"
+              onPress={() => submit({}, true)}
+            />
           ) : null}
         </View>
         {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
@@ -356,7 +349,7 @@ function Chip({
 /**
  * Pick options. As soon as one has a picture, every option shares one frame
  * so tiles line up; an option without one shows its label in that frame.
- * Pictures open full screen, where an option can be picked too.
+ * A tap picks; a long press opens the pictures full screen.
  */
 function PickOptions({ entry, draft, update }: BodyProps) {
   const { item } = entry;
@@ -368,15 +361,7 @@ function PickOptions({ entry, draft, update }: BodyProps) {
     const uri = mediaOf(option)?.type === "image" ? resolve(mediaOf(option)) : null;
     return uri ? [{ uri, label: option.label, optionId: option.id }] : [];
   });
-  const pick = (id: string) =>
-    update({
-      optionIds:
-        item.max_choices === 1
-          ? [id]
-          : draft.optionIds.includes(id)
-            ? draft.optionIds.filter((value) => value !== id)
-            : [...draft.optionIds, id],
-    });
+  const pick = (id: string) => update({ optionIds: toggleOptionId(item, draft.optionIds, id) });
   return (
     <View className="gap-3">
       {contextMedia(item).map((media) => (
@@ -403,13 +388,7 @@ function PickOptions({ entry, draft, update }: BodyProps) {
             >
               {framed ? (
                 pictureIndex >= 0 ? (
-                  <Pressable
-                    accessibilityRole="imagebutton"
-                    accessibilityLabel={`Open ${option.label} full screen`}
-                    onPress={() => setViewing(pictureIndex)}
-                  >
-                    <DecisionMedia environmentId={entry.environmentId} media={media!} framed />
-                  </Pressable>
+                  <DecisionMedia environmentId={entry.environmentId} media={media!} framed />
                 ) : media ? (
                   <DecisionMedia environmentId={entry.environmentId} media={media} />
                 ) : (

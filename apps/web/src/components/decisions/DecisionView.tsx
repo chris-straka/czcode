@@ -57,6 +57,7 @@ import {
   type DecisionDraft,
   draftProblem,
   draftToAnswer,
+  toggleOptionId,
   emptyDraft,
   unseenMediaProblem,
   VERDICT_BUTTONS,
@@ -83,11 +84,7 @@ interface DecisionViewProps {
 
 /** Opens images full screen; option images can be picked from there. */
 interface FullScreenImages {
-  readonly open: (
-    images: ReadonlyArray<ExpandedImageItem>,
-    index: number,
-    optionIds?: ReadonlyArray<string>,
-  ) => void;
+  readonly open: (images: ReadonlyArray<ExpandedImageItem>, index: number) => void;
 }
 const FullScreenContext = createContext<FullScreenImages>({ open: () => {} });
 
@@ -125,38 +122,31 @@ export function DecisionView({
   const unseen = unseenMediaProblem(item, engaged);
   const problem = unseen ?? draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
-  const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: "retry" | "none") =>
+  const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: boolean) =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
-  // Options can be sent back for another round; a pick can also be turned down outright.
-  const declinable = item.options.length > 0 && item.kind !== "rank";
+  // "None of these" sends the note and asks for new options.
+  const declinable = item.kind === "pick" && item.options.length > 0;
   const pick = item.kind === "pick";
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fullScreen, setFullScreen] = useState<{
     readonly images: ReadonlyArray<ExpandedImageItem>;
     readonly index: number;
-    readonly optionIds?: ReadonlyArray<string>;
   } | null>(null);
   const title = item.title || item.question;
   const fullScreenImages = useMemo<FullScreenImages>(
     () => ({
-      open: (images, index, optionIds) =>
-        setFullScreen({ images, index, ...(optionIds ? { optionIds } : {}) }),
+      open: (images, index) => setFullScreen({ images, index }),
     }),
     [],
   );
 
   const pickOption = (id: string) => {
     if (item.kind !== "pick") return;
-    if (item.max_choices === 1) return update({ optionIds: [id] });
-    update({
-      optionIds: draft.optionIds.includes(id)
-        ? draft.optionIds.filter((value) => value !== id)
-        : [...draft.optionIds, id],
-    });
+    update({ optionIds: toggleOptionId(item, draft.optionIds, id) });
   };
 
-  // Keys: j/k scroll, 1-9 pick, 0 none of these, r none of these and try
-  // again, Enter sends, n/p (J/K) step through Review all, Esc closes. A text field keeps its keys; Esc there leaves it first.
+  // Keys: j/k scroll, 1-9 pick (again to clear), 0 or r none of these,
+  // Enter sends, n/p (J/K) step through Review all, Esc clears a pick, then closes. A text field keeps its keys; Esc there leaves it first.
   // They are never shown on screen (owner's call, 2026-10-07).
   const keyHandler = useRef<(event: KeyboardEvent) => void>(() => {});
   const onKey = (event: KeyboardEvent) => {
@@ -190,12 +180,9 @@ export function DecisionView({
           onClose();
           return true;
         case "0":
-          if (!pick) return false;
-          submit({}, "none");
-          return true;
         case "r":
           if (!declinable) return false;
-          submit({}, "retry");
+          submit({}, true);
           return true;
         case "Enter":
           if (verdicts || item.kind === "timeline" || problem !== null) return false;
@@ -224,6 +211,23 @@ export function DecisionView({
     const listener = (event: KeyboardEvent) => keyHandler.current(event);
     window.addEventListener("keydown", listener);
     return () => window.removeEventListener("keydown", listener);
+  }, []);
+  // Esc clears a pick before anything closes the view, so it runs ahead of
+  // the feed's own Esc handling.
+  const clearPick = useRef<(event: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    clearPick.current = (event) => {
+      if (event.key !== "Escape" || !pick || draft.optionIds.length === 0) return;
+      if (fullScreen !== null || isTypingTarget(event.target)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      update({ optionIds: [] });
+    };
+  });
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => clearPick.current(event);
+    window.addEventListener("keydown", listener, true);
+    return () => window.removeEventListener("keydown", listener, true);
   }, []);
 
   // Judge from the media: anything more than a short note folds under
@@ -328,28 +332,6 @@ export function DecisionView({
         <ExpandedImageDialog
           preview={{ images: [...fullScreen.images], index: fullScreen.index }}
           onClose={() => setFullScreen(null)}
-          {...(fullScreen.optionIds
-            ? {
-                renderAction: (index: number) => {
-                  const id = fullScreen.optionIds?.[index];
-                  if (id === undefined) return null;
-                  const picked = draft.optionIds.includes(id);
-                  return (
-                    <Button
-                      size="xs"
-                      variant={picked ? "secondary" : "default"}
-                      className="ms-2"
-                      onClick={() => {
-                        pickOption(id);
-                        if (item.max_choices === 1) setFullScreen(null);
-                      }}
-                    >
-                      {picked ? "Picked" : "Pick this"}
-                    </Button>
-                  );
-                },
-              }
-            : {})}
         />
       ) : null}
 
@@ -418,17 +400,13 @@ export function DecisionView({
               </Button>
             )}
             {declinable ? (
-              <>
-                {pick ? (
-                  <Button variant="outline" onClick={() => submit({}, "none")}>
-                    None of these
-                  </Button>
-                ) : null}
-                <Button variant="ghost" onClick={() => submit({}, "retry")}>
-                  <RepeatIcon />
-                  None of these, try again
-                </Button>
-              </>
+              <Button
+                variant="outline"
+                title="Sends your note and asks for new options"
+                onClick={() => submit({}, true)}
+              >
+                None of these
+              </Button>
             ) : null}
             {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
               <span className="text-xs text-muted-foreground">{problem}</span>
@@ -529,21 +507,11 @@ function AttachedMedia({
 
 function PickBody({ entry, draft, update }: BodyProps) {
   const { item } = entry;
-  const fullScreen = useContext(FullScreenContext);
-  const resolveMedia = useDecisionMediaResolver(entry.environmentId);
-  const toggle = (id: string) => {
-    if (item.max_choices === 1) return update({ optionIds: [id] });
-    update({
-      optionIds: draft.optionIds.includes(id)
-        ? draft.optionIds.filter((value) => value !== id)
-        : [...draft.optionIds, id],
-    });
-  };
+  const toggle = (id: string) => update({ optionIds: toggleOptionId(item, draft.optionIds, id) });
   const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Options share one frame as soon as any of them has a picture, so tiles,
   // captions and text-only options line up.
   const framed = item.options.some((option) => mediaOf(option) !== null);
-  const imageOptions = item.options.filter((option) => mediaOf(option)?.type === "image");
   const context = contextMedia(item);
   return (
     <div className="space-y-4">
@@ -563,12 +531,9 @@ function PickBody({ entry, draft, update }: BodyProps) {
               tabIndex={0}
               aria-selected={selected}
               aria-label={option.label}
-              // Players and the full-screen button keep their own clicks; anywhere else selects.
+              // Players keep their own clicks; anywhere else selects.
               onClick={(event) => {
-                if (
-                  (event.target as HTMLElement).closest("audio,video,model-viewer,[data-open-full]")
-                )
-                  return;
+                if ((event.target as HTMLElement).closest("audio,video,model-viewer")) return;
                 toggle(option.id);
               }}
               onKeyDown={(event) => {
@@ -584,26 +549,7 @@ function PickBody({ entry, draft, update }: BodyProps) {
               )}
             >
               {framed ? (
-                media?.type === "image" ? (
-                  <button
-                    type="button"
-                    data-open-full
-                    aria-label={`Open ${option.label} full screen`}
-                    className="block w-full cursor-zoom-in rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    onClick={() =>
-                      fullScreen.open(
-                        imageOptions.map((candidate) => ({
-                          src: resolveMedia(mediaOf(candidate)),
-                          name: candidate.label,
-                        })),
-                        imageOptions.indexOf(option),
-                        imageOptions.map((candidate) => candidate.id),
-                      )
-                    }
-                  >
-                    <DecisionMedia environmentId={entry.environmentId} media={media} framed />
-                  </button>
-                ) : media ? (
+                media ? (
                   <DecisionMedia environmentId={entry.environmentId} media={media} framed />
                 ) : (
                   <div

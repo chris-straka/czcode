@@ -115,6 +115,24 @@ function invalid(reason: string) {
   return new DecisionInvalidError({ reason });
 }
 
+const OPTION_NUMBER = /^\s*(\d+)\s*(?:[.):·-]|\s)/;
+
+/**
+ * Options whose labels are all numbered ("1 · …", "2. …") in their numbers'
+ * order. Agents sometimes list the recommended option first while keeping its
+ * number; the owner reads the numbers, so they set the order.
+ */
+export function inNumberedOrder<T extends { readonly label: string }>(
+  options: ReadonlyArray<T>,
+): ReadonlyArray<T> {
+  const numbers = options.map((option) => OPTION_NUMBER.exec(option.label)?.[1]);
+  if (options.length < 2 || numbers.some((number) => number === undefined)) return options;
+  return options
+    .map((option, index) => ({ option, number: Number(numbers[index]) }))
+    .sort((a, b) => a.number - b.number)
+    .map(({ option }) => option);
+}
+
 /** Checks a submission against its own media and options. Returns a reason, or null. */
 function submissionProblem(input: DecisionSubmitInput): string | null {
   const media = input.media ?? [];
@@ -355,7 +373,7 @@ const make = Effect.gen(function* () {
         question: input.question,
         body_md: input.body_md ?? "",
         media: input.media ?? [],
-        options: input.options ?? [],
+        options: inNumberedOrder(input.options ?? []),
         max_choices: input.max_choices ?? 1,
         steps: input.steps ?? [],
         context_media_idx: input.context_media_idx ?? null,

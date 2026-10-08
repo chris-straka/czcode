@@ -103,15 +103,24 @@ export function draftProblem(item: DecisionItem, draft: DecisionDraft): string |
   }
 }
 
+/** The selection after clicking an option: a selected option clears, others join (or replace). */
+export function toggleOptionId(
+  item: DecisionItem,
+  optionIds: ReadonlyArray<string>,
+  id: string,
+): ReadonlyArray<string> {
+  if (optionIds.includes(id)) return optionIds.filter((value) => value !== id);
+  return item.max_choices === 1 ? [id] : [...optionIds, id];
+}
+
 /**
- * The answer to send. "retry" is "none of these, try again"; "none" is "none
- * of these" with no new round. Both carry only the note.
+ * The answer to send. `noneOfThese` is "none of these": it carries only the
+ * note and asks the agent for new options.
  */
 export function draftToAnswer(
   item: DecisionItem,
   draft: DecisionDraft,
-  // `true` is "retry", as older callers pass it.
-  noneOfThese?: boolean | "retry" | "none",
+  noneOfThese?: boolean,
 ): DecisionAnswerInput {
   const comment = draft.comment.trim() || null;
   const base = {
@@ -123,8 +132,7 @@ export function draftToAnswer(
     // Stretches and comments marked on a sound's or video's timeline, whatever the kind.
     ...(draft.marks.length > 0 ? { marks: draft.marks } : {}),
   };
-  if (noneOfThese === "retry" || noneOfThese === true) return { ...base, retry: true };
-  if (noneOfThese === "none") return { ...base, declined: true };
+  if (noneOfThese) return { ...base, retry: true };
   switch (item.kind) {
     case "pick":
       return { ...base, option_ids: draft.optionIds };
@@ -155,8 +163,9 @@ export function draftToAnswer(
 
 /** A one-line summary of an answer for the answered card. */
 export function answerSummary(item: DecisionItem, answer: DecisionAnswerInput): string {
-  if (answer.retry) return "None of these: try again";
-  if (answer.declined) return "None of these";
+  if (answer.retry) return "None of these";
+  // Older clients could turn a pick down without asking for new options.
+  if (answer.declined) return "None of these (no new options)";
   const label = (id: string) => item.options.find((option) => option.id === id)?.label ?? id;
   if (answer.option_ids?.length) return answer.option_ids.map(label).join(", ");
   if (answer.rank?.length) return answer.rank.map(label).join(" › ");
