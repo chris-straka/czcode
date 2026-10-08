@@ -146,7 +146,7 @@ export function FeedThreadRow({
       to="/$environmentId/$threadId"
       params={{ environmentId: thread.environmentId, threadId: thread.id }}
       className={cn(
-        "block space-y-0.5 border-t border-border px-4 py-3 outline-none first:border-t-0 hover:bg-accent/40 focus-visible:bg-accent/40",
+        "block space-y-0.5 border-t border-border px-4 py-3 outline-none first:border-t-0 hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
       )}
       data-feed-thread-row=""
       data-feed-item=""

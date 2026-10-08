@@ -113,7 +113,7 @@ export function FeedThreadGroups({
               type="button"
               aria-expanded={expanded}
               data-feed-item=""
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-left outline-none hover:bg-accent/40 focus-visible:bg-accent/40"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left outline-none hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               onClick={() => setOpen((current) => new Map(current).set(group.project, !expanded))}
             >
               {expanded ? (

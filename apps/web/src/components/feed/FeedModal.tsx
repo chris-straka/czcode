@@ -49,6 +49,22 @@ export function FeedModal({
     },
   });
   useEffect(() => {
+    // The composer's editor claims Esc even when empty; an empty one has no
+    // menu open, so Esc there leaves the view before the editor sees it.
+    const onCapture = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.isContentEditable &&
+        (target.textContent ?? "").trim() === "" &&
+        rootRef.current?.contains(target)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }
+    };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (editingText(event.target)) {
@@ -57,8 +73,12 @@ export function FeedModal({
       }
       onClose();
     };
+    window.addEventListener("keydown", onCapture, true);
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onCapture, true);
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [onClose]);
 
   return (
