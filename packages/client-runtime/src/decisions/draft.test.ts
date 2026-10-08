@@ -141,7 +141,13 @@ describe("toggleOptionId", () => {
 describe("note pictures", () => {
   it("go with any answer, and a review still reads as its verdict", () => {
     const review = item({ kind: "review" });
-    const picture = { type: "image", key: "k", name: "ref.png", mime: "image/png", size: 1 } as const;
+    const picture = {
+      type: "image",
+      key: "k",
+      name: "ref.png",
+      mime: "image/png",
+      size: 1,
+    } as const;
     const answer = draftToAnswer(review, {
       ...emptyDraft(review),
       choice: "changes",
