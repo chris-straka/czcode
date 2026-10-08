@@ -96,7 +96,7 @@ function chipsMatch(filter: OneFeedFilter, item: DecisionItem): boolean {
 }
 
 /** True when a thread with no matching decision still belongs under the filter's projects. */
-export function threadMatchesFilter(filter: OneFeedFilter, thread: OneFeedThread): boolean {
+function threadMatchesFilter(filter: OneFeedFilter, thread: OneFeedThread): boolean {
   if (filter.kinds?.size) return false;
   if (!filter.projects?.size && !filter.group) return true;
   const project = filter.threadProject?.(thread) ?? null;
