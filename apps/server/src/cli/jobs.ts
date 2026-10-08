@@ -25,7 +25,7 @@ const when = (ms: number | null) =>
   ms === null ? "—" : DateTime.formatIso(DateTime.makeUnsafe(ms));
 
 /** One line per job, failures flagged: what, schedule, last run, next run. */
-export function describeJob(job: ScheduleJob): string {
+function describeJob(job: ScheduleJob): string {
   const scheduled = job.lastScheduledRun;
   const last =
     job.lastRun.status === "failed"
