@@ -14,7 +14,9 @@ set -eu
 repo=chris-straka/czcode
 app=/Applications/czcode.app
 
-if pgrep -x czcode > /dev/null; then
+# The app itself, not `cz`/`ct`, which run the server through the same binary
+# (their argv carries bin.mjs) and keep working across the swap.
+if pgrep -fl "$app/Contents/MacOS/czcode" | grep -qv "bin.mjs"; then
   echo "czcode is running; quit it first" >&2
   exit 1
 fi

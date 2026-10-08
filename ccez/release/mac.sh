@@ -24,7 +24,9 @@ done
 
 repo=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 cd "$repo"
-if $install && pgrep -x czcode > /dev/null; then
+# The app itself, not `cz`/`ct`, which run the server through the same binary
+# (their argv carries bin.mjs) and keep working across the swap.
+if $install && pgrep -fl "/Applications/czcode.app/Contents/MacOS/czcode" | grep -qv "bin.mjs"; then
   echo "czcode is running; quit it first" >&2
   exit 1
 fi
