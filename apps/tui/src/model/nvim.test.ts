@@ -62,7 +62,9 @@ describe.skipIf(!hasNvim)("runInParentNvim against a headless nvim", () => {
   it("lets Esc through to the TUI's terminal despite a global tnoremap <Esc>", async () => {
     process.env.NVIM = socket;
     const remote = (expr: string) =>
-      execFileSync("nvim", ["--server", socket, "--remote-expr", expr]).toString().trim();
+      NodeChildProcess.execFileSync("nvim", ["--server", socket, "--remote-expr", expr])
+        .toString()
+        .trim();
     remote(`luaeval("vim.keymap.set('t', '<Esc>', [[<C-\\\\><C-n>]])")`);
     remote("execute('enew')");
     const job = Number(remote(`luaeval("vim.fn.jobstart('sleep 30', { term = true })")`));

@@ -68,8 +68,11 @@ export async function processAncestors(pid: number, depth = 8): Promise<Array<nu
   let current = pid;
   for (let step = 0; step < depth; step++) {
     const parent = await new Promise<number | null>((resolve) =>
-      execFile("ps", ["-o", "ppid=", "-p", String(current)], { timeout: 2000 }, (error, out) =>
-        resolve(error ? null : Number(out.trim()) || null),
+      NodeChildProcess.execFile(
+        "ps",
+        ["-o", "ppid=", "-p", String(current)],
+        { timeout: 2000 },
+        (error, out) => resolve(error ? null : Number(out.trim()) || null),
       ),
     );
     if (parent === null || parent <= 1) break;

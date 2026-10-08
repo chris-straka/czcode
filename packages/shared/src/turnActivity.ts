@@ -8,7 +8,7 @@
  */
 import type { OrchestrationV2TurnItem } from "@cz/contracts";
 
-export const TURN_ACTIVITY_MAX_CHARS = 100;
+const TURN_ACTIVITY_MAX_CHARS = 100;
 
 const firstLine = (text: string) =>
   text

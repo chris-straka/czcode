@@ -84,10 +84,10 @@ export interface FleetMachineInput {
 }
 
 /** A disk below this fraction free (or below DISK_LOW_BYTES) is flagged. */
-export const DISK_LOW_RATIO = 0.1;
-export const DISK_LOW_BYTES = 10 * 1024 ** 3;
-export const MEMORY_HIGH_RATIO = 0.9;
-export const SWAP_HIGH_RATIO = 0.8;
+const DISK_LOW_RATIO = 0.1;
+const DISK_LOW_BYTES = 10 * 1024 ** 3;
+const MEMORY_HIGH_RATIO = 0.9;
+const SWAP_HIGH_RATIO = 0.8;
 
 /** What a machine is short of, worst first. */
 export function fleetWarnings(resources: HostResourcesSnapshot | null): Array<FleetWarning> {
@@ -128,7 +128,7 @@ const toMs = (value: DateTime.Utc | null | undefined) =>
   value == null ? null : DateTime.toEpochMillis(value);
 
 /** A thread counts as running while it has an active run or is waiting on you. */
-export function isRunningAgent(thread: OrchestrationV2ThreadShell): boolean {
+function isRunningAgent(thread: OrchestrationV2ThreadShell): boolean {
   return (
     thread.deletedAt === null &&
     thread.archivedAt === null &&

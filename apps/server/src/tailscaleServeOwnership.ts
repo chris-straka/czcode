@@ -17,7 +17,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
-export const WELL_KNOWN_ENVIRONMENT_PATH = "/.well-known/cz/environment";
+const WELL_KNOWN_ENVIRONMENT_PATH = "/.well-known/cz/environment";
 const PROBE_TIMEOUT = Duration.millis(2_500);
 
 /**

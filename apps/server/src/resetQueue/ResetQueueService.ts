@@ -92,7 +92,7 @@ function spareAllowanceExpiring(windows: ReadonlyArray<UsageWindow>, now: number
  * or driver matches fails now rather than when the run comes due. With no
  * providers loaded yet the selection is kept as given.
  */
-export function resolveQueuedModel(
+function resolveQueuedModel(
   selection: ModelSelection,
   providers: ReadonlyArray<Pick<ServerProvider, "instanceId" | "driver" | "enabled">>,
 ): Effect.Effect<ModelSelection, QueuedRunError> {

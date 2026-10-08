@@ -186,13 +186,17 @@ it.layer(TestLayer)("ResetQueueService", (it) => {
       const queue = yield* ResetQueueService.ResetQueueService;
 
       const byDriver = yield* queue.enqueue(
-        task("by-driver", { modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" } }),
+        task("by-driver", {
+          modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+        }),
       );
       assert.equal(byDriver.modelSelection.instanceId, "codexWork");
 
       const unknown = yield* queue
         .enqueue(
-          task("nowhere", { modelSelection: { instanceId: ProviderInstanceId.make("grok"), model: "grok-5" } }),
+          task("nowhere", {
+            modelSelection: { instanceId: ProviderInstanceId.make("grok"), model: "grok-5" },
+          }),
         )
         .pipe(Effect.flip);
       assert.equal(unknown._tag, "QueuedRunError");
