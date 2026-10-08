@@ -86,16 +86,18 @@ The jobs run without root. These need the owner (`sudo`) once:
 
 ## Agent work drive
 
-The system drives fill up with build output, model caches and media, so a
-host with a second drive keeps those there. `agent-drive.sh`, a nightly host
-job, moves them to `/data/<user>/<same path>` and leaves a symlink behind, so
-every path and tool keeps working: mediaforge's store, the model caches
-(Hugging Face, torch, Whisper, gk-stylize), uv's and sccache's caches, the
-Android SDK and emulator images, every Rust `target` folder, and Python
-`.venv` folders over 1 GB. It moves a folder only while nothing is using
-it, so busy ones and new build folders follow on later nights. Hosts
-without a second drive skip it. If the drive isn't mounted, the moved
-folders are unreachable and the health job says so.
+Hosts keep as little as they can; the private repos are the record. The
+weekly `sweep` job deletes build output (Rust `target`, Gradle build
+folders, idle `node_modules`) and finished worktrees, sparing ccez-llm and
+anything in use. What is worth keeping but large lives on a second drive
+where a host has one: `agent-drive.sh`, a nightly host job, moves model
+caches and weights the tools use (Hugging Face, torch, Whisper, gk-stylize),
+uv's and sccache's caches, mediaforge's store, Python `.venv`s over 1 GB,
+the Android SDK and emulator images, and ccez-llm's build folder to
+`/data/<user>/<same path>`, leaving a symlink so every path keeps working.
+It moves a folder only while nothing is using it. Hosts without a second
+drive skip it. If the drive isn't mounted, the moved folders are
+unreachable and the health job says so.
 
 art's `/data` (the 1 TB T7, ext4) is that drive. It stays ext4: measured
 with `disk-bench.sh` (2026-10-07, load around 30 on 4 cores), the T7 and
