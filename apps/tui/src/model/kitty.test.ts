@@ -4,10 +4,23 @@ import {
   fitCells,
   idColor,
   inlineImagesSupported,
+  MAX_PLACEHOLDER_CELLS,
   placeholderRows,
   pngSize,
   transmitSequence,
 } from "./kitty.ts";
+
+describe("placeholderRows", () => {
+  it("draws images wider and taller than 64 cells (full screen in a big window)", () => {
+    const rows = placeholderRows(150, 70);
+    expect(rows).toHaveLength(70);
+    // Each cell: the placeholder plus a row and a column mark (3 code points).
+    expect([...rows[69]!]).toHaveLength(150 * 3);
+    // Row 69 and column 149 get their own marks from the spec's 297.
+    expect([...rows[69]!][1]).not.toBe([...rows[63]!][1]);
+    expect(MAX_PLACEHOLDER_CELLS).toBe(297);
+  });
+});
 
 describe("kitty placeholders", () => {
   it("transmits in 4096-byte chunks, flagging all but the last", () => {
