@@ -4,6 +4,7 @@ import {
   VERDICT_BUTTONS,
 } from "@cz/client-runtime/decisions/draft";
 import { filterChips } from "@cz/client-runtime/decisions/feed";
+import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
 import { buildOneFeed, feedFolderLabel } from "@cz/client-runtime/decisions/oneFeed";
 import type { EnvironmentThreadShell } from "@cz/client-runtime/state/models";
 import type { DecisionAnswerInput, DecisionMediaRef, DecisionProjectBlurb } from "@cz/contracts";
@@ -25,6 +26,7 @@ import {
 } from "~/state/decisions";
 import { useProjects, useThreadShells } from "~/state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
+import { useJobsOn } from "~/state/jobs";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
@@ -41,6 +43,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { FeedModal } from "./FeedModal";
 import { FeedMeta, FeedThreadCard, FeedThreadRow, feedThreadStatus } from "./FeedThreadCard";
 import { FeedTopBar } from "./FeedTopBar";
+import { MorningBriefCard } from "./MorningBriefCard";
 
 /** How long an answer can be undone before it is sent. */
 const UNDO_WINDOW_MS = 5_000;
@@ -126,17 +129,48 @@ export function FeedPage() {
 
   // Chips come from what this machine filter and device could show, so a
   // chip never leads to an empty feed.
-  const chips = useMemo(() => {
-    const reachable = buildOneFeed({
-      threads: [],
-      decisions: feed.entries,
-      filter: {
-        machine: filtered.filter.machine,
-        ...(filtered.filter.device ? { device: filtered.filter.device } : {}),
-      },
-    }).flatMap((card) => (card.kind === "decision" ? [card.decision.item] : []));
-    return filterChips(reachable);
-  }, [feed.entries, filtered.filter.machine, filtered.filter.device]);
+  // The Morning brief reads the same set: the whole night, not just the picked chips.
+  const reachable = useMemo(
+    () =>
+      buildOneFeed({
+        threads: [],
+        decisions: feed.entries,
+        filter: {
+          machine: filtered.filter.machine,
+          ...(filtered.filter.device ? { device: filtered.filter.device } : {}),
+        },
+      }).flatMap((card) => (card.kind === "decision" ? [card.decision] : [])),
+    [feed.entries, filtered.filter.machine, filtered.filter.device],
+  );
+  const chips = useMemo(() => filterChips(reachable.map((entry) => entry.item)), [reachable]);
+
+  const machine = filtered.filter.machine;
+  const shownMachineIds = useMemo(
+    () => (machine.type === "all" ? [...presentationById.keys()] : [machine.environmentId]),
+    [machine, presentationById],
+  );
+  const jobs = useJobsOn(shownMachineIds);
+  const briefDay = briefWindow(now);
+  // Keyed on `since`, which changes once a day, not on `now`, which ticks every minute.
+  const since = briefDay?.since ?? null;
+  const brief = useMemo(
+    () =>
+      since === null
+        ? null
+        : buildMorningBrief({
+            decisions: reachable,
+            threads: threads.filter(
+              (thread) => machine.type === "all" || thread.environmentId === machine.environmentId,
+            ),
+            jobs,
+            groupOf: (project) => blurbs.get(project)?.group ?? "software",
+            since,
+          }),
+    [since, reachable, threads, machine, jobs, blurbs],
+  );
+  const briefDigests = useThreadDigests(
+    brief ? [...brief.threads.failed, ...brief.threads.finished].slice(0, 5) : [],
+  );
 
   // Answered items stay hidden until the next refresh drops them from the feed.
   const cards = useMemo(
@@ -286,6 +320,21 @@ export function FeedPage() {
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4">
           <SidebarUpdateArchitectureWarning />
+          {briefDay && brief ? (
+            <MorningBriefCard
+              day={briefDay.day}
+              brief={brief}
+              placement={(thread) => ({
+                excerpt: briefDigests.get(`${thread.environmentId}:${thread.id}`)?.excerpt ?? null,
+              })}
+              machineLabel={machineLabel}
+              onOpenDecision={(entry) => setOpenKey(entryKey(entry))}
+              onReviewAll={() => {
+                setSession(true);
+                setOpenKey(visible[0] ? entryKey(visible[0]) : null);
+              }}
+            />
+          ) : null}
           <div className="flex items-center gap-2">
             <ToggleGroup
               value={[tab]}
