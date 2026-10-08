@@ -37,3 +37,25 @@ describe("itemLines", () => {
     ]);
   });
 });
+
+describe("image attachments", () => {
+  it("adds a line for each image a message carries, naming it", () => {
+    const message = {
+      id: "m1",
+      type: "user_message",
+      text: "Does this look right?",
+      attachments: [
+        { type: "image", id: "att-1", name: "sidebar.png" },
+        { type: "file", id: "att-2", name: "notes.txt" },
+      ],
+    } as unknown as OrchestrationV2TurnItem;
+    expect(itemLines(message)).toEqual([
+      { tone: "user", text: "› Does this look right?" },
+      {
+        tone: "dim",
+        text: "🖼 sidebar.png",
+        image: { attachmentId: "att-1", name: "sidebar.png" },
+      },
+    ]);
+  });
+});
