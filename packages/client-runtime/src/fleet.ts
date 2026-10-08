@@ -26,7 +26,7 @@ import * as DateTime from "effect/DateTime";
 export type FleetMachineState = "awake" | "connecting" | "busy" | "asleep" | "unreachable";
 
 /** A run still `starting` this long has no start left coming; the server fails it soon after. */
-export const STUCK_START_MS = 15 * 60_000;
+const STUCK_START_MS = 15 * 60_000;
 
 export interface FleetAgent {
   readonly threadId: ThreadId;

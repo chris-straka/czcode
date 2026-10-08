@@ -22,7 +22,7 @@ import * as ProjectionStore from "./ProjectionStore.ts";
 import { makeProviderFailure } from "./ProviderFailure.ts";
 
 /** A healthy start leaves `starting` in seconds; a slow provider login in a few minutes. */
-export const STUCK_START_AFTER_MS = 15 * 60_000;
+const STUCK_START_AFTER_MS = 15 * 60_000;
 const SWEEP_INTERVAL = Duration.minutes(5);
 
 export interface StuckRunStart {
