@@ -216,6 +216,13 @@ and the pairing link work as on Linux; Claude opens this Mac's browser.
 - **Staying awake:** while cz runs and the Mac is on power, the Mac doesn't
   sleep (`caffeinate`). The display still sleeps and the screen can lock.
   There's no Wake-on-LAN.
+- **MacBooks with the lid closed:** on power, a MacBook keeps running with its
+  lid closed (`lid-awake-mac.sh`, a root launchd daemon). Unplugged, it's a
+  normal laptop: it sleeps when the lid closes, and if it was unplugged while
+  closed it sleeps at once, so it doesn't stay awake in a bag. Check it with
+  `bash ~/SWE/czcode/ccez/hosts/lid-awake-mac.sh status`; remove it with
+  `sudo bash ~/SWE/czcode/ccez/hosts/lid-awake-mac.sh uninstall`.
+  `CZ_HOST_LID_AWAKE=0` before `mac.sh` skips it.
 - **After a restart:** cz runs while the agent account is logged in. Log in
   to it once, then switch back to another account from the menu bar (fast
   user switching); cz keeps running in the background.
