@@ -454,9 +454,9 @@ export function FeedPage() {
         }}
         filters={filters}
       />
-      {/* The page never scrolls sideways; only the chip row does. */}
+      {/* The page never scrolls sideways; only the chip row does. A long URL or word wraps. */}
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4">
+        <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4 wrap-anywhere">
           <SidebarUpdateArchitectureWarning />
           <ToggleGroup
             aria-label="Feed"
@@ -877,12 +877,15 @@ function DecisionCard({
             {item.options.map((option) => (
               <Button
                 key={option.id}
-                size="sm"
+                size="sm-multiline"
                 variant="outline"
+                className="max-w-full"
                 onClick={() => onQuickAnswer({ option_ids: [option.id] })}
               >
-                {option.label}
-                {option.recommended ? " ★" : ""}
+                <span className="min-w-0 text-left">
+                  {option.label}
+                  {option.recommended ? " ★" : ""}
+                </span>
               </Button>
             ))}
           </div>
