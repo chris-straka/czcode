@@ -141,7 +141,7 @@ function EnvironmentScopeMenu({
             ? "Unavailable environment"
             : singleEnvironment
               ? "No environments"
-              : "All environments"
+              : "All machines"
       }
     >
       <MenuRadioGroup
@@ -155,7 +155,7 @@ function EnvironmentScopeMenu({
             <MenuRadioItem value={ALL_ENVIRONMENTS_VALUE}>
               <span className="flex min-w-0 items-center gap-2">
                 <LayersIcon aria-hidden className="size-3.5" />
-                <span className="min-w-0 flex-1 truncate">All environments</span>
+                <span className="min-w-0 flex-1 truncate">All machines</span>
                 <MenuRadioItemIndicator />
               </span>
             </MenuRadioItem>

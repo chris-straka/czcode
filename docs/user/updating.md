@@ -50,7 +50,9 @@ Updating restarts that machine's server, so let active turns finish first.
 
 ## Update providers
 
-**Settings → Providers** shows provider updates for the selected environment.
+**Settings → Providers** opens on **All machines**: one grid of every provider on every
+connected machine, showing whether it's signed in, its version, and whether an update is waiting.
+Select a cell, or pick a machine in the header, to change that machine's provider.
 **Update all** updates every outdated provider on every connected environment
 at once. Hover it to see which providers it will update. Providers that only
 offer a manual update command are not included.
