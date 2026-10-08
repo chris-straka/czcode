@@ -144,9 +144,9 @@ document.getElementById("clay").onclick=()=>{clay=!clay;m.model.materials.forEac
 
 /**
  * The one frame every option's media shares, so options of different shapes
- * line up: fixed aspect, contained, on a neutral letterbox.
+ * line up. Pictures fill it (most are 16:9 thumbnails).
  */
-export const OPTION_FRAME_STYLE = { width: "100%", aspectRatio: 4 / 3, borderRadius: 10 } as const;
+export const OPTION_FRAME_STYLE = { width: "100%", aspectRatio: 16 / 9, borderRadius: 10 } as const;
 
 /** One attachment, sized for a card (`compact`), an option tile (`framed`), or the full view. */
 export function DecisionMedia({
@@ -174,7 +174,7 @@ export function DecisionMedia({
         <Image
           source={{ uri }}
           accessibilityLabel={media.caption ?? media.name}
-          contentFit="contain"
+          contentFit="cover"
           style={{ width: "100%", height: "100%" }}
         />
       </View>

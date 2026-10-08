@@ -30,9 +30,8 @@ playing. The agent gets the marks and comments with your answer. An
 open Decision shows its media first, with any longer write-up under
 **Details**.
 
-On a pick, **None of these** turns all the options down, and **Try again**
-(**None of these, try again** in the full view) asks the agent for new
-ones; a note is optional.
+On a pick, **None of these** sends your note, if any, and asks the agent
+for new options. Click a selected option again, or press Esc, to clear it.
 
 In an open Decision, answering moves straight to the next open one, and
 after the last it returns to Needs you. The arrows at the top step through

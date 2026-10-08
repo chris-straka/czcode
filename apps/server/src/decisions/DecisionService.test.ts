@@ -309,3 +309,22 @@ it.layer(TestLayer)("DecisionService", (it) => {
     }),
   );
 });
+
+describe("inNumberedOrder", () => {
+  const options = (...labels: string[]) => labels.map((label, i) => ({ id: `o${i}`, label }));
+
+  it("puts numbered options back in their numbers' order", () => {
+    const sorted = DecisionService.inNumberedOrder(
+      options('3 · "This week" bulletin', "1 · Express Entry draws", "2. US fees"),
+    );
+    assert.deepStrictEqual(
+      sorted.map((option) => option.label),
+      ["1 · Express Entry draws", "2. US fees", '3 · "This week" bulletin'],
+    );
+  });
+
+  it("keeps the agent's order when any label is unnumbered", () => {
+    const given = options("3 · Bulletin", "Express Entry", "2 · US fees");
+    assert.strictEqual(DecisionService.inNumberedOrder(given), given);
+  });
+});
