@@ -41,6 +41,12 @@ export function parseDarwinSwapUsage(text: string): Swap | null {
     : { totalBytes: total, usedBytes: used, devices: [] };
 }
 
+/** macOS `sysctl -n kern.memorystatus_vm_pressure_level`: 1 normal, 2 warn, 4 critical. */
+export function parseDarwinMemoryPressure(text: string): "normal" | "warn" | "critical" | null {
+  const level = Number(text.trim());
+  return level === 1 ? "normal" : level === 2 ? "warn" : level === 4 ? "critical" : null;
+}
+
 const DISK_FILESYSTEMS = new Set([
   "ext2",
   "ext3",

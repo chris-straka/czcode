@@ -82,7 +82,9 @@ const warningText = (warning: FleetWarning) =>
     ? `disk ${warning.mount} ${formatBytes(warning.freeBytes)} free`
     : warning.kind === "memory"
       ? `memory ${Math.round(warning.usedRatio * 100)}% used`
-      : `swap ${Math.round(warning.usedRatio * 100)}% used`;
+      : warning.kind === "pressure"
+        ? `memory pressure ${warning.level === "critical" ? "critical" : "high"}`
+        : `swap ${Math.round(warning.usedRatio * 100)}% used`;
 
 type Row =
   | { readonly kind: "machine"; readonly machine: FleetMachine }

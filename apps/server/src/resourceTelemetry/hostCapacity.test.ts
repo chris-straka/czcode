@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  parseDarwinMemoryPressure,
   parseDarwinSwapUsage,
   parseLinuxDiskMounts,
   parseProcSwaps,
@@ -41,6 +42,13 @@ describe("host capacity", () => {
       usedBytes: Math.round(1024.5 * 1024 * 1024),
       devices: [],
     });
+  });
+
+  it("reads macOS memory pressure", () => {
+    expect(parseDarwinMemoryPressure("1\n")).toBe("normal");
+    expect(parseDarwinMemoryPressure("2")).toBe("warn");
+    expect(parseDarwinMemoryPressure("4")).toBe("critical");
+    expect(parseDarwinMemoryPressure("")).toBe(null);
   });
 
   it("lists one mount per real disk", () => {

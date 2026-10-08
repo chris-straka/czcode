@@ -88,6 +88,16 @@ describe("fleetWarnings", () => {
     });
     expect(fleetWarnings(tight).map((warning) => warning.kind)).toEqual(["memory", "swap"]);
   });
+
+  it("judges a Mac by its memory pressure, not its on-demand swap", () => {
+    const calm = resources({
+      memoryPressure: "normal",
+      swap: { totalBytes: 3 * GB, usedBytes: 2.5 * GB, devices: [] },
+    });
+    expect(fleetWarnings(calm)).toEqual([]);
+    const strained = resources({ memoryPressure: "warn" });
+    expect(fleetWarnings(strained)).toEqual([{ kind: "pressure", level: "warn" }]);
+  });
 });
 
 describe("fleetMachines", () => {

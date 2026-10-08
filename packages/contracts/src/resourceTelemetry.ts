@@ -31,6 +31,11 @@ export const HostResourcesSnapshot = Schema.Struct({
       ),
     }),
   ),
+  /**
+   * macOS's own memory pressure. Its swap grows on demand and keeps cold
+   * pages, so a full swap means little there; pressure is the real signal.
+   */
+  memoryPressure: Schema.optionalKey(Schema.Literals(["normal", "warn", "critical"])),
   /** Free space per disk mount; a full disk stops builds and agents. */
   disks: Schema.optionalKey(
     Schema.Array(

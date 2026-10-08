@@ -12,6 +12,7 @@ import * as Layer from "effect/Layer";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import {
+  parseDarwinMemoryPressure,
   parseDarwinSwapUsage,
   parseLinuxDiskMounts,
   parseProcSwaps,
@@ -104,6 +105,7 @@ const make = Effect.fn("makeHostResources")(function* () {
           Effect.orElseSucceed(() => ""),
         );
     let swap: HostResourcesSnapshot["swap"];
+    let memoryPressure: HostResourcesSnapshot["memoryPressure"];
     let mounts: Array<string> = [];
     if (platform === "linux") {
       const devices = yield* Effect.forEach(
@@ -123,6 +125,10 @@ const make = Effect.fn("makeHostResources")(function* () {
     } else if (platform === "darwin") {
       swap =
         parseDarwinSwapUsage(yield* runText("/usr/sbin/sysctl", ["vm.swapusage"])) ?? undefined;
+      memoryPressure =
+        parseDarwinMemoryPressure(
+          yield* runText("/usr/sbin/sysctl", ["-n", "kern.memorystatus_vm_pressure_level"]),
+        ) ?? undefined;
       // The sealed system volume reports the shared APFS container; Data is where files land.
       const external = yield* fs.readDirectory("/Volumes").pipe(Effect.orElseSucceed(() => []));
       mounts = ["/System/Volumes/Data", ...external.map((name) => `/Volumes/${name}`)];
@@ -136,6 +142,7 @@ const make = Effect.fn("makeHostResources")(function* () {
     return {
       ...(loadAverage ? { loadAverage } : {}),
       ...(swap ? { swap } : {}),
+      ...(memoryPressure ? { memoryPressure } : {}),
       disks,
       sampledAt: DateTime.toEpochMillis(yield* DateTime.now),
       cpuUtilization,

@@ -130,6 +130,8 @@ export function machineProblem(machine: FleetMachine): string | null {
       return `memory ${percent(warning.usedRatio)} used`;
     case "swap":
       return `swap ${percent(warning.usedRatio)} used`;
+    case "pressure":
+      return `memory pressure ${warning.level === "critical" ? "critical" : "high"}`;
   }
 }
 

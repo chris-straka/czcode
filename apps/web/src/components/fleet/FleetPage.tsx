@@ -49,7 +49,9 @@ const warningText = (warning: FleetWarning) =>
     ? `${warning.mount} has ${formatBytes(warning.freeBytes)} free`
     : warning.kind === "memory"
       ? `Memory ${Math.round(warning.usedRatio * 100)}% used`
-      : `Swap ${Math.round(warning.usedRatio * 100)}% used`;
+      : warning.kind === "pressure"
+        ? `Memory pressure ${warning.level === "critical" ? "critical" : "high"}`
+        : `Swap ${Math.round(warning.usedRatio * 100)}% used`;
 
 const STATE_BADGE: Record<
   FleetMachine["state"],
