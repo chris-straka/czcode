@@ -117,6 +117,13 @@ How to ask:
   work or end the thread with a resume plan.
 - Give a recommendation when there is one (marked on the option), and say
   why in one line.
+- Start with a one-line question that says exactly what is being chosen.
+- Each option gets its own distinct image (for a video: a thumbnail mock of
+  that video), or no option gets one. Never attach the same image to every
+  option: the owner can't tell the options apart (owner feedback,
+  2026-10-07). Shared context goes in the body or `context_media_idx`.
+- To judge a video, show the finished video (or a playable draft), not a
+  plan or a summary card. Nothing is published without the owner.
 - Render every option the same way and at the same size: an image of the
   same dimensions for each, or none. Clients frame option media at one
   aspect ratio, and `ask_owner` / `cz inbox submit` warn when only some
