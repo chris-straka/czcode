@@ -71,6 +71,19 @@ Decisions and keep going with the rest.
 A Mac uses `mac.sh` instead ([README](README.md#a-mac)); it is for a
 separate macOS account on a shared Mac and has no host jobs.
 
+### A MacBook as a host
+
+`mac.sh` keeps a Mac awake on power with `caffeinate -s`, but closing a
+MacBook's lid still sleeps it unless an external display is attached. For a
+laptop that works with the lid closed, after `mac.sh`:
+
+- `sudo pmset -a disablesleep 1` (undo: `0`). It applies on battery too, so
+  keep the laptop on its charger at home and switch it back before carrying
+  it in a bag.
+- Turn on Remote Login (System Settings → General → Sharing) with key-only
+  SSH, so `pick-host.sh`, the host jobs and other agents can reach it; then
+  give it a real login column in `hosts.txt`.
+
 ## One-time root steps still open
 
 The jobs run without root. These need the owner (`sudo`) once:

@@ -20,6 +20,8 @@ import {
 
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
+import { DeveloperOnly, useDeveloperControls } from "./DeveloperOnly";
+import { WorktreeStorageSettingsSection } from "./WorktreeStorageSettings";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { cn } from "../../lib/utils";
 import { useEnvironmentQuery } from "../../state/query";
@@ -520,6 +522,7 @@ function EmptySourceControlDiscovery({
 
 export function SourceControlSettingsPanel() {
   const { scope, environment, connectedEnvironments } = useSettingsScope();
+  const developerControls = useDeveloperControls();
   // Discovery scans one machine's tools, so it shows the representative
   // environment (named in the section title when several are selected);
   // the settings rows above it fan out like everywhere else.
@@ -536,8 +539,13 @@ export function SourceControlSettingsPanel() {
         }),
   );
   const result = discovery.data ?? EMPTY_DISCOVERY_RESULT;
-  const hasVersionControlSystems = result.versionControlSystems.length > 0;
-  const hasDiscoveryItems = hasVersionControlSystems || result.sourceControlProviders.length > 0;
+  // GitHub is the host most people use; the rest (and the Git tool itself)
+  // stay behind Developer controls rather than being removed.
+  const sourceControlProviders = developerControls
+    ? result.sourceControlProviders
+    : result.sourceControlProviders.filter((item) => item.kind === "github");
+  const hasVersionControlSystems = developerControls && result.versionControlSystems.length > 0;
+  const hasDiscoveryItems = hasVersionControlSystems || sourceControlProviders.length > 0;
   const isInitialScanPending = discovery.isPending && discovery.data === null;
   const handleScan = () => {
     discovery.refresh();
@@ -572,11 +580,15 @@ export function SourceControlSettingsPanel() {
         </SettingsSection>
       ) : isInitialScanPending ? (
         <>
+          {developerControls ? (
+            <SourceControlSectionSkeleton
+              title={`Version Control${environmentSuffix}`}
+              headerAction={scanButton}
+            />
+          ) : null}
           <SourceControlSectionSkeleton
-            title={`Version Control${environmentSuffix}`}
-            headerAction={scanButton}
+            title={developerControls ? "Source Control Providers" : `GitHub${environmentSuffix}`}
           />
-          <SourceControlSectionSkeleton title="Source Control Providers" />
         </>
       ) : hasDiscoveryItems ? (
         <>
@@ -594,17 +606,19 @@ export function SourceControlSettingsPanel() {
             </SettingsSection>
           ) : null}
 
-          {result.sourceControlProviders.length > 0 ? (
+          {sourceControlProviders.length > 0 ? (
             <SettingsSection
               id={hasVersionControlSystems ? undefined : searchableSetting("source-control").id}
               title={
-                hasVersionControlSystems
-                  ? "Source Control Providers"
-                  : `Source Control Providers${environmentSuffix}`
+                !developerControls
+                  ? `GitHub${environmentSuffix}`
+                  : hasVersionControlSystems
+                    ? "Source Control Providers"
+                    : `Source Control Providers${environmentSuffix}`
               }
               headerAction={hasVersionControlSystems ? null : scanButton}
             >
-              {result.sourceControlProviders.map((item) => (
+              {sourceControlProviders.map((item) => (
                 <DiscoveryItemRow key={`provider:${item.kind}`} item={item}>
                   {item.kind === "bitbucket" ? (
                     <SettingsSearchTarget id={searchableSetting("bitbucket-credentials").id}>
@@ -648,7 +662,10 @@ export function SourceControlSettingsPanel() {
         />
       )}
 
-      <SourceControlWritingSettingsSection />
+      <DeveloperOnly>
+        <WorktreeStorageSettingsSection />
+        <SourceControlWritingSettingsSection />
+      </DeveloperOnly>
     </SettingsPageContainer>
   );
 }

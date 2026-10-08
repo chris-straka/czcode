@@ -11,6 +11,7 @@ import {
 import {
   CircleAlertIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   CircleDashedIcon,
   InfoIcon,
   SlidersHorizontalIcon,
@@ -22,8 +23,10 @@ import {
 } from "@cz/client-runtime/state/usage";
 
 import {
+  foldMinorModels,
   isCompatibleUsageContractVersion,
   isModelCostUnknown,
+  type ModelTotals,
   type DailyTotals,
   type HourlyTotals,
   type MergedUsage,
@@ -77,12 +80,14 @@ import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 import { ResetQueueSection } from "./ResetQueueSection";
 import { UsageLimitsSection } from "./UsageLimits";
+import { UsageMachineLoad } from "./UsageMachineLoad";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart } from "./UsageProviderChart";
 import { SpeedPremium, UsageModelDialog } from "./UsageModelDialog";
 import { UsageShareBar } from "./UsageShareBar";
 import {
   costTypeSegments,
+  foldEarlierPeriods,
   modelShare,
   sortModelsByTokens,
   speedCostSegments,
@@ -133,9 +138,13 @@ export function UsagePage() {
   const metric = preferences.metric;
   const showingLimits = metric === "limits";
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Machine load reads a rolling range ending here; minute samples need no finer key.
+  const [loadUntil, setLoadUntil] = useState(() => Math.floor(Date.now() / 60_000) * 60_000);
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
   const [breakdown, setBreakdown] = useState<"model" | "time">("model");
+  const [showMinorModels, setShowMinorModels] = useState(false);
+  const [showEarlierPeriods, setShowEarlierPeriods] = useState(false);
   const [priceDialog, setPriceDialog] = useState<{ readonly model?: string } | null>(null);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const [selectedEnvironmentIds, setSelectedEnvironmentIds] =
@@ -192,6 +201,14 @@ export function UsagePage() {
         : merged.models,
     [breakdown, merged.models, metric],
   );
+  const foldedModels = useMemo(
+    () => foldMinorModels(breakdownModels, metric === "tokens" ? "tokens" : "cost"),
+    [breakdownModels, metric],
+  );
+  const foldedPeriods = useMemo(
+    () => foldEarlierPeriods(breakdownPeriods, isPast24Hours ? 12 : 7),
+    [breakdownPeriods, isPast24Hours],
+  );
   const activeProviders = useMemo(() => providersWithUsage(merged.providers), [merged.providers]);
   const selectedModel =
     selectedModelKey === null
@@ -219,6 +236,7 @@ export function UsagePage() {
     const nextPreferences = { metric, windowDays: days };
     setPreferences(nextPreferences);
     saveUsagePagePreferences(nextPreferences);
+    setLoadUntil(Math.floor(Date.now() / 60_000) * 60_000);
     setWindowSelection({
       days,
       window: makeWindow(days, undefined, days === 1 ? "hour" : "day"),
@@ -288,6 +306,7 @@ export function UsagePage() {
       return;
     }
     const nextWindow = makeWindow(windowDays, undefined, isPast24Hours ? "hour" : "day");
+    setLoadUntil(Math.floor(Date.now() / 60_000) * 60_000);
     if (
       nextWindow.sinceDay !== window.sinceDay ||
       nextWindow.untilDay !== window.untilDay ||
@@ -325,8 +344,8 @@ export function UsagePage() {
       ? `${formatDateTimeShort(window.sinceTime, window.timeZone)} to ${formatDateTimeShort(window.untilTime, window.timeZone)}`
       : `${formatDayShort(window.sinceDay)} to ${formatDayShort(window.untilDay)}`;
   const topbarContent = (
-    <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-2 xl:flex">
-      <WorkspaceBreadcrumb ariaLabel="Usage breadcrumb" className="col-span-2 min-w-0">
+    <div className="flex w-full min-w-0 items-center gap-3">
+      <WorkspaceBreadcrumb ariaLabel="Usage breadcrumb" className="min-w-0">
         <WorkspaceBreadcrumbItem>
           <h1>Usage</h1>
         </WorkspaceBreadcrumbItem>
@@ -350,7 +369,7 @@ export function UsagePage() {
           {windowLabel}
         </span>
       ) : null}
-      <div className="ms-auto hidden min-w-0 items-center justify-end gap-2 xl:flex">
+      <div className="ms-auto hidden shrink-0 items-center justify-end gap-2 xl:flex">
         <ToggleGroup
           aria-label="Usage metric"
           variant="segmented"
@@ -395,7 +414,7 @@ export function UsagePage() {
           <RefreshIcon size="sm" refreshing={isRefreshing} />
         </Button>
       </div>
-      <div className="col-span-2 ms-auto flex min-w-0 items-center justify-end gap-1 xl:hidden">
+      <div className="ms-auto flex shrink-0 items-center justify-end gap-1 xl:hidden">
         <Select
           value={metric}
           onValueChange={(value) => {
@@ -464,12 +483,12 @@ export function UsagePage() {
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none isolate">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
-        <WorkspacePageHeader electron={isElectron} className="h-auto">
+        <WorkspacePageHeader electron={isElectron} alignWith="wide">
           {topbarContent}
         </WorkspacePageHeader>
 
         <ScrollArea className="min-h-0 flex-1">
-          <WorkspacePageContainer width="wide">
+          <WorkspacePageContainer width="wide" alignedHeader>
             {selectedEnvironments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {environments.length === 0
@@ -721,59 +740,38 @@ export function UsagePage() {
                             </td>
                           </tr>
                         ) : (
-                          breakdownModels.map((model, index) => {
-                            const key = `${model.provider}:${model.model}`;
-                            const value = metric === "tokens" ? model.totalTokens : model.costUsd;
-                            const share = modelShare(
-                              model,
-                              metric === "tokens" ? "tokens" : "cost",
-                            );
-                            return (
-                              <tr
-                                key={key}
-                                className="relative border-b border-border/50 text-right whitespace-nowrap text-muted-foreground tabular-nums transition-colors hover:bg-muted/50 has-focus-visible:bg-muted/50"
-                              >
-                                <td className="py-2.5 pr-3 text-left text-xs">{index + 1}</td>
-                                <td className="py-2.5 text-left whitespace-normal">
-                                  {/* The button's overlay makes the whole row open the model.
-                                      Focus shows as the row's hover fill, not a ring. */}
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedModelKey(key)}
-                                    className="flex items-center gap-2 text-left text-foreground outline-none after:absolute after:inset-0"
-                                  >
-                                    <ProviderMark provider={model.provider} className="size-3.5" />
-                                    {model.model}
-                                  </button>
-                                  <div aria-hidden className="mt-1.5 h-0.5 max-w-48">
-                                    <div
-                                      className="h-full rounded-full"
-                                      style={{
-                                        // A short minimum keeps tiny shares a dash, not a dot.
-                                        width:
-                                          value > 0 && breakdownPeak > 0
-                                            ? `max(0.5rem, ${(value / breakdownPeak) * 100}%)`
-                                            : 0,
-                                        backgroundColor:
-                                          PROVIDER_PRESENTATION[model.provider].color,
-                                      }}
-                                    />
-                                  </div>
-                                </td>
-                                <td className="py-2.5 pl-6 text-foreground">
-                                  {isModelCostUnknown(model) ? (
-                                    <span className="text-muted-foreground">Unpriced</span>
-                                  ) : (
-                                    formatUsd(model.costUsd)
-                                  )}
-                                </td>
-                                <td className="hidden py-2.5 pl-6 sm:table-cell">
-                                  {share === null ? "" : formatPercent(share)}
-                                </td>
-                                <td className="py-2.5 pl-6">{formatTokens(model.totalTokens)}</td>
-                              </tr>
-                            );
-                          })
+                          <>
+                            {foldedModels.major.map((model, index) => (
+                              <ModelBreakdownRow
+                                key={`${model.provider}:${model.model}`}
+                                model={model}
+                                rank={index + 1}
+                                metric={metric === "tokens" ? "tokens" : "cost"}
+                                peak={breakdownPeak}
+                                onOpen={setSelectedModelKey}
+                              />
+                            ))}
+                            {foldedModels.minor.length > 0 ? (
+                              <OtherModelsRow
+                                models={foldedModels.minor}
+                                metric={metric === "tokens" ? "tokens" : "cost"}
+                                expanded={showMinorModels}
+                                onToggle={() => setShowMinorModels((shown) => !shown)}
+                              />
+                            ) : null}
+                            {showMinorModels
+                              ? foldedModels.minor.map((model, index) => (
+                                  <ModelBreakdownRow
+                                    key={`${model.provider}:${model.model}`}
+                                    model={model}
+                                    rank={foldedModels.major.length + index + 1}
+                                    metric={metric === "tokens" ? "tokens" : "cost"}
+                                    peak={breakdownPeak}
+                                    onOpen={setSelectedModelKey}
+                                  />
+                                ))
+                              : null}
+                          </>
                         )}
                       </tbody>
                     </table>
@@ -810,32 +808,35 @@ export function UsagePage() {
                             </td>
                           </tr>
                         ) : (
-                          breakdownPeriods.map((period) => (
-                            <tr
-                              key={"hourStart" in period ? period.hourStart : period.day}
-                              className="border-b border-border/50 transition-colors hover:bg-muted/50"
-                            >
-                              <td className="py-2 text-foreground">
-                                {"hourStart" in period
-                                  ? formatHourShort(period.hourStart, window.timeZone)
-                                  : formatDayShort(period.day)}
-                              </td>
-                              {activeProviders.map((provider) => (
-                                <td
-                                  key={provider}
-                                  className="py-2 text-right text-muted-foreground tabular-nums"
-                                >
-                                  {formatUsd(period.byProvider.get(provider)?.costUsd ?? 0)}
-                                </td>
-                              ))}
-                              <td className="py-2 text-right text-foreground tabular-nums">
-                                {formatUsd(period.costUsd)}
-                              </td>
-                              <td className="py-2 text-right text-muted-foreground tabular-nums">
-                                {formatTokens(period.totalTokens)}
-                              </td>
-                            </tr>
-                          ))
+                          <>
+                            {foldedPeriods.recent.map((period) => (
+                              <PeriodBreakdownRow
+                                key={"hourStart" in period ? period.hourStart : period.day}
+                                period={period}
+                                providers={activeProviders}
+                                timeZone={window.timeZone}
+                              />
+                            ))}
+                            {foldedPeriods.earlier.length > 0 ? (
+                              <EarlierPeriodsRow
+                                periods={foldedPeriods.earlier}
+                                providers={activeProviders}
+                                unit={isPast24Hours ? "hour" : "day"}
+                                expanded={showEarlierPeriods}
+                                onToggle={() => setShowEarlierPeriods((shown) => !shown)}
+                              />
+                            ) : null}
+                            {showEarlierPeriods
+                              ? foldedPeriods.earlier.map((period) => (
+                                  <PeriodBreakdownRow
+                                    key={"hourStart" in period ? period.hourStart : period.day}
+                                    period={period}
+                                    providers={activeProviders}
+                                    timeZone={window.timeZone}
+                                  />
+                                ))
+                              : null}
+                          </>
                         )}
                       </tbody>
                     </table>
@@ -843,6 +844,19 @@ export function UsagePage() {
                 </section>
               </>
             )}
+            {selectedEnvironments.length > 0 && !showingLimits ? (
+              <UsageMachineLoad
+                selectedEnvironmentIds={selectedEnvironmentIds}
+                sinceMs={loadUntil - windowDays * 24 * 60 * 60_000}
+                untilMs={loadUntil}
+                rangeLabel={
+                  WINDOW_OPTIONS.find(
+                    (option) => option.days === windowDays,
+                  )?.label.toLowerCase() ?? ""
+                }
+                timeZone={window.timeZone}
+              />
+            ) : null}
           </WorkspacePageContainer>
         </ScrollArea>
       </div>
@@ -1025,6 +1039,191 @@ function ProviderMark({
       displayName={presentation.label}
       iconClassName={className}
     />
+  );
+}
+
+/** One model in the breakdown; the whole row opens the model's dialog. */
+function ModelBreakdownRow({
+  model,
+  rank,
+  metric,
+  peak,
+  onOpen,
+}: {
+  readonly model: ModelTotals;
+  readonly rank: number;
+  readonly metric: "cost" | "tokens";
+  readonly peak: number;
+  readonly onOpen: (key: string) => void;
+}) {
+  const key = `${model.provider}:${model.model}`;
+  const value = metric === "tokens" ? model.totalTokens : model.costUsd;
+  const share = modelShare(model, metric);
+  return (
+    <tr className="relative border-b border-border/50 text-right whitespace-nowrap text-muted-foreground tabular-nums transition-colors hover:bg-muted/50 has-focus-visible:bg-muted/50">
+      <td className="py-2.5 pr-3 text-left text-xs">{rank}</td>
+      <td className="py-2.5 text-left whitespace-normal">
+        {/* The button's overlay makes the whole row open the model.
+            Focus shows as the row's hover fill, not a ring. */}
+        <button
+          type="button"
+          onClick={() => onOpen(key)}
+          className="flex items-center gap-2 text-left text-foreground outline-none after:absolute after:inset-0"
+        >
+          <ProviderMark provider={model.provider} className="size-3.5" />
+          {model.model}
+        </button>
+        <div aria-hidden className="mt-1.5 h-0.5 max-w-48">
+          <div
+            className="h-full rounded-full"
+            style={{
+              // A short minimum keeps tiny shares a dash, not a dot.
+              width: value > 0 && peak > 0 ? `max(0.5rem, ${(value / peak) * 100}%)` : 0,
+              backgroundColor: PROVIDER_PRESENTATION[model.provider].color,
+            }}
+          />
+        </div>
+      </td>
+      <td className="py-2.5 pl-6 text-foreground">
+        {isModelCostUnknown(model) ? (
+          <span className="text-muted-foreground">Unpriced</span>
+        ) : (
+          formatUsd(model.costUsd)
+        )}
+      </td>
+      <td className="hidden py-2.5 pl-6 sm:table-cell">
+        {share === null ? "" : formatPercent(share)}
+      </td>
+      <td className="py-2.5 pl-6">{formatTokens(model.totalTokens)}</td>
+    </tr>
+  );
+}
+
+/** The long tail of models as one row; clicking it lists them below. */
+function OtherModelsRow({
+  models,
+  metric,
+  expanded,
+  onToggle,
+}: {
+  readonly models: readonly ModelTotals[];
+  readonly metric: "cost" | "tokens";
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+}) {
+  const priced = models.filter((model) => !isModelCostUnknown(model));
+  const costUsd = priced.reduce((total, model) => total + model.costUsd, 0);
+  const share =
+    metric === "cost" && priced.length === 0
+      ? null
+      : models.reduce((total, model) => total + (modelShare(model, metric) ?? 0), 0);
+  const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
+  return (
+    <tr className="relative border-b border-border/50 text-right whitespace-nowrap text-muted-foreground tabular-nums transition-colors hover:bg-muted/50 has-focus-visible:bg-muted/50">
+      <td className="py-2.5 pr-3" />
+      <td className="py-2.5 text-left">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="flex items-center gap-2 text-left text-foreground outline-none after:absolute after:inset-0"
+        >
+          <Chevron className="size-3.5 text-muted-foreground" aria-hidden />
+          Other
+          <span className="text-xs text-muted-foreground">{models.length} models</span>
+        </button>
+      </td>
+      <td className="py-2.5 pl-6 text-foreground">
+        {priced.length === 0 ? (
+          <span className="text-muted-foreground">Unpriced</span>
+        ) : (
+          formatUsd(costUsd)
+        )}
+      </td>
+      <td className="hidden py-2.5 pl-6 sm:table-cell">
+        {share === null ? "" : formatPercent(share)}
+      </td>
+      <td className="py-2.5 pl-6">
+        {formatTokens(models.reduce((total, model) => total + model.totalTokens, 0))}
+      </td>
+    </tr>
+  );
+}
+
+function PeriodBreakdownRow({
+  period,
+  providers,
+  timeZone,
+}: {
+  readonly period: DailyTotals | HourlyTotals;
+  readonly providers: readonly UsageProviderKind[];
+  readonly timeZone: string;
+}) {
+  return (
+    <tr className="border-b border-border/50 transition-colors hover:bg-muted/50">
+      <td className="py-2 text-foreground">
+        {"hourStart" in period
+          ? formatHourShort(period.hourStart, timeZone)
+          : formatDayShort(period.day)}
+      </td>
+      {providers.map((provider) => (
+        <td key={provider} className="py-2 text-right text-muted-foreground tabular-nums">
+          {formatUsd(period.byProvider.get(provider)?.costUsd ?? 0)}
+        </td>
+      ))}
+      <td className="py-2 text-right text-foreground tabular-nums">{formatUsd(period.costUsd)}</td>
+      <td className="py-2 text-right text-muted-foreground tabular-nums">
+        {formatTokens(period.totalTokens)}
+      </td>
+    </tr>
+  );
+}
+
+/** Older periods summed into one row; clicking it lists them below. */
+function EarlierPeriodsRow({
+  periods,
+  providers,
+  unit,
+  expanded,
+  onToggle,
+}: {
+  readonly periods: readonly (DailyTotals | HourlyTotals)[];
+  readonly providers: readonly UsageProviderKind[];
+  readonly unit: "day" | "hour";
+  readonly expanded: boolean;
+  readonly onToggle: () => void;
+}) {
+  const sum = (value: (period: DailyTotals | HourlyTotals) => number) =>
+    periods.reduce((total, period) => total + value(period), 0);
+  const Chevron = expanded ? ChevronDownIcon : ChevronRightIcon;
+  return (
+    <tr className="relative border-b border-border/50 transition-colors hover:bg-muted/50 has-focus-visible:bg-muted/50">
+      <td className="py-2 text-foreground">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="flex items-center gap-2 text-left outline-none after:absolute after:inset-0"
+        >
+          <Chevron className="size-3.5 text-muted-foreground" aria-hidden />
+          Earlier
+          <span className="truncate text-xs text-muted-foreground">
+            {periods.length} {unit === "day" ? "days" : "hours"}
+          </span>
+        </button>
+      </td>
+      {providers.map((provider) => (
+        <td key={provider} className="py-2 text-right text-muted-foreground tabular-nums">
+          {formatUsd(sum((period) => period.byProvider.get(provider)?.costUsd ?? 0))}
+        </td>
+      ))}
+      <td className="py-2 text-right text-foreground tabular-nums">
+        {formatUsd(sum((period) => period.costUsd))}
+      </td>
+      <td className="py-2 text-right text-muted-foreground tabular-nums">
+        {formatTokens(sum((period) => period.totalTokens))}
+      </td>
+    </tr>
   );
 }
 

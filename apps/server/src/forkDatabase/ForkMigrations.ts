@@ -1,6 +1,6 @@
 /**
  * Schema for `cz.sqlite`, the database of fork-only features (decisions, the
- * reset queue). It is its own file so these migrations never share numbers
+ * reset queue, host load history). It is its own file so these migrations never share numbers
  * with upstream's `statev2.sqlite` migrations (this fork merges upstream
  * weekly).
  *
@@ -63,10 +63,24 @@ const projectBlurbs = Effect.gen(function* () {
   `;
 });
 
+/** One CPU/RAM/GPU reading per minute (HostLoadHistory), pruned past its retention. */
+const hostLoadSamples = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`
+    CREATE TABLE IF NOT EXISTS host_load_samples (
+      sampled_at INTEGER PRIMARY KEY,
+      cpu REAL NOT NULL,
+      memory_used INTEGER NOT NULL,
+      gpu REAL
+    )
+  `;
+});
+
 const loader = Migrator.fromRecord({
   "1_DecisionItems": decisionItems,
   "2_QueuedRuns": queuedRuns,
   "3_ProjectBlurbs": projectBlurbs,
+  "4_HostLoadSamples": hostLoadSamples,
 });
 
 /** Brings `cz.sqlite` up to date. Needs the fork SqlClient. */

@@ -4,6 +4,7 @@ import { EnvironmentId, USAGE_CONTRACT_VERSION } from "@cz/contracts";
 import { type RouteProp, useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
 import { cursorKeychainAccessEnvironments } from "@cz/client-runtime/state/usage";
 import {
+  foldMinorModels,
   isCompatibleUsageContractVersion,
   isModelCostUnknown,
   type DailyTotals,
@@ -795,6 +796,7 @@ function MetricCell(props: {
 function ModelsSection(props: { readonly merged: MergedUsage; readonly metric: UsageChartMetric }) {
   const { merged, metric } = props;
   const colors = useProviderColors();
+  const [showMinor, setShowMinor] = useState(false);
   if (merged.models.length === 0) return null;
 
   // Ranked like the provider rows. .sort() on a copy, not .toSorted(): Hermes
@@ -804,46 +806,98 @@ function ModelsSection(props: { readonly merged: MergedUsage; readonly metric: U
       ? b.costUsd - a.costUsd || b.totalTokens - a.totalTokens
       : b.totalTokens - a.totalTokens || b.costUsd - a.costUsd,
   );
+  const { major, minor } = foldMinorModels(ordered, metric);
+  const minorPriced = minor.filter((model) => !isModelCostUnknown(model));
+  const minorTokens = minor.reduce((total, model) => total + model.totalTokens, 0);
+  const minorCost = minorPriced.reduce((total, model) => total + model.costUsd, 0);
 
   return (
     <SettingsSection title="By model">
-      {ordered.map((model, index) => (
-        <View
+      {major.map((model, index) => (
+        <ModelRow
           key={`${model.provider}:${model.model}`}
-          className={
-            index === 0
-              ? "flex-row items-center gap-3 p-4"
-              : "flex-row items-center gap-3 border-t border-border-subtle p-4"
-          }
+          model={model}
+          metric={metric}
+          color={colors[model.provider]}
+          first={index === 0}
+        />
+      ))}
+      {minor.length > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showMinor }}
+          onPress={() => setShowMinor((shown) => !shown)}
+          className="flex-row items-center gap-3 border-t border-border-subtle p-4"
         >
-          <View
-            className="size-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: colors[model.provider] }}
-          />
+          <View className="size-2.5 shrink-0 rounded-full bg-border" />
           <View className="min-w-0 flex-1 gap-0.5">
-            <Text className="text-base text-foreground" numberOfLines={1}>
-              {model.model}
-            </Text>
+            <Text className="text-base text-foreground">Other</Text>
             <Text className="text-sm text-foreground-muted">
-              {metric === "tokens"
-                ? `${formatPercent(model.tokenShare)} of tokens · ${
-                    isModelCostUnknown(model) ? "no known rates" : formatUsd(model.costUsd)
-                  }`
-                : isModelCostUnknown(model)
-                  ? `no known rates · ${formatTokens(model.totalTokens)} tokens`
-                  : `${formatPercent(model.costShare)} of cost · ${formatTokens(model.totalTokens)} tokens`}
+              {`${minor.length} models · ${showMinor ? "tap to hide" : "tap to show"}`}
             </Text>
           </View>
           <Text className="text-base tabular-nums text-foreground">
             {metric === "tokens"
-              ? formatTokens(model.totalTokens)
-              : isModelCostUnknown(model)
+              ? formatTokens(minorTokens)
+              : minorPriced.length === 0
                 ? "Unpriced"
-                : formatUsd(model.costUsd)}
+                : formatUsd(minorCost)}
           </Text>
-        </View>
-      ))}
+        </Pressable>
+      ) : null}
+      {showMinor
+        ? minor.map((model) => (
+            <ModelRow
+              key={`${model.provider}:${model.model}`}
+              model={model}
+              metric={metric}
+              color={colors[model.provider]}
+              first={false}
+            />
+          ))
+        : null}
     </SettingsSection>
+  );
+}
+
+function ModelRow(props: {
+  readonly model: MergedUsage["models"][number];
+  readonly metric: UsageChartMetric;
+  readonly color: string;
+  readonly first: boolean;
+}) {
+  const { model, metric } = props;
+  return (
+    <View
+      className={
+        props.first
+          ? "flex-row items-center gap-3 p-4"
+          : "flex-row items-center gap-3 border-t border-border-subtle p-4"
+      }
+    >
+      <View className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: props.color }} />
+      <View className="min-w-0 flex-1 gap-0.5">
+        <Text className="text-base text-foreground" numberOfLines={1}>
+          {model.model}
+        </Text>
+        <Text className="text-sm text-foreground-muted">
+          {metric === "tokens"
+            ? `${formatPercent(model.tokenShare)} of tokens · ${
+                isModelCostUnknown(model) ? "no known rates" : formatUsd(model.costUsd)
+              }`
+            : isModelCostUnknown(model)
+              ? `no known rates · ${formatTokens(model.totalTokens)} tokens`
+              : `${formatPercent(model.costShare)} of cost · ${formatTokens(model.totalTokens)} tokens`}
+        </Text>
+      </View>
+      <Text className="text-base tabular-nums text-foreground">
+        {metric === "tokens"
+          ? formatTokens(model.totalTokens)
+          : isModelCostUnknown(model)
+            ? "Unpriced"
+            : formatUsd(model.costUsd)}
+      </Text>
+    </View>
   );
 }
 

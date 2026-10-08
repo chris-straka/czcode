@@ -115,6 +115,7 @@ import {
   SettingsSection,
 } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
+import { DeveloperOnly } from "./DeveloperOnly";
 import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { BrowserImportWizard, type WizardTarget } from "./BrowserImportWizard";
@@ -1507,14 +1508,16 @@ export function IntegrationsSettingsPanel() {
   const previewDefaultsDisabled = !isElectron;
   const previewDefaults = (
     <>
-      <BrowserProfilesSetting disabled={previewDefaultsDisabled} />
-      <BrowserViewportSetting disabled={previewDefaultsDisabled} />
-      <BrowserZoomSetting disabled={previewDefaultsDisabled} />
-      <BrowserAppearanceSetting disabled={previewDefaultsDisabled} />
-      <BrowserRecordingFrameRateSetting disabled={previewDefaultsDisabled} />
-      <BrowserRecordingInputSettings disabled={previewDefaultsDisabled} />
       <BrowserLinkTargetSetting disabled={previewDefaultsDisabled} />
-      <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
+      <DeveloperOnly>
+        <BrowserProfilesSetting disabled={previewDefaultsDisabled} />
+        <BrowserViewportSetting disabled={previewDefaultsDisabled} />
+        <BrowserZoomSetting disabled={previewDefaultsDisabled} />
+        <BrowserAppearanceSetting disabled={previewDefaultsDisabled} />
+        <BrowserRecordingFrameRateSetting disabled={previewDefaultsDisabled} />
+        <BrowserRecordingInputSettings disabled={previewDefaultsDisabled} />
+        <BrowserAutoShowFloatingPreviewSetting disabled={previewDefaultsDisabled} />
+      </DeveloperOnly>
     </>
   );
 
@@ -1532,7 +1535,9 @@ export function IntegrationsSettingsPanel() {
           previewDefaults
         )}
       </SettingsSection>
-      <DeviceIntegrationSettings />
+      <DeveloperOnly>
+        <DeviceIntegrationSettings />
+      </DeveloperOnly>
     </SettingsPageContainer>
   );
 }
