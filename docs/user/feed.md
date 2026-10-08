@@ -16,7 +16,7 @@ Beside the search bar, **All · Games · Software** and **Projects** narrow
 both pages, for one machine or all.
 
 Opening a thread or a Decision shows it on its own page; **Back** (or Esc)
-returns to the feed where you left it.
+returns to the page you came from, where you left it.
 
 ## Decisions
 

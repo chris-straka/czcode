@@ -17,7 +17,7 @@ import type { EnvironmentThreadShell } from "@cz/client-runtime/state/models";
 import type { DecisionAnswerInput, DecisionMediaRef } from "@cz/contracts";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { CheckIcon, InboxIcon, PencilIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useFeedFilterStore } from "~/feedFilterStore";
 import { cn } from "~/lib/utils";
@@ -301,8 +301,19 @@ export function FeedPage() {
       (group === null || threadGroupOf(thread) === group)
     );
   });
-  // Two pages: Needs you at /, Threads at /threads.
-  const tab = location.pathname === "/threads" ? "threads" : "needs";
+  // Needs you (/) and Threads (/threads) are two pages; a Decision opens over Needs you.
+  const tab: "needs" | "threads" = location.pathname === "/threads" ? "threads" : "needs";
+  // Each page keeps its own scroll position across switches.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollTops = useRef({ needs: 0, threads: 0 });
+  const shownTab = useRef(tab);
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || shownTab.current === tab) return;
+    scrollTops.current[shownTab.current] = scroller.scrollTop;
+    shownTab.current = tab;
+    scroller.scrollTop = scrollTops.current[tab];
+  }, [tab]);
   const answeredShown = answered.entries.filter(
     (entry) =>
       (machine.type === "all" || entry.environmentId === machine.environmentId) &&
@@ -458,7 +469,7 @@ export function FeedPage() {
         filters={filters}
       />
       {/* The page never scrolls sideways; only the chip row does. */}
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div ref={scrollerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4">
           <SidebarUpdateArchitectureWarning />
           <ToggleGroup
@@ -466,7 +477,7 @@ export function FeedPage() {
             value={[tab]}
             onValueChange={(value) => {
               const next = value[0];
-              if (next === "needs" || (next === "threads" && tab !== next)) {
+              if ((next === "needs" || next === "threads") && next !== tab) {
                 void navigate({ to: next === "threads" ? "/threads" : "/" });
               }
             }}
@@ -487,16 +498,11 @@ export function FeedPage() {
           ))}
           {tab === "needs" && briefDay && brief ? (
             <MorningBriefCard
-              day={briefDay.day}
               brief={brief}
               placement={(thread) => ({
                 excerpt: briefDigests.get(`${thread.environmentId}:${thread.id}`)?.excerpt ?? null,
               })}
               machineLabel={machineLabel}
-              onOpenDecision={(entry) => showDecision(entryKey(entry), { session: false })}
-              onReviewAll={() => {
-                if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
-              }}
             />
           ) : null}
 
@@ -536,7 +542,6 @@ export function FeedPage() {
                     </EmptyMedia>
                     <EmptyHeader>
                       <EmptyTitle>Nothing needs you</EmptyTitle>
-                      <EmptyDescription>Agents' questions show up here.</EmptyDescription>
                     </EmptyHeader>
                     <Button size="sm" variant="outline" render={<Link to="/threads" />}>
                       See threads
