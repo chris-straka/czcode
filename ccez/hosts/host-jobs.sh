@@ -14,10 +14,9 @@
 # idle sleep) and stays up while a job runs, so the nightly jobs find the
 # other hosts awake.
 set -euo pipefail
-# The installed release's copy, so jobs change only with cz updates (which
-# rerun this); this folder's until a release exists.
-hosts="$HOME/.local/lib/cz-host/cz/current/ccez/hosts"
-[ -f "$hosts/job-run.sh" ] || hosts=$(cd "$(dirname "$0")" && pwd)
+# Jobs run the scripts next to this one: the installed release's copy when a
+# cz update reruns it, the checkout's when linux.sh or a person does.
+hosts=$(cd "$(dirname "$0")" && pwd)
 units="$HOME/.config/systemd/user"
 config="$HOME/.config/cz-host"
 wake=03:30
