@@ -43,6 +43,10 @@
       "types": "./src/proposedPlan.ts",
       "default": "./src/proposedPlan.ts"
     },
+    "./hostLoad": {
+      "types": "./src/hostLoad.ts",
+      "default": "./src/hostLoad.ts"
+    },
     "./fleet": {
       "types": "./src/fleet.ts",
       "default": "./src/fleet.ts"

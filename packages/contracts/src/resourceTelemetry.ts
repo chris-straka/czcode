@@ -44,6 +44,40 @@ export const HostResourcesSnapshot = Schema.Struct({
 });
 export type HostResourcesSnapshot = typeof HostResourcesSnapshot.Type;
 
+const LoadFraction = Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 }));
+
+/** Average and peak of a host's minute load samples over a span. GPU is null without an NVIDIA card. */
+export const HostLoadStats = Schema.Struct({
+  avgCpu: LoadFraction,
+  peakCpu: LoadFraction,
+  avgMemoryBytes: NonNegativeInt,
+  peakMemoryBytes: NonNegativeInt,
+  avgGpu: Schema.NullOr(LoadFraction),
+  peakGpu: Schema.NullOr(LoadFraction),
+});
+export type HostLoadStats = typeof HostLoadStats.Type;
+
+/** A range of a host's load history, split into `buckets` equal spans for a sparkline. */
+export const HostLoadHistoryInput = Schema.Struct({
+  sinceMs: NonNegativeInt,
+  untilMs: NonNegativeInt,
+  buckets: PositiveInt.check(Schema.isLessThanOrEqualTo(240)),
+});
+export type HostLoadHistoryInput = typeof HostLoadHistoryInput.Type;
+
+export const HostLoadHistory = Schema.Struct({
+  sampleIntervalMs: PositiveInt,
+  /** Oldest kept sample; a range reaching further back has no data there. */
+  firstSampleAt: Schema.NullOr(NonNegativeInt),
+  cpuCount: NonNegativeInt,
+  totalMemoryBytes: NonNegativeInt,
+  /** The whole range, or null without samples in it. */
+  summary: Schema.NullOr(HostLoadStats),
+  /** Equal spans from `sinceMs`; null where the host has no samples (off or not yet sampling). */
+  buckets: Schema.Array(Schema.NullOr(HostLoadStats)),
+});
+export type HostLoadHistory = typeof HostLoadHistory.Type;
+
 export const ResourceTelemetryIoSemantics = Schema.Literals([
   "storage",
   "logical",
