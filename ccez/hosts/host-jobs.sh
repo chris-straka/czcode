@@ -27,6 +27,7 @@ jobs=(
   "health|*-*-* 03:30|health.sh|Disk, SMART, logs, failed units, memory, and the other hosts"
   "backup|*-*-* 03:35|backup-userdata.sh|Copy ~/.cz/userdata to the backup host in hosts.txt (7 days kept)"
   "sync|*-*-* 03:45|repo-sync.sh|Clone missing repos from repos.txt, fast-forward clean ones, list the rest"
+  "drive|*-*-* 03:50|agent-drive.sh|Move build output, model caches and media to the agent drive, when idle"
   "update|*-*-* 04:00|cz-update.sh|Build origin/main and restart cz into it when no agent is working"
 )
 automerge=0
