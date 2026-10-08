@@ -7,6 +7,7 @@ import {
   unseenMediaProblem,
   VERDICT_BUTTONS,
 } from "@cz/client-runtime/decisions/draft";
+import { shortMachineLabel } from "@cz/client-runtime/decisions/oneFeed";
 import type {
   DecisionAnswerInput,
   DecisionMediaRef,
@@ -123,8 +124,8 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
   return (
     <View className="flex-1 bg-screen">
       <AndroidScreenHeader
-        title={entry.item.kind}
-        subtitle={`${entry.item.project} · ${entry.environmentLabel}`}
+        title="Decision"
+        subtitle={`${entry.item.kind} · ${entry.item.project} · ${shortMachineLabel(entry.environmentLabel)}`}
         onBack={() => navigation.goBack()}
         actions={[
           ...(entry.item.thread

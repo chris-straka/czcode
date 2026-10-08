@@ -4,6 +4,9 @@
  * thread's card; decisions from outside a thread get cards of their own.
  * Cards that need the owner come first. Shared by web and mobile.
  *
+ * Sorts with `.sort` on fresh arrays, not `.toSorted`: the phone's Hermes
+ * engine has no `toSorted`.
+ *
  * @module oneFeed
  */
 import type { DecisionItem, EnvironmentId } from "@cz/contracts";
@@ -97,7 +100,7 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
         (filter.device === undefined || isForDevice(entry.item, filter.device)) &&
         chipsMatch(filter, entry.item),
     )
-    .toSorted((a, b) => compareFeedItems(a.item, b.item, projectOrder));
+    .sort((a, b) => compareFeedItems(a.item, b.item, projectOrder));
 
   const threadsByKey = new Map(
     input.threads
@@ -160,9 +163,9 @@ export function buildOneFeed<T extends OneFeedThread, D extends OneFeedDecision>
     card.kind === "thread" ? Date.parse(card.thread.updatedAt) : card.decision.item.created_at;
   return [
     ...needsYou
-      .toSorted((a, b) => a.rank - b.rank || updatedAt(b.card) - updatedAt(a.card))
+      .sort((a, b) => a.rank - b.rank || updatedAt(b.card) - updatedAt(a.card))
       .map(({ card }) => card),
-    ...rest.toSorted((a, b) => updatedAt(b) - updatedAt(a)),
+    ...rest.sort((a, b) => updatedAt(b) - updatedAt(a)),
   ];
 }
 

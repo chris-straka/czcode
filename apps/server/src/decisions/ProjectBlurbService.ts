@@ -59,7 +59,8 @@ export function readmeBlurb(markdown: string): string | null {
     .replace(/[`*_]+/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  const sentences = text.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g) ?? [text];
+  // A sentence ends at . ! or ? before a capital, so "FACTORY.md" stays whole.
+  const sentences = text.split(/(?<=[.!?])\s+(?=["'(*]?[A-Z])/);
   let line = sentences[0]!.trim();
   if (line.length < 60 && sentences[1]) line = `${line} ${sentences[1].trim()}`;
   return line.length <= MAX_CHARS ? line : `${line.slice(0, MAX_CHARS - 1).trimEnd()}…`;

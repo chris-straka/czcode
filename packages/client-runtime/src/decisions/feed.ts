@@ -39,7 +39,7 @@ export function orderFeed(
 ): DecisionItem[] {
   return items
     .filter((item) => item.status === "open")
-    .toSorted((a, b) => compareFeedItems(a, b, projectOrder));
+    .sort((a, b) => compareFeedItems(a, b, projectOrder));
 }
 
 export interface FeedFilter {
@@ -63,7 +63,7 @@ export function filterChips(items: readonly DecisionItem[]): {
   const count = <K>(keys: readonly K[]) => {
     const counts = new Map<K, number>();
     for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
-    return [...counts].toSorted((a, b) => b[1] - a[1]).map(([key]) => key);
+    return [...counts].sort((a, b) => b[1] - a[1]).map(([key]) => key);
   };
   return {
     projects: count(items.map((item) => item.project)),

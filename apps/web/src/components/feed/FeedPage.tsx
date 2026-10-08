@@ -244,7 +244,8 @@ export function FeedPage() {
         return result._tag === "Success" ? (result.value as DecisionMediaRef) : null;
       }
     : null;
-  const selectedBlurbs = selectedProjects.map((project) => ({
+  // Lines for one or two picked projects; a whole group would be a wall of text.
+  const selectedBlurbs = (selectedProjects.length <= 2 ? selectedProjects : []).map((project) => ({
     project,
     description: blurbs.get(project)?.description ?? null,
   }));
@@ -645,9 +646,9 @@ function AnsweredList({ feed, now }: { readonly feed: DecisionFeed; readonly now
         <h2 className="font-medium text-foreground">{item.title || item.question}</h2>
         {pictures.length > 0 ? (
           <div className="grid grid-cols-3 gap-2">
-            {pictures.map((media) => (
+            {pictures.map((media, index) => (
               <DecisionMedia
-                key={media.key}
+                key={`${media.key}:${index}`}
                 environmentId={entry.environmentId}
                 media={media}
                 framed

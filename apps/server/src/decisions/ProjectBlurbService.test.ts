@@ -26,6 +26,14 @@ describe("readmeBlurb", () => {
     ).toBe("A Bevy horror game set in one apartment block during a blackout.");
   });
 
+  it("doesn't end a sentence inside a file name", () => {
+    expect(
+      readmeBlurb(
+        "# Games\n\nEvery game here is built by the agent factory ([FACTORY.md](../FACTORY.md)): agents do\nthe volume. This folder is not a git repo.",
+      ),
+    ).toBe("Every game here is built by the agent factory (FACTORY.md): agents do the volume.");
+  });
+
   it("returns null when there is no prose", () => {
     expect(readmeBlurb("# title\n\n## only headings\n")).toBeNull();
   });

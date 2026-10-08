@@ -54,10 +54,13 @@ export function FeedNeedsYou() {
               <Text className="font-cz-medium text-base text-foreground">{card.thread.title}</Text>
             ) : null}
             {decisions.map((entry) => {
+              // Keyed by option: two options can show the same image.
               const pictures = entry.item.options.flatMap((option) => {
                 const media =
                   option.media_idx === null ? undefined : entry.item.media[option.media_idx];
-                return entry.item.kind === "pick" && media?.type === "image" ? [media] : [];
+                return entry.item.kind === "pick" && media?.type === "image"
+                  ? [{ key: option.id, media }]
+                  : [];
               });
               return (
                 <Pressable
@@ -79,8 +82,8 @@ export function FeedNeedsYou() {
                   </Text>
                   {pictures.length > 0 ? (
                     <View className="flex-row gap-2">
-                      {pictures.slice(0, 3).map((media) => (
-                        <View key={media.key} className="flex-1">
+                      {pictures.slice(0, 3).map(({ key, media }) => (
+                        <View key={key} className="flex-1">
                           <DecisionMedia environmentId={entry.environmentId} media={media} framed />
                         </View>
                       ))}

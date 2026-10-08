@@ -49,7 +49,10 @@ export function DecisionsRouteScreen() {
         ? projects.filter((value) => value !== project)
         : [...projects, project],
     );
-  const described = [...new Set([...projects, ...(peek ? [peek] : [])])];
+  // Lines for one or two picked projects; a whole group would be a wall of text.
+  const described = [
+    ...new Set([...(projects.length <= 2 ? projects : []), ...(peek ? [peek] : [])]),
+  ];
   const open = (entry: DecisionEntry, session = false) =>
     navigation.navigate("Decision", {
       environmentId: entry.environmentId,
@@ -114,7 +117,7 @@ export function DecisionsRouteScreen() {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerClassName="gap-2 px-4 pt-3"
-                className="grow-0"
+                className="shrink-0 grow-0"
               >
                 <Pressable
                   accessibilityRole="button"
@@ -210,8 +213,8 @@ export function DecisionsRouteScreen() {
                   </Text>
                   {pictures.length > 0 ? (
                     <View className="flex-row gap-2">
-                      {pictures.slice(0, 3).map((media) => (
-                        <View key={media.key} className="flex-1">
+                      {pictures.slice(0, 3).map((media, index) => (
+                        <View key={`${media.key}:${index}`} className="flex-1">
                           <DecisionMedia environmentId={entry.environmentId} media={media} framed />
                         </View>
                       ))}
@@ -278,8 +281,8 @@ export function DecisionsRouteScreen() {
                 </Pressable>
                 {thumbs.length > 0 ? (
                   <Pressable onPress={() => open(entry)} className="flex-row gap-2">
-                    {thumbs.slice(0, 3).map((media) => (
-                      <View key={media.key} className="flex-1">
+                    {thumbs.slice(0, 3).map((media, index) => (
+                      <View key={`${media.key}:${index}`} className="flex-1">
                         <DecisionMedia environmentId={entry.environmentId} media={media} compact />
                       </View>
                     ))}
