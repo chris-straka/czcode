@@ -125,7 +125,9 @@ while read -r top; do
       size=$(du -sh "$tree" 2> /dev/null | cut -f1)
       age=$days
       [ "$age" -lt 1 ] && age=1
-      touched_within "$age" "$tree/" && continue
+      # Its own files, not build output or caches inside it.
+      [ -n "$(find "$tree/" \( -name node_modules -o -name target -o -name build -o -name .git \) -prune -o \
+        -newermt "-$age days" -print -quit 2> /dev/null)" ] && continue
       [ -z "$(git -C "$tree" status --porcelain 2> /dev/null)" ] || continue
       git -C "$tree" branch -r --contains HEAD 2> /dev/null | grep -q . || continue
       if sqlite3 "file:$db?mode=ro" "SELECT 1 FROM orchestration_v2_projection_threads WHERE deleted_at IS NULL AND payload_json LIKE '%\"worktreePath\":\"$tree\"%' LIMIT 1" 2> /dev/null | grep -q 1; then
