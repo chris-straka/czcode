@@ -15,6 +15,8 @@
 # - A cap on journald and Docker logs, and no rsyslog copies in /var/log
 #   (a dying drive's kernel errors once filled 106 GB there), so logs can't
 #   fill the disk.
+# - A network watchdog that reconnects the wired chip when the router stops
+#   answering (net-watchdog.sh).
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 in_wsl=false
@@ -108,5 +110,32 @@ if command -v docker > /dev/null 2>&1 && [ ! -e /etc/docker/daemon.json ]; then
   else
     echo "Docker log caps apply after Docker's next restart (containers are running)."
   fi
+fi
+if ! $in_wsl && command -v nmcli > /dev/null 2>&1; then
+  step "Network watchdog"
+  # Reconnects a wired chip that stops passing traffic after the router
+  # restarts (net-watchdog.sh says why). Log: journalctl -t cz-net-watchdog
+  install -m 755 "$(dirname "${BASH_SOURCE[0]}")/net-watchdog.sh" /usr/local/sbin/cz-net-watchdog
+  cat > /etc/systemd/system/cz-net-watchdog.service << 'UNIT'
+[Unit]
+Description=Reconnect the wired network when the router stops answering (ccez/hosts/net-watchdog.sh)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cz-net-watchdog
+UNIT
+  cat > /etc/systemd/system/cz-net-watchdog.timer << 'UNIT'
+[Unit]
+Description=Check the wired network every minute (ccez/hosts/net-watchdog.sh)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now cz-net-watchdog.timer > /dev/null 2>&1
 fi
 echo "Tuning done."
