@@ -226,11 +226,12 @@ export function DecisionView({
     return () => window.removeEventListener("keydown", listener);
   }, []);
 
-  // Judge a video from the video: it comes first and a long write-up folds
-  // under Details, as does a long text beside pictures.
-  const mediaFirst =
-    item.media.some((media) => media.type === "video") ||
-    (item.body_md.length > 800 && item.media.some((media) => media.type === "image"));
+  // Judge from the media: anything more than a short note folds under
+  // Details below the pictures, clips, sounds or option tiles.
+  const hasMedia =
+    item.media.some((media) => media.type !== "apk") ||
+    item.options.some((option) => optionMedia(item, option) !== null);
+  const mediaFirst = hasMedia && item.body_md.length > 280;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-decision-kind={item.kind}>
@@ -315,9 +316,7 @@ export function DecisionView({
           </UploadContext>
           {item.kind !== "read" && item.body_md && mediaFirst ? (
             <details className="max-w-2xl rounded-md border border-border px-3 py-2">
-              <summary className="cursor-pointer text-sm text-muted-foreground">
-                Details: script, notes
-              </summary>
+              <summary className="cursor-pointer text-sm text-muted-foreground">Details</summary>
               <div className="pt-2">
                 <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
               </div>
@@ -366,7 +365,8 @@ export function DecisionView({
               }
               value={draft.comment}
               onChange={(event) => update({ comment: event.target.value })}
-              className="min-h-10 flex-1"
+              size="line"
+              className="flex-1"
             />
             <VoiceNoteButton
               recorded={draft.voiceKey !== null}
@@ -433,7 +433,7 @@ export function DecisionView({
             {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
               <span className="text-xs text-muted-foreground">{problem}</span>
             ) : null}
-            <Button variant="ghost-muted" size="sm" onClick={onDismiss}>
+            <Button variant="ghost-muted" size="sm" className="ms-auto" onClick={onDismiss}>
               No longer relevant
             </Button>
           </div>
@@ -616,8 +616,9 @@ function PickBody({ entry, draft, update }: BodyProps) {
                   </div>
                 )
               ) : null}
-              <span className="flex items-start gap-1.5 text-sm font-medium">
-                <span className="min-w-0 flex-1">{framed && !media ? null : option.label}</span>
+              {/* The badge sits under the label so a narrow tile keeps its width for words. */}
+              <span className="flex flex-col items-start gap-1 text-sm font-medium">
+                {framed && !media ? null : <span>{option.label}</span>}
                 {option.recommended ? (
                   <Badge variant="info" size="sm">
                     Recommended

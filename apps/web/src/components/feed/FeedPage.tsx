@@ -12,12 +12,13 @@ import {
   feedFolderLabel,
   feedProjectGroup,
   feedProjectKey,
+  shortMachineLabel,
 } from "@cz/client-runtime/decisions/oneFeed";
 import type { EnvironmentThreadShell } from "@cz/client-runtime/state/models";
 import type { DecisionAnswerInput, DecisionMediaRef } from "@cz/contracts";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { CheckIcon, InboxIcon, PencilIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useFeedFilterStore } from "~/feedFilterStore";
 import { cn } from "~/lib/utils";
@@ -53,7 +54,7 @@ import { Skeleton } from "../ui/skeleton";
 import { toastManager } from "../ui/toast";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { FeedModal } from "./FeedModal";
-import { FeedMeta, FeedThreadCard } from "./FeedThreadCard";
+import { FeedThreadCard } from "./FeedThreadCard";
 import { FeedGroupToggle, type FeedProjectChoice, FeedProjectsMenu } from "./FeedFilters";
 import { FeedThreadGroups } from "./FeedThreadGroups";
 import { FeedTopBar } from "./FeedTopBar";
@@ -122,7 +123,6 @@ export function FeedPage() {
   const withdrawCommand = useAtomCommand(decisionEnvironment.withdraw, "dismiss decision");
   const selectedProjects = useFeedFilterStore((state) => state.projects);
   const group = useFeedFilterStore((state) => state.group);
-  const [tabChoice, setTab] = useState<"needs" | "threads" | null>(null);
   const [showAnswered, setShowAnswered] = useState(false);
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
@@ -131,18 +131,16 @@ export function FeedPage() {
   const onDecisions = location.pathname === "/decisions";
   const openKey =
     onDecisions && typeof location.search.open === "string" ? location.search.open : null;
-  const session = onDecisions && location.search.session === "1";
   const navigateBack = useNavigateBack();
-  /** Opens a Decision; inside Review all, stepping replaces the entry so Back leaves the session. */
-  const showDecision = (key: string | null, options: { session?: boolean } = {}) => {
-    const inSession = options.session ?? session;
+  /** Opens a Decision; stepping from one to the next replaces the entry, so Back leaves them all. */
+  const showDecision = (key: string | null) => {
     if (key === null) {
       navigateBack();
       return;
     }
     void navigate({
       to: "/decisions",
-      search: { open: key, ...(inSession ? { session: "1" as const } : {}) },
+      search: { open: key },
       replace: openKey !== null,
     });
   };
@@ -302,7 +300,19 @@ export function FeedPage() {
       (group === null || threadGroupOf(thread) === group)
     );
   });
-  const tab = tabChoice ?? (needsYou.length > 0 ? "needs" : "threads");
+  // Needs you (/) and Threads (/threads) are two pages; a Decision opens over Needs you.
+  const tab: "needs" | "threads" = location.pathname === "/threads" ? "threads" : "needs";
+  // Each page keeps its own scroll position across switches.
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollTops = useRef({ needs: 0, threads: 0 });
+  const shownTab = useRef(tab);
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || shownTab.current === tab) return;
+    scrollTops.current[shownTab.current] = scroller.scrollTop;
+    shownTab.current = tab;
+    scroller.scrollTop = scrollTops.current[tab];
+  }, [tab]);
   const answeredShown = answered.entries.filter(
     (entry) =>
       (machine.type === "all" || entry.environmentId === machine.environmentId) &&
@@ -373,7 +383,11 @@ export function FeedPage() {
       timeout: UNDO_WINDOW_MS,
       actionProps: { children: "Undo", onClick: () => undo(key) },
     });
-    const next = session ? visible.find((candidate) => entryKey(candidate) !== key) : undefined;
+    // In the full view, answering moves on to the next open Decision, then back to the list.
+    if (openKey === null) return;
+    const index = visible.findIndex((candidate) => entryKey(candidate) === key);
+    const rest = visible.filter((candidate) => entryKey(candidate) !== key);
+    const next = rest[index] ?? rest[index - 1];
     showDecision(next ? entryKey(next) : null);
   };
   const quickAnswer = (entry: DecisionEntry, patch: Partial<DecisionAnswerInput>) =>
@@ -420,7 +434,8 @@ export function FeedPage() {
       entry={entry}
       embedded={embedded}
       age={ageLabel(entry.item.created_at, now)}
-      onOpen={() => showDecision(entryKey(entry), { session: false })}
+      showMachine={machine.type === "all"}
+      onOpen={() => showDecision(entryKey(entry))}
       onQuickAnswer={(patch) => quickAnswer(entry, patch)}
       onDismiss={() => answer(entry, null)}
     />
@@ -434,7 +449,10 @@ export function FeedPage() {
       top: () => focusFeedItem("first"),
       bottom: () => focusFeedItem("last"),
     },
-    (location.pathname === "/" || location.pathname === "/decisions") && openKey === null,
+    (location.pathname === "/" ||
+      location.pathname === "/threads" ||
+      location.pathname === "/decisions") &&
+      openKey === null,
   );
 
   const filters = (
@@ -450,12 +468,12 @@ export function FeedPage() {
         badge={filtered.entries.length}
         reviewing={visible.length > 0}
         onReviewAll={() => {
-          if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
+          if (visible[0]) showDecision(entryKey(visible[0]));
         }}
         filters={filters}
       />
       {/* The page never scrolls sideways; only the chip row does. A long URL or word wraps. */}
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <div ref={scrollerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4 wrap-anywhere">
           <SidebarUpdateArchitectureWarning />
           <ToggleGroup
@@ -463,7 +481,9 @@ export function FeedPage() {
             value={[tab]}
             onValueChange={(value) => {
               const next = value[0];
-              if (next === "needs" || next === "threads") setTab(next);
+              if ((next === "needs" || next === "threads") && next !== tab) {
+                void navigate({ to: next === "threads" ? "/threads" : "/" });
+              }
             }}
           >
             <Toggle size="sm" value="needs">
@@ -482,16 +502,11 @@ export function FeedPage() {
           ))}
           {tab === "needs" && briefDay && brief ? (
             <MorningBriefCard
-              day={briefDay.day}
               brief={brief}
               placement={(thread) => ({
                 excerpt: briefDigests.get(`${thread.environmentId}:${thread.id}`)?.excerpt ?? null,
               })}
               machineLabel={machineLabel}
-              onOpenDecision={(entry) => showDecision(entryKey(entry), { session: false })}
-              onReviewAll={() => {
-                if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
-              }}
             />
           ) : null}
 
@@ -531,8 +546,10 @@ export function FeedPage() {
                     </EmptyMedia>
                     <EmptyHeader>
                       <EmptyTitle>Nothing needs you</EmptyTitle>
-                      <EmptyDescription>Agents' questions show up here.</EmptyDescription>
                     </EmptyHeader>
+                    <Button size="sm" variant="outline" render={<Link to="/threads" />}>
+                      See threads
+                    </Button>
                   </Empty>
                 )
               ) : null}
@@ -579,7 +596,7 @@ export function FeedPage() {
           <DecisionView
             key={openKey}
             entry={opened}
-            {...(session
+            {...(visible.length > 1
               ? {
                   position: { index: visible.indexOf(opened), total: visible.length },
                   onSkip: () => {
@@ -736,14 +753,17 @@ function AnsweredList({ feed, now }: { readonly feed: DecisionFeed; readonly now
 }
 
 /**
- * A decision as a feed card, shaped by its kind so most never need opening:
- * a single-choice pick answers from its option tiles or buttons, review and
- * pitch from their verdict buttons, a playtest installs from the card.
- * `embedded` drops the frame for a decision riding on its thread's card.
+ * A decision as a feed card that reads in three seconds: the thing itself
+ * (a clip, a waveform, pictures), one line of question, then the answer.
+ * Most never need opening: a single-choice pick answers from its options,
+ * review and pitch from their verdicts, a playtest installs from the card.
+ * Project and age trail in small type. `embedded` drops the frame for a
+ * decision riding on its thread's card.
  */
 function DecisionCard({
   entry,
   age,
+  showMachine,
   embedded = false,
   onOpen,
   onQuickAnswer,
@@ -751,6 +771,8 @@ function DecisionCard({
 }: {
   entry: DecisionEntry;
   age: string;
+  /** Name the machine only when the feed shows more than one. */
+  showMachine: boolean;
   embedded?: boolean;
   onOpen: () => void;
   onQuickAnswer: (patch: Partial<DecisionAnswerInput>) => void;
@@ -759,11 +781,16 @@ function DecisionCard({
 }) {
   const { item } = entry;
   const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
+  const optionsCarryMedia = item.kind === "pick" || item.kind === "rank";
   // A sound or a video plays right on the card, the thing itself before any text.
-  const preview =
-    item.kind === "pick" || item.kind === "rank"
-      ? undefined
-      : item.media.find((media) => media.type === "audio" || media.type === "video");
+  const preview = optionsCarryMedia
+    ? undefined
+    : item.media.find((media) => media.type === "audio" || media.type === "video");
+  // Otherwise up to three pictures, enough to judge whether it needs a closer look.
+  const pictures =
+    optionsCarryMedia || preview
+      ? []
+      : item.media.filter((media) => media.type === "image").slice(0, 3);
   // A card answers in place once nothing on it still needs watching, hearing,
   // or installing; otherwise it offers Open.
   const quick =
@@ -774,9 +801,12 @@ function DecisionCard({
   const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Only single-choice picks answer from the card; the rest open the full view.
   const inlinePick = item.kind === "pick" && item.max_choices === 1 && item.options.length > 0;
-  const pictures = inlinePick && item.options.some((option) => mediaOf(option)?.type === "image");
+  const optionPictures =
+    inlinePick && item.options.some((option) => mediaOf(option)?.type === "image");
   const apk =
     item.kind === "playtest" ? item.media.find((media) => media.type === "apk") : undefined;
+  const title = embedded ? item.question : item.title || item.question;
+  const subtitle = !embedded && item.title && item.title !== item.question ? item.question : null;
   return (
     <article
       className={cn(
@@ -787,40 +817,6 @@ function DecisionCard({
       )}
       data-decision-card={item.kind}
     >
-      <button
-        type="button"
-        data-feed-item=""
-        className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={onOpen}
-      >
-        <div className="flex items-center gap-1.5">
-          {embedded ? null : (
-            <FeedMeta machine={entry.environmentLabel} folder={item.project} model={null} />
-          )}
-          <Badge variant="secondary" size="sm">
-            {item.kind}
-          </Badge>
-          {item.blocking ? (
-            <Badge variant="warning" size="sm">
-              Agent waiting
-            </Badge>
-          ) : null}
-          {embedded ? null : (
-            <span className="ms-auto shrink-0 text-xs text-muted-foreground">{age}</span>
-          )}
-        </div>
-        <h3
-          className={cn("mt-1 text-foreground", embedded ? "text-sm font-medium" : "font-medium")}
-        >
-          {embedded ? item.question : item.title || item.question}
-        </h3>
-        {!embedded && item.title && item.title !== item.question ? (
-          <p className="text-sm text-muted-foreground">{item.question}</p>
-        ) : null}
-        {item.cost_note ? (
-          <p className="text-xs text-warning-foreground">{item.cost_note}</p>
-        ) : null}
-      </button>
       {preview ? (
         <DecisionMediaEngagement
           value={(key) =>
@@ -835,8 +831,46 @@ function DecisionCard({
           />
         </DecisionMediaEngagement>
       ) : null}
+      {pictures.length > 0 ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          className={cn("grid w-full gap-2", pictures.length > 1 ? "grid-cols-3" : "grid-cols-1")}
+          onClick={onOpen}
+        >
+          {pictures.map((media) => (
+            <DecisionMedia
+              key={media.key}
+              environmentId={entry.environmentId}
+              media={media}
+              framed
+              {...(pictures.length === 1 ? { className: "aspect-[16/9]" } : {})}
+            />
+          ))}
+        </button>
+      ) : null}
+      <button
+        type="button"
+        data-feed-item=""
+        className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={onOpen}
+      >
+        <h3
+          className={cn(
+            "line-clamp-2 text-foreground",
+            embedded ? "text-sm font-medium" : "font-medium",
+          )}
+        >
+          {title}
+        </h3>
+        {subtitle ? <p className="line-clamp-2 text-sm text-muted-foreground">{subtitle}</p> : null}
+        {item.cost_note ? (
+          <p className="text-xs text-warning-foreground">{item.cost_note}</p>
+        ) : null}
+      </button>
       {inlinePick ? (
-        pictures ? (
+        optionPictures ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {item.options.map((option) => {
               const media = mediaOf(option);
@@ -873,20 +907,18 @@ function DecisionCard({
             })}
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          // Long labels wrap instead of running off a phone screen.
+          <div className="grid gap-1.5">
             {item.options.map((option) => (
-              <Button
+              <button
                 key={option.id}
-                size="sm-multiline"
-                variant="outline"
-                className="max-w-full"
+                type="button"
+                className="rounded-md border border-border px-3 py-2 text-left text-sm text-foreground outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => onQuickAnswer({ option_ids: [option.id] })}
               >
-                <span className="min-w-0 text-left">
-                  {option.label}
-                  {option.recommended ? " ★" : ""}
-                </span>
-              </Button>
+                {option.label}
+                {option.recommended ? " ★" : ""}
+              </button>
             ))}
           </div>
         )
@@ -908,7 +940,7 @@ function DecisionCard({
           ))}
         </div>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-y-1">
         {inlinePick || quick ? null : (
           <Button size="sm" variant="outline" onClick={onOpen}>
             Open
@@ -916,18 +948,36 @@ function DecisionCard({
         )}
         {item.kind === "pick" ? (
           <>
-            <Button size="sm" variant="outline" onClick={() => onQuickAnswer({ declined: true })}>
+            <Button
+              size="xs"
+              variant="ghost-muted"
+              onClick={() => onQuickAnswer({ declined: true })}
+            >
               None of these
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => onQuickAnswer({ retry: true })}>
-              None of these, try again
+            <Button size="xs" variant="ghost-muted" onClick={() => onQuickAnswer({ retry: true })}>
+              Try again
             </Button>
           </>
         ) : null}
-        <Button size="xs" variant="ghost-muted" className="ms-auto" onClick={onDismiss}>
+        <Button size="xs" variant="ghost-muted" onClick={onDismiss}>
           No longer relevant
         </Button>
       </div>
+      {embedded ? null : (
+        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {item.blocking ? (
+            <Badge variant="warning" size="sm">
+              Agent waiting
+            </Badge>
+          ) : null}
+          <span className="truncate">
+            {showMachine ? `${shortMachineLabel(entry.environmentLabel)} · ` : ""}
+            {item.project}
+          </span>
+          <span className="ms-auto shrink-0">{age}</span>
+        </div>
+      )}
     </article>
   );
 }
