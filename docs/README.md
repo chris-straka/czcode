@@ -18,6 +18,7 @@
 - [Usage and limits](./user/usage.md)
 - [Fleet](./user/fleet.md)
 - [Terminal app](./user/terminal-app.md)
+- [The feed](./user/feed.md)
 - [Schedules](./user/schedules.md)
 - [Morning brief](./user/morning-brief.md)
 - [Product usage data](./user/telemetry.md)

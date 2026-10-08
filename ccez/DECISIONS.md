@@ -45,8 +45,12 @@ voice note, plus **"none of these, try again"** with a note.
 1. **Pick:** choose one (or several, if the agent allows) from options that
    can be images, 3D models, sounds, or clips. Example: 4 Andras concepts.
 2. **Review:** one artifact; approve, reject, or ask for changes. On images
-   the owner can **draw on it** (redline) and circle areas. Example: a level
-   blockout render, a turnaround sheet.
+   the owner can **draw on it** (redline) and circle areas. Sound plays from
+   its waveform: the owner drags across it to mark stretches to like or
+   change, with a note; the answer carries them as `marks` (seconds). Give
+   audio `sections` (`[{ "at": 0, "label": "intro" }, …]`) and they label the
+   waveform; don't attach a waveform picture, the player draws it. Example: a
+   level blockout render, a turnaround sheet, an adaptive music cue.
 3. **Listen:** a board of sound variants (instead of A/B). Each row plays on
    tap, loops on long-press, and gets keep / kill / favourite plus an
    optional note ("too retro", "more metal"). **"More like these"** sends the
@@ -83,6 +87,10 @@ voice note, plus **"none of these, try again"** with a note.
 - `cost_note` (optional): what answering yes will spend ("runs Tripo, about
   $0.40").
 - `resume`: how work continues after the answer (see below).
+- A way out: the owner can mark any open decision **No longer relevant**,
+  which withdraws it. Asking again in the same thread under the same title
+  replaces the earlier open one, and archiving or deleting the asking thread
+  withdraws its open decisions, so stale questions don't pile up.
 - `target_device` (optional): `phone`, `desktop`, or `any`. A playtest that
   ships an app build defaults to `phone`; everything else to `any`. Each
   client shows its own device's decisions and folds the rest into one quiet
@@ -123,7 +131,9 @@ How to ask:
   option: the owner can't tell the options apart (owner feedback,
   2026-10-07). Shared context goes in the body or `context_media_idx`.
 - To judge a video, show the finished video (or a playable draft), not a
-  plan or a summary card. Nothing is published without the owner.
+  plan or a summary card. Nothing is published without the owner. Clients
+  show the video first and fold the write-up (script, shot table) under
+  Details, so keep the body to what the owner needs after watching.
 - Render every option the same way and at the same size: an image of the
   same dimensions for each, or none. Clients frame option media at one
   aspect ratio, and `ask_owner` / `cz inbox submit` warn when only some
