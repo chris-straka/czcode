@@ -26,6 +26,8 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
+
 import * as ServerConfig from "../config.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProcessRunner from "../processRunner.ts";
@@ -50,15 +52,14 @@ const idleMinutesConfig = Config.Int("CZ_SLEEP_WHEN_IDLE_MINUTES").pipe(Config.o
 const wakeTimesConfig = Config.String("CZ_HOST_WAKE_TIMES").pipe(Config.option);
 
 /** The sleep log, one JSON line per sleep or wake, read by `cz sleep`. */
-export const sleepLogPath = (stateDir: string, path: Path.Path) =>
-  path.join(stateDir, "host-sleep.jsonl");
+const sleepLogPath = (stateDir: string, path: Path.Path) => path.join(stateDir, "host-sleep.jsonl");
 
 const run = Effect.gen(function* () {
   const idleMinutes = Option.getOrElse(
     yield* idleMinutesConfig.pipe(Effect.orElseSucceed(() => Option.none<number>())),
     () => 0,
   );
-  if (idleMinutes <= 0 || process.platform !== "linux") return;
+  if (idleMinutes <= 0 || (yield* HostProcessPlatform) !== "linux") return;
   const idleMs = idleMinutes * 60 * 1000;
   const wakeTimes = Option.getOrElse(
     yield* wakeTimesConfig.pipe(Effect.orElseSucceed(() => Option.none<string>())),
