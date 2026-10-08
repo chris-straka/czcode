@@ -113,7 +113,7 @@ SWE/games/hll                         chris-straka/hll
 SWE/games/horde-tactics               chris-straka/horde-tactics
 SWE/games/interpreter                 chris-straka/interpreter
 SWE/games/night-bakery                chris-straka/night-bakery
-SWE/games/sidekick-story              chris-straka/sidekick-story
+SWE/games/seven-locked-vault              chris-straka/seven-locked-vault
 SWE/games/_tools                       chris-straka/game-tools
 SWE/games/waning-light                chris-straka/waning-light
 SWE/genforge                          chris-straka/genforge
