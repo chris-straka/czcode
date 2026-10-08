@@ -10,7 +10,8 @@
 import * as NodeDgram from "node:dgram";
 import * as NodeOS from "node:os";
 
-import { HostWakeInfo, type WakeHostResult } from "@cz/contracts";
+import { HostWakeInfo, type OnlinePeers, type WakeHostResult } from "@cz/contracts";
+import * as Cache from "effect/Cache";
 import * as Clock from "effect/Clock";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
@@ -54,6 +55,11 @@ export class HostWakeService extends Context.Service<
     /** How to wake this machine, when it sleeps when idle; published to the tailnet. */
     readonly ownWakeInfo: Option.Option<HostWakeInfo>;
     readonly wake: (host: string) => Effect.Effect<WakeHostResult>;
+    /**
+     * Tailnet peers online right now, from `tailscale status`. A machine
+     * listed here whose cz server isn't answering is busy, not asleep.
+     */
+    readonly onlinePeers: Effect.Effect<OnlinePeers>;
   }
 >()("cz/hostWake/HostWakeService") {}
 
@@ -166,7 +172,23 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  return HostWakeService.of({ ownWakeInfo, wake });
+  // One `tailscale status` serves every client polling Fleet.
+  const peersCache = yield* Cache.make({
+    capacity: 1,
+    timeToLive: "15 seconds",
+    lookup: (_key: "peers") =>
+      processes
+        .run({ command: "tailscale", args: ["status", "--json"], timeout: "5 seconds" })
+        .pipe(
+          Effect.flatMap((status) =>
+            status.code === 0 ? decodeJson(status.stdout) : Effect.succeed(null),
+          ),
+          Effect.map((json) => ({ peers: [...onlineTailscalePeers(json)] })),
+          Effect.orElseSucceed((): OnlinePeers => ({ peers: [] })),
+        ),
+  });
+
+  return HostWakeService.of({ ownWakeInfo, wake, onlinePeers: Cache.get(peersCache, "peers") });
 });
 
 export const layer = Layer.effect(HostWakeService, make).pipe(Layer.provide(ProcessRunner.layer));

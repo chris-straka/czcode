@@ -32,6 +32,7 @@ const STATE_MARK: Record<FleetMachine["state"], { readonly mark: string; readonl
   {
     awake: { mark: "●", color: "green" },
     connecting: { mark: "◌", color: "yellow" },
+    busy: { mark: "◐", color: "yellow" },
     asleep: { mark: "○", color: "blue" },
     unreachable: { mark: "✕", color: "red" },
   };
@@ -94,7 +95,8 @@ type Row =
 /**
  * Every paired machine at once, live: state, CPU, memory, swap and zram,
  * disks, load, and the agents working there now. j/k move, Enter opens an
- * agent's thread, s stops it, w wakes a sleeping machine.
+ * agent's thread, s stops it, w wakes a sleeping machine (not a busy one,
+ * which is on but too loaded to answer).
  */
 export function FleetScreen(props: {
   readonly atoms: TuiAtoms;
@@ -112,6 +114,7 @@ export function FleetScreen(props: {
         shellSnapshotAtom: atoms.snapshotAtom,
         hostResourcesAtom: (environmentId) =>
           atoms.server.hostResources({ environmentId, input: {} }),
+        onlinePeersAtom: (environmentId) => atoms.server.onlinePeers({ environmentId, input: {} }),
       }),
     [atoms],
   );
@@ -166,6 +169,10 @@ export function FleetScreen(props: {
       if (input === "w") {
         const { machine } = current;
         if (machine.state === "awake") return setStatus(`${machine.label} is awake.`);
+        // Online on the tailnet but too loaded to answer: a wake packet does nothing.
+        if (machine.state === "busy") {
+          return setStatus(`${machine.label} is on but too busy to answer; waking won't help.`);
+        }
         setStatus(`Waking ${machine.label}…`);
         void wakeHost(machine.environmentId, { userInitiated: true }).then(
           (message) => message && setStatus(message),
@@ -218,12 +225,17 @@ export function FleetScreen(props: {
       const resources = machine.resources;
       const mark = STATE_MARK[machine.state];
       const awake = machine.state === "awake";
+      const busy = machine.state === "busy";
       const facts = [
-        machine.state === "asleep" ? "asleep · w wakes it" : machine.state,
-        awake && resources?.loadAverage?.[0] !== undefined
+        machine.state === "asleep"
+          ? "asleep · w wakes it"
+          : busy
+            ? "busy, not responding"
+            : machine.state,
+        (awake || busy) && resources?.loadAverage?.[0] !== undefined
           ? `load ${resources.loadAverage[0].toFixed(1)}`
           : null,
-        awake && resources ? `${resources.cpuCount} cores` : null,
+        (awake || busy) && resources ? `${resources.cpuCount} cores` : null,
       ].filter(Boolean);
       lines.push(
         h(
@@ -349,7 +361,11 @@ export function FleetScreen(props: {
         h(
           Box,
           { flexGrow: 1, marginRight: 1 },
-          h(Text, { color: agent.needsYou ? "yellow" : "cyan", wrap: "truncate" }, agent.activity),
+          h(
+            Text,
+            { color: agent.needsYou ? "yellow" : agent.stuck ? "red" : "cyan", wrap: "truncate" },
+            agent.activity,
+          ),
         ),
         h(
           Box,

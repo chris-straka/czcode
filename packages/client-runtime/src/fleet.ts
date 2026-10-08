@@ -8,6 +8,7 @@
 import type {
   EnvironmentId,
   HostResourcesSnapshot,
+  OnlinePeers,
   OrchestrationV2ShellSnapshot,
   OrchestrationV2ThreadShell,
   ThreadId,
@@ -15,12 +16,17 @@ import type {
 import * as DateTime from "effect/DateTime";
 
 /**
- * awake: connected. connecting: first attempt still in flight. asleep: not
+ * awake: connected. connecting: first attempt still in flight. busy: its cz
+ * server isn't answering but the machine is online on the tailnet, so it is
+ * overloaded, not asleep, and waking it would do nothing. asleep: not
  * answering, but another machine can send it a wake packet (a host that
  * sleeps when idle looks exactly like this). unreachable: not answering and
  * nothing can wake it.
  */
-export type FleetMachineState = "awake" | "connecting" | "asleep" | "unreachable";
+export type FleetMachineState = "awake" | "connecting" | "busy" | "asleep" | "unreachable";
+
+/** A run still `starting` this long has no start left coming; the server fails it soon after. */
+export const STUCK_START_MS = 15 * 60_000;
 
 export interface FleetAgent {
   readonly threadId: ThreadId;
@@ -32,6 +38,8 @@ export interface FleetAgent {
   readonly needsYou: boolean;
   /** When the current work started, for "12m". */
   readonly sinceMs: number | null;
+  /** Starting for longer than a start takes: shown, but not counted as working. */
+  readonly stuck: boolean;
 }
 
 export type FleetWarning =
@@ -79,6 +87,8 @@ export interface FleetMachineInput {
     | null;
   /** The machine has an address to wake by and another connected machine to send it. */
   readonly wakeable: boolean;
+  /** Another connected machine sees it online on the tailnet. */
+  readonly peerOnline: boolean;
   readonly resources: HostResourcesSnapshot | null;
   readonly shell: Pick<OrchestrationV2ShellSnapshot, "threads" | "projects"> | null;
 }
@@ -121,7 +131,26 @@ function machineState(input: FleetMachineInput): FleetMachineState {
   if (input.phase === "connecting" && input.resources === null && input.shell === null) {
     return "connecting";
   }
+  if (input.peerOnline) return "busy";
   return input.wakeable ? "asleep" : "unreachable";
+}
+
+/**
+ * Whether `host` (a connection URL's hostname: MagicDNS name, short name, or
+ * Tailscale IP) is among the online peers.
+ */
+export function isPeerOnline(host: string | null, peers: OnlinePeers["peers"]): boolean {
+  if (host === null) return false;
+  const wanted = host.toLowerCase().replace(/\.$/, "");
+  return peers.some((peer) => {
+    const dnsName = peer.dnsName.toLowerCase();
+    return (
+      dnsName === wanted ||
+      dnsName.split(".")[0] === wanted ||
+      peer.hostName.toLowerCase() === wanted ||
+      peer.tailscaleIps.includes(wanted)
+    );
+  });
 }
 
 const toMs = (value: DateTime.Utc | null | undefined) =>
@@ -136,13 +165,17 @@ function isRunningAgent(thread: OrchestrationV2ThreadShell): boolean {
   );
 }
 
-function agentsOf(shell: FleetMachineInput["shell"]): Array<FleetAgent> {
+function agentsOf(shell: FleetMachineInput["shell"], nowMs: number): Array<FleetAgent> {
   if (shell === null) return [];
   const projects = new Map(shell.projects.map((project) => [project.id, project.title]));
   return shell.threads
     .filter(isRunningAgent)
     .map((thread) => {
       const needsYou = thread.pendingRuntimeRequest !== null;
+      const sinceMs = toMs(thread.activityRunStartedAt) ?? toMs(thread.latestRunStartedAt);
+      const starting =
+        thread.activityRunStatus === "starting" || thread.activityRunStatus === "preparing";
+      const stuck = !needsYou && starting && sinceMs !== null && nowMs - sinceMs > STUCK_START_MS;
       return {
         threadId: thread.id,
         title: thread.title || "Untitled",
@@ -150,9 +183,12 @@ function agentsOf(shell: FleetMachineInput["shell"]): Array<FleetAgent> {
         model: thread.modelSelection.model,
         activity: needsYou
           ? "needs you"
-          : (thread.currentActivity ?? thread.activityRunStatus ?? "working"),
+          : stuck
+            ? "stuck starting"
+            : (thread.currentActivity ?? thread.activityRunStatus ?? "working"),
         needsYou,
-        sinceMs: toMs(thread.activityRunStartedAt) ?? toMs(thread.latestRunStartedAt),
+        sinceMs,
+        stuck,
       };
     })
     .sort(
@@ -163,12 +199,16 @@ function agentsOf(shell: FleetMachineInput["shell"]): Array<FleetAgent> {
 }
 
 /** One row per machine: awake ones first, the busiest at the top. */
-export function fleetMachines(inputs: ReadonlyArray<FleetMachineInput>): Array<FleetMachine> {
+export function fleetMachines(
+  inputs: ReadonlyArray<FleetMachineInput>,
+  nowMs: number,
+): Array<FleetMachine> {
   const order: Record<FleetMachineState, number> = {
     awake: 0,
     connecting: 1,
-    asleep: 2,
-    unreachable: 3,
+    busy: 2,
+    asleep: 3,
+    unreachable: 4,
   };
   return inputs
     .map((input) => ({
@@ -179,7 +219,7 @@ export function fleetMachines(inputs: ReadonlyArray<FleetMachineInput>): Array<F
       warnings: fleetWarnings(input.resources),
       // A machine that isn't answering may still list threads from its last
       // snapshot; they aren't known to be running, so don't show them.
-      agents: input.phase === "connected" ? agentsOf(input.shell) : [],
+      agents: input.phase === "connected" ? agentsOf(input.shell, nowMs) : [],
     }))
     .sort(
       (left, right) =>
@@ -202,7 +242,7 @@ export function fleetTotals(machines: ReadonlyArray<FleetMachine>): FleetTotals 
     memoryTotalBytes += resources.totalMemoryBytes;
     memoryUsedBytes += resources.totalMemoryBytes - resources.availableMemoryBytes;
   }
-  const agents = machines.flatMap((machine) => machine.agents);
+  const agents = machines.flatMap((machine) => machine.agents).filter((agent) => !agent.stuck);
   return {
     machines: machines.length,
     awake: machines.filter((machine) => machine.state === "awake").length,
