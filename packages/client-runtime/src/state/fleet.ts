@@ -8,6 +8,7 @@
 import type {
   EnvironmentId,
   HostResourcesSnapshot,
+  OnlinePeers,
   OrchestrationV2ShellSnapshot,
 } from "@cz/contracts";
 import * as Option from "effect/Option";
@@ -16,7 +17,12 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import type { ConnectionCatalogEntry } from "../connection/catalog.ts";
 import { connectionCatalogDisplayUrl } from "../connection/presentation.ts";
 import type { SupervisorConnectionState } from "../connection/index.ts";
-import { type FleetMachine, type FleetMachineInput, fleetMachines } from "../fleet.ts";
+import {
+  type FleetMachine,
+  type FleetMachineInput,
+  fleetMachines,
+  isPeerOnline,
+} from "../fleet.ts";
 import { wakeHostFromUrl } from "./hostWake.ts";
 
 export interface FleetAtomSources {
@@ -32,6 +38,10 @@ export interface FleetAtomSources {
   readonly hostResourcesAtom: (
     environmentId: EnvironmentId,
   ) => Atom.Atom<AsyncResult.AsyncResult<HostResourcesSnapshot, unknown>>;
+  /** Tailnet peers a connected machine sees online; refresh it with `hostResourcesAtom`. */
+  readonly onlinePeersAtom: (
+    environmentId: EnvironmentId,
+  ) => Atom.Atom<AsyncResult.AsyncResult<OnlinePeers, unknown>>;
 }
 
 /** Every enabled machine, ready to draw. Refresh `hostResourcesAtom` per machine to keep it live. */
@@ -50,17 +60,37 @@ export function createFleetAtom(sources: FleetAtomSources): Atom.Atom<ReadonlyAr
       [...phases].some(
         ([environmentId, phase]) => environmentId !== except && phase === "connected",
       );
+    // What the connected machines see on the tailnet: a machine they see
+    // online but can't reach is busy, not asleep.
+    const peersSeenBy = new Map(
+      [...phases].flatMap(([environmentId, phase]) =>
+        phase === "connected"
+          ? [
+              [
+                environmentId,
+                Option.getOrNull(AsyncResult.value(get(sources.onlinePeersAtom(environmentId))))
+                  ?.peers ?? [],
+              ] as const,
+            ]
+          : [],
+      ),
+    );
+    const seenOnline = (environmentId: EnvironmentId, host: string | null) =>
+      [...peersSeenBy].some(([seer, peers]) => seer !== environmentId && isPeerOnline(host, peers));
     const inputs: Array<FleetMachineInput> = entries.map(([environmentId, entry]) => ({
       environmentId,
       label: entry.target.label,
       phase: phases.get(environmentId) ?? null,
       wakeable:
         wakeHostFromUrl(connectionCatalogDisplayUrl(entry)) !== null && anyConnected(environmentId),
+      peerOnline: seenOnline(environmentId, wakeHostFromUrl(connectionCatalogDisplayUrl(entry))),
       // The last reading survives a failed refresh, so a machine that just went
       // quiet still shows where it stood.
       resources: Option.getOrNull(AsyncResult.value(get(sources.hostResourcesAtom(environmentId)))),
       shell: get(sources.shellSnapshotAtom(environmentId)),
     }));
-    return fleetMachines(inputs);
+    // Atoms recompute on every host reading, so "now" stays fresh enough to judge a stuck start.
+    // @effect-diagnostics-next-line globalDate:off
+    return fleetMachines(inputs, Date.now());
   });
 }
