@@ -4,7 +4,8 @@
  * start, nothing busy for a while, nobody at the keyboard, the newest build
  * settled, and no automatic restart in the last hour. Otherwise the sidebar
  * keeps showing "Restart to update" and the owner decides. Each decision is
- * logged once when it changes ("desktop update: ..."), so the server log
+ * recorded once when it changes, as a `desktopUpdate.decision` span in the
+ * server trace (`grep desktopUpdate.decision server.trace.ndjson`), so the log
  * answers "why did (or didn't) the app restart?".
  *
  * The install goes through DesktopAppUpdate, the same prepare-then-commit
@@ -121,6 +122,12 @@ export function decideRestart(input: RestartInput): RestartDecision {
   return { action: "install", version: state.downloadedVersion };
 }
 
+/** One line in the server trace: the trace keeps spans, not bare log lines. */
+const record = (line: string) =>
+  Effect.logInfo(line).pipe(
+    Effect.withSpan("desktopUpdate.decision", { attributes: { decision: line } }),
+  );
+
 function describe(decision: RestartDecision): string {
   switch (decision.action) {
     case "install":
@@ -180,9 +187,7 @@ const run = Effect.gen(function* () {
   const logDecision = (decision: RestartDecision) => {
     const line = describe(decision);
     return Ref.getAndSet(lastLogged, line).pipe(
-      Effect.flatMap((previous) =>
-        line === "" || previous === line ? Effect.void : Effect.logInfo(line),
-      ),
+      Effect.flatMap((previous) => (line === "" || previous === line ? Effect.void : record(line))),
     );
   };
 
@@ -197,7 +202,7 @@ const run = Effect.gen(function* () {
     const recheck = decideRestart(yield* readInput);
     if (recheck.action !== "install" || prepared.targetVersion !== decision.version) {
       const reason = recheck.action === "wait" ? recheck.reason : "the update changed";
-      yield* Effect.logInfo(`desktop update: skipped at the last moment (${reason})`);
+      yield* record(`desktop update: skipped at the last moment (${reason})`);
       yield* Ref.set(lastLogged, "");
       yield* receiver.cancelDesktopUpdate(token).pipe(Effect.ignore);
       return;
@@ -207,7 +212,7 @@ const run = Effect.gen(function* () {
       .pipe(Effect.ignore);
     // Success stops this server, so this only returns on failure.
     return yield* update.commit(token);
-  }).pipe(Effect.catch((error) => Effect.logWarning("desktop update: install failed", error)));
+  }).pipe(Effect.catch((error) => record(`desktop update: install failed (${error.message})`)));
   return yield* Effect.forever(Effect.sleep(CHECK_INTERVAL).pipe(Effect.andThen(check)));
 });
 
