@@ -8,21 +8,25 @@ desktop app, terminal app, or Android app. Set up the machine where the agents w
 You need an installed, authenticated provider before starting a thread. You can
 launch czcode and configure providers afterwards.
 
-czcode has no store listing, install site, or release downloads. Each part is
-built from a checkout of this repo.
+czcode has no store listing or install site. The Mac app installs from the
+repo's GitHub releases and updates itself; everything else is built from a
+checkout of this repo.
 
 ## Mac desktop app
 
-From a checkout on an Apple Silicon Mac:
+On an Apple Silicon Mac, quit czcode if it's running, then in Terminal:
 
 ```bash
-ccez/release/mac.sh --install
+curl -fsSL https://raw.githubusercontent.com/chris-straka/czcode/main/ccez/release/mac-install.sh | sh
 ```
 
-This builds the app, replaces `/Applications/czcode.app`, and puts `cz` in
-`~/.local/bin`. That `cz` runs the installed app's own server, so the command
-line always matches the app. Quit czcode first; the script refuses while it
-runs. The app isn't signed, so open it the first time with right-click → Open.
+This installs the newest build of `main` as `/Applications/czcode.app` and puts
+`cz` in `~/.local/bin`. That `cz` runs the installed app's own server, so the
+command line always matches the app. From then on the app updates itself (see
+[Updating czcode](./updating.md#mac-app)).
+
+To try a local change instead, build and install from a checkout with
+`ccez/release/mac.sh --install`.
 
 ## Another computer as an agent host
 

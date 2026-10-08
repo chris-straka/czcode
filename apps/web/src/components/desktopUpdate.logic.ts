@@ -77,10 +77,10 @@ export function getDesktopUpdateButtonTooltip(state: DesktopUpdateState): string
   if (state.status === "downloading") {
     const progress =
       typeof state.downloadPercent === "number" ? ` (${Math.floor(state.downloadPercent)}%)` : "";
-    return `Downloading update${progress}`;
+    return `Updating${progress}…`;
   }
   if (state.status === "downloaded") {
-    return `Update ${state.downloadedVersion ?? state.availableVersion ?? "ready"} downloaded. Click to restart and install.`;
+    return `Restart to update to ${state.downloadedVersion ?? state.availableVersion ?? "the new version"}`;
   }
   if (state.status === "error") {
     if (state.errorContext === "download" && state.availableVersion) {
