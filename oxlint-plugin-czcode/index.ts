@@ -1,5 +1,6 @@
 import { definePlugin } from "@oxlint/plugins";
 
+import clickableCursor from "./rules/clickable-cursor.ts";
 import namespaceNodeImports from "./rules/namespace-node-imports.ts";
 import noGlobalProcessRuntime from "./rules/no-global-process-runtime.ts";
 import noHermesUnsupportedApis from "./rules/no-hermes-unsupported-apis.ts";
@@ -18,6 +19,7 @@ export default definePlugin({
     name: "czcode",
   },
   rules: {
+    "clickable-cursor": clickableCursor,
     "namespace-node-imports": namespaceNodeImports,
     "no-global-process-runtime": noGlobalProcessRuntime,
     "no-hermes-unsupported-apis": noHermesUnsupportedApis,
