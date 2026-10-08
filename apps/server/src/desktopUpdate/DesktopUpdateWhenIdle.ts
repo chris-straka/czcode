@@ -31,7 +31,7 @@ const UPCOMING_WORK_MS = 10 * 60 * 1000;
  * install it waits for the user to retry, so a broken update can't restart
  * the backends every minute.
  */
-export function hasDownloadedDesktopUpdate(report: Option.Option<DesktopUpdateStatusReport>) {
+function hasDownloadedDesktopUpdate(report: Option.Option<DesktopUpdateStatusReport>) {
   return (
     Option.isSome(report) &&
     report.value.state.status === "downloaded" &&

@@ -45,7 +45,12 @@ ls -a "$work/Applications" | grep -q czcode-old && fail "old app left behind"
 [ ! -e "$work/failed" ] || fail "failure reported: $(cat "$work/failed")"
 if [ -n "${1:-}" ]; then
   rm "$work/Applications/czcode.app/Contents/marker"
-  codesign --verify --deep --strict "$work/Applications/czcode.app" || fail "swapped app fails codesign --verify"
+  # The build is unsigned (only its binaries carry linker signatures), so
+  # compare the swapped app with a fresh unpack of the zip instead.
+  mkdir "$work/fresh"
+  ditto -x -k "$1" "$work/fresh"
+  diff -r "$work/fresh/czcode.app" "$work/Applications/czcode.app" > /dev/null || fail "swapped app differs from the zip"
+  rm -rf "$work/fresh"
   # What the cz shim runs: the app's own Node on its bundled server.
   app="$work/Applications/czcode.app"
   ELECTRON_RUN_AS_NODE=1 "$app/Contents/MacOS/czcode" \
