@@ -1,0 +1,78 @@
+name: Mac Release
+
+# Builds the unsigned arm64 Mac app that ccez/release/mac.sh builds, on every
+# push to main, and publishes it as a prerelease tagged v<version>-mac.<run>.
+# The installed app reads these releases and updates itself
+# (apps/desktop/src/electron/MacReleaseUpdater.ts). Keeps the last five.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push makes an older build pointless.
+concurrency:
+  group: mac-release
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and publish the Mac app
+    if: github.repository == 'chris-straka/czcode'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: false
+
+      - name: Install desktop dependencies
+        run: vp install --filter=@cz/desktop... --filter=cz... --filter=@cz/scripts...
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Build
+        id: build
+        run: |
+          version="$(node -p 'require("./apps/desktop/package.json").version')-mac.${GITHUB_RUN_NUMBER}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          CZ_DESKTOP_VERSION="$version" sh ccez/release/mac.sh
+          zip="Czcode-$version-arm64.zip"
+          test -f "release/$zip"
+          (cd release && shasum -a 256 "$zip" > "$zip.sha256")
+          echo "zip=release/$zip" >> "$GITHUB_OUTPUT"
+
+      - name: Test the update swap on a copy of the app
+        run: sh ccez/release/test-mac-swap.sh "${{ steps.build.outputs.zip }}"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.build.outputs.version }}
+          ZIP: ${{ steps.build.outputs.zip }}
+        run: |
+          gh release create "v$VERSION" "$ZIP" "$ZIP.sha256" \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "czcode $VERSION (Mac)" \
+            --notes "Unsigned arm64 build of main at $GITHUB_SHA. Installed apps update to it on their own; to install by hand, see ccez/release/mac-install.sh."
+
+      - name: Keep the last five Mac releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 100 --json tagName --jq '.[].tagName' |
+            grep -E -- '-mac\.[0-9]+$' | tail -n +6 |
+            while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
