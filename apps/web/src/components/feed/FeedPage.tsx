@@ -35,6 +35,7 @@ import { useProjects, useThreadShells } from "~/state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
 import { useJobsOn } from "~/state/jobs";
 import { useNavigateBack } from "~/hooks/useNavigateBack";
+import { useVimKeys } from "~/hooks/useVimKeys";
 import { useAtomCommand } from "~/state/use-atom-command";
 import {
   DECISION_OPTION_FRAME_CLASS,
@@ -57,6 +58,25 @@ import { FeedGroupToggle, type FeedProjectChoice, FeedProjectsMenu } from "./Fee
 import { FeedThreadGroups } from "./FeedThreadGroups";
 import { FeedTopBar } from "./FeedTopBar";
 import { MorningBriefCard } from "./MorningBriefCard";
+
+/** Moves focus to the next, previous, first, or last card, row or group in the feed. */
+function focusFeedItem(step: 1 | -1 | "first" | "last") {
+  const items = [
+    ...document.querySelectorAll<HTMLElement>("[data-feed-page] [data-feed-item]"),
+  ].filter((item) => item.offsetParent !== null);
+  if (items.length === 0) return;
+  const current = items.indexOf(document.activeElement as HTMLElement);
+  const next =
+    step === "first"
+      ? items[0]
+      : step === "last"
+        ? items.at(-1)
+        : current === -1
+          ? items[step === 1 ? 0 : items.length - 1]
+          : items[Math.min(items.length - 1, Math.max(0, current + step))];
+  next?.focus();
+  next?.scrollIntoView({ block: "nearest" });
+}
 
 /** How long an answer can be undone before it is sent. */
 const UNDO_WINDOW_MS = 5_000;
@@ -404,6 +424,17 @@ export function FeedPage() {
       onQuickAnswer={(patch) => quickAnswer(entry, patch)}
       onDismiss={() => answer(entry, null)}
     />
+  );
+
+  // j/k step through cards, rows and groups; gg and G jump to the ends; Enter opens.
+  useVimKeys(
+    {
+      down: () => focusFeedItem(1),
+      up: () => focusFeedItem(-1),
+      top: () => focusFeedItem("first"),
+      bottom: () => focusFeedItem("last"),
+    },
+    (location.pathname === "/" || location.pathname === "/decisions") && openKey === null,
   );
 
   const filters = (
@@ -756,7 +787,12 @@ function DecisionCard({
       )}
       data-decision-card={item.kind}
     >
-      <button type="button" className="block w-full text-left" onClick={onOpen}>
+      <button
+        type="button"
+        data-feed-item=""
+        className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={onOpen}
+      >
         <div className="flex items-center gap-1.5">
           {embedded ? null : (
             <FeedMeta machine={entry.environmentLabel} folder={item.project} model={null} />

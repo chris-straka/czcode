@@ -219,7 +219,7 @@ export function DecisionView({
     item.media.some((media) => media.type === "video") ||
     (item.body_md.length > 800 && item.media.some((media) => media.type === "image"));
   const keyHints = [
-    "j/k scroll",
+    "j/k scroll · gg/G ends",
     item.kind === "pick" || verdicts
       ? `1-${Math.min(9, item.kind === "pick" ? item.options.length : (verdicts?.length ?? 1))} choose`
       : null,

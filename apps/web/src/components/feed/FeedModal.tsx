@@ -1,7 +1,8 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { ArrowLeftIcon } from "lucide-react";
 
+import { mainScroller, useVimKeys } from "~/hooks/useVimKeys";
 import { Button } from "../ui/button";
 
 /** True when Esc should leave the field rather than the view: a text field with something in it. */
@@ -19,7 +20,7 @@ function editingText(target: EventTarget | null): target is HTMLElement {
  * desktop, the whole screen on a phone. The feed stays mounted underneath,
  * so going back finds it where it was. Back and Esc return; Esc in a field
  * with text leaves the field first, and anything that handled Esc itself (a
- * menu, a dialog) keeps it.
+ * menu, a dialog) keeps it. j/k scroll, gg and G jump to the top and bottom.
  */
 export function FeedModal({
   label,
@@ -30,6 +31,23 @@ export function FeedModal({
   readonly onClose: () => void;
   readonly children: ReactNode;
 }) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLElement | null>(null);
+  const scroller = () => {
+    const cached = scrollerRef.current;
+    if (cached?.isConnected && cached.scrollHeight > cached.clientHeight) return cached;
+    scrollerRef.current = mainScroller(rootRef.current);
+    return scrollerRef.current;
+  };
+  useVimKeys({
+    down: () => scroller()?.scrollBy({ top: 120 }),
+    up: () => scroller()?.scrollBy({ top: -120 }),
+    top: () => scroller()?.scrollTo({ top: 0 }),
+    bottom: () => {
+      const element = scroller();
+      element?.scrollTo({ top: element.scrollHeight });
+    },
+  });
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -45,6 +63,7 @@ export function FeedModal({
 
   return (
     <div
+      ref={rootRef}
       role="region"
       aria-label={label}
       data-feed-modal=""

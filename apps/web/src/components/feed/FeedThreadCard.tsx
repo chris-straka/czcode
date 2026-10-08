@@ -108,6 +108,7 @@ export function FeedThreadCard({
       <Link
         to="/$environmentId/$threadId"
         params={{ environmentId: thread.environmentId, threadId: thread.id }}
+        data-feed-item=""
         className="block space-y-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <div className="flex items-center gap-2">
@@ -148,6 +149,7 @@ export function FeedThreadRow({
         "block space-y-0.5 border-t border-border px-4 py-3 outline-none first:border-t-0 hover:bg-accent/40 focus-visible:bg-accent/40",
       )}
       data-feed-thread-row=""
+      data-feed-item=""
     >
       <div className="flex min-w-0 items-center gap-2">
         <FeedStatusBadge status={status} />
