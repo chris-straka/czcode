@@ -317,7 +317,7 @@ export function FeedPage() {
       (group === null || groupOf(entry.item.project) === group),
   );
 
-  // Decisions in feed order, for Review all and the modal's position.
+  // Decisions in feed order, for stepping through them and the view's position.
   const visible = useMemo(
     () => cards.flatMap((card) => (card.kind === "decision" ? [card.decision] : card.decisions)),
     [cards],
@@ -463,9 +463,10 @@ export function FeedPage() {
     <div className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-background" data-feed-page="">
       <FeedTopBar
         badge={filtered.entries.length}
-        reviewing={visible.length > 0}
-        onReviewAll={() => {
-          if (visible[0]) showDecision(entryKey(visible[0]));
+        onOpenNeedsYou={() => {
+          // From anywhere, the list of open Decisions; on it already, back to its top.
+          if (location.pathname === "/") scrollerRef.current?.scrollTo({ top: 0 });
+          else void navigate({ to: "/" });
         }}
         filters={filters}
       />

@@ -6,7 +6,8 @@ them). It has two pages, switched at the top:
 - **Needs you:** questions agents asked you (Decisions) and threads waiting
   for an approval or an answer, most important first, with the
   [Morning brief](./morning-brief.md) on top. **Answered** at the bottom
-  shows what you already answered.
+  shows what you already answered. The inbox icon in the top bar, with the
+  open count, brings you here from anywhere.
 - **Threads:** every thread, grouped by project, running ones first. Each
   row shows the thread's last summary line, so you rarely need to open one.
   Groups with nothing new fold; finished threads older than three days fold
