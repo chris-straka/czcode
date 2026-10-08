@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
-  type EnvironmentId,
+  EnvironmentId,
   ProviderDriverKind,
   ProviderInstanceId,
   type ServerProvider,
@@ -9,34 +9,22 @@ import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 
 import {
-  buildLocalEnvironmentUpdateGroups,
   canOneClickUpdateProviderCandidate,
   collectProviderUpdateCandidates,
-  collectProviderUpdateOutcomeSnapshots,
-  collectUpdatedProviderSnapshots,
-  deriveEnvironmentDisplayLabel,
-  environmentGroupsWithUpdates,
-  firstFailedProviderUpdateMessage,
-  firstRejectedProviderUpdateMessage,
-  getProviderUpdateInitialToastView,
-  getProviderUpdateProgressToastView,
-  getProviderUpdateRejectedToastView,
-  getProviderUpdateRunToastView,
+  collectProviderUpdateMachines,
+  describeProviderUpdateFailure,
+  getProviderUpdateNoticeTitle,
+  getProviderUpdateRunRows,
+  getProviderUpdateRunSummary,
   getProviderUpdateSidebarPillView,
   hasOneClickUpdateProviderCandidate,
   isProviderUpdateCandidate,
   isProviderSettingsUpdateCandidate,
-  isTerminalProviderUpdatePhase,
-  localEnvironmentUpdateNotificationKey,
+  providerUpdateNoticeKey,
   providerUpdateNotificationKey,
-  resolveEnvironmentUpdateRowStatus,
-  shouldShowPrimaryProviderUpdateToast,
-  type LocalEnvironmentProvidersInput,
-  type LocalEnvironmentUpdateGroup,
-  type LocalProviderUpdateOutcome,
+  providerUpdateRunsFor,
   type ProviderUpdateCandidate,
-  type ProviderUpdateSidebarPillView,
-  type ProviderUpdateToastView,
+  type ProviderUpdateRun,
 } from "./ProviderUpdateLaunchNotification.logic";
 
 const checkedAt = "2026-04-23T10:00:00.000Z";
@@ -237,212 +225,6 @@ describe("provider update launch notification logic", () => {
     expect(providerUpdateNotificationKey([nextPublishedVersion])).not.toBe(
       providerUpdateNotificationKey([first]),
     );
-  });
-
-  it("tracks updated provider snapshots by instance instead of collapsing to a sibling driver", () => {
-    const targetInstanceId = instanceId("codex_personal");
-    const siblingInstanceId = instanceId("codex");
-    const updatedPersonal = provider({
-      driver: driver("codex"),
-      instanceId: targetInstanceId,
-      version: "1.1.0",
-      latestVersion: "1.1.0",
-      advisoryStatus: "current",
-      updateState: {
-        status: "succeeded",
-        startedAt: checkedAt,
-        finishedAt: checkedAt,
-        message: "Provider updated.",
-        output: null,
-      },
-    });
-    const currentDefaultSibling = provider({
-      driver: driver("codex"),
-      instanceId: siblingInstanceId,
-      version: "1.1.0",
-      latestVersion: "1.1.0",
-      advisoryStatus: "current",
-      updateState: undefined,
-    });
-
-    expect(
-      collectUpdatedProviderSnapshots({
-        results: [
-          AsyncResult.success({
-            providers: [updatedPersonal, currentDefaultSibling],
-          }),
-        ],
-        providerInstanceIds: new Set([targetInstanceId]),
-      }),
-    ).toEqual([updatedPersonal]);
-  });
-
-  it("describes a single one-click update", () => {
-    const view = getProviderUpdateInitialToastView({
-      updateProviders: [updateCandidate({ driver: driver("codex"), latestVersion: "1.1.0" })],
-      oneClickProviders: [updateCandidate({ driver: driver("codex"), latestVersion: "1.1.0" })],
-    });
-
-    expect(view).toMatchObject({
-      phase: "initial",
-      type: "warning",
-      title: "Update Available: Codex v1.1.0",
-      description: "Install the update now or review provider settings.",
-    });
-  });
-
-  it("describes settings-only updates without one-click support", () => {
-    const view = getProviderUpdateInitialToastView({
-      updateProviders: [
-        updateCandidate({ driver: driver("codex"), canUpdate: false }),
-        updateCandidate({ driver: driver("cursor"), canUpdate: false }),
-      ],
-      oneClickProviders: [],
-    });
-
-    expect(view.description).toBe("Codex and Cursor can be updated from provider settings.");
-  });
-
-  it("uses server update state for running progress", () => {
-    const view = getProviderUpdateProgressToastView({
-      providers: [
-        provider({
-          driver: driver("codex"),
-          updateState: {
-            status: "running",
-            startedAt: checkedAt,
-            finishedAt: null,
-            message: "Updating provider.",
-            output: null,
-          },
-        }),
-      ],
-      providerCount: 1,
-    });
-
-    expect(view).toMatchObject({
-      phase: "running",
-      type: "loading",
-      title: "Updating provider",
-    });
-    expect(shouldShowPrimaryProviderUpdateToast(view)).toBe(false);
-  });
-
-  it("keeps the initial prompt and terminal outcomes visible as toasts", () => {
-    expect(
-      shouldShowPrimaryProviderUpdateToast(
-        getProviderUpdateInitialToastView({
-          updateProviders: [updateCandidate({ driver: driver("codex") })],
-          oneClickProviders: [updateCandidate({ driver: driver("codex") })],
-        }),
-      ),
-    ).toBe(true);
-    expect(
-      shouldShowPrimaryProviderUpdateToast(getProviderUpdateRejectedToastView(1, "boom")),
-    ).toBe(true);
-  });
-
-  it("uses server failure state for failed progress", () => {
-    const view = getProviderUpdateProgressToastView({
-      providers: [
-        provider({
-          driver: driver("codex"),
-          updateState: {
-            status: "failed",
-            startedAt: checkedAt,
-            finishedAt: checkedAt,
-            message: "command failed",
-            output: "stderr",
-          },
-        }),
-      ],
-      providerCount: 1,
-    });
-
-    expect(view).toMatchObject({
-      phase: "failed",
-      type: "error",
-      title: "Provider update failed",
-      description: "command failed",
-    });
-  });
-
-  it("keeps unchanged providers actionable from settings", () => {
-    const view = getProviderUpdateProgressToastView({
-      providers: [
-        provider({
-          driver: driver("cursor"),
-          updateState: {
-            status: "unchanged",
-            startedAt: checkedAt,
-            finishedAt: checkedAt,
-            message: "still old",
-            output: null,
-          },
-        }),
-      ],
-      providerCount: 1,
-    });
-
-    expect(view).toMatchObject({
-      phase: "unchanged",
-      type: "warning",
-      title: "Provider still needs an update",
-      description: "Cursor still appears outdated. Check provider settings for details.",
-    });
-  });
-
-  it("marks progress succeeded once every attempted provider is no longer outdated", () => {
-    const view = getProviderUpdateProgressToastView({
-      providers: [
-        provider({
-          driver: driver("codex"),
-          version: "1.1.0",
-          latestVersion: "1.1.0",
-          advisoryStatus: "current",
-          updateState: {
-            status: "succeeded",
-            startedAt: checkedAt,
-            finishedAt: checkedAt,
-            message: "Provider updated.",
-            output: null,
-          },
-        }),
-      ],
-      providerCount: 1,
-    });
-
-    expect(view).toMatchObject({
-      phase: "succeeded",
-      type: "success",
-      title: "Provider updated",
-      description: "New sessions will use the updated provider.",
-      dismissAfterVisibleMs: 3_000,
-    });
-  });
-
-  it("falls back to a rejected RPC message for transport-level failures", () => {
-    const results = [AsyncResult.failure(Cause.die(new Error("WebSocket closed")))];
-
-    expect(firstFailedProviderUpdateMessage(results)).toBe("WebSocket closed");
-    expect(getProviderUpdateRejectedToastView(2, "WebSocket closed")).toMatchObject({
-      phase: "failed",
-      title: "Provider updates failed",
-      description: "WebSocket closed",
-    });
-  });
-
-  it("collects only attempted provider snapshots from update responses", () => {
-    const codex = provider({ driver: driver("codex") });
-    const cursor = provider({ driver: driver("cursor") });
-    const results = [AsyncResult.success({ providers: [codex, cursor] })];
-
-    expect(
-      collectUpdatedProviderSnapshots({
-        results,
-        providerInstanceIds: new Set([cursor.instanceId]),
-      }),
-    ).toEqual([cursor]);
   });
 
   it("summarizes active provider updates for the sidebar pill", () => {
@@ -653,392 +435,6 @@ describe("provider update launch notification logic", () => {
       ]),
     ).toBeNull();
   });
-
-  describe("multi-backend update outcomes", () => {
-    const terminalState = (
-      status: "succeeded" | "failed" | "unchanged",
-      message: string,
-    ): NonNullable<ServerProvider["updateState"]> => ({
-      status,
-      startedAt: checkedAt,
-      finishedAt: checkedAt,
-      message,
-      output: null,
-    });
-
-    const fulfilledOutcome = (
-      isPrimary: boolean,
-      snapshot: ServerProvider | null,
-      environment = "env",
-    ): PromiseSettledResult<LocalProviderUpdateOutcome> => ({
-      status: "fulfilled",
-      value: {
-        environmentId: environment as LocalProviderUpdateOutcome["environmentId"],
-        isPrimary,
-        driver: snapshot?.driver ?? driver("codex"),
-        instanceId: snapshot?.instanceId ?? instanceId("codex"),
-        provider: snapshot,
-      },
-    });
-
-    it("surfaces a secondary backend's failed update over the primary's success", () => {
-      const snapshots = collectProviderUpdateOutcomeSnapshots([
-        fulfilledOutcome(
-          true,
-          provider({
-            driver: driver("codex"),
-            updateState: terminalState("succeeded", "Provider updated."),
-          }),
-        ),
-        fulfilledOutcome(
-          false,
-          provider({
-            driver: driver("codex"),
-            updateState: terminalState("failed", "npm: NotFound"),
-          }),
-        ),
-      ]);
-
-      expect(snapshots).toHaveLength(1);
-      expect(snapshots[0]?.updateState?.status).toBe("failed");
-      expect(
-        getProviderUpdateProgressToastView({ providers: snapshots, providerCount: 1 }),
-      ).toMatchObject({ phase: "failed" });
-    });
-
-    it("surfaces a secondary backend that stayed outdated over the primary's success", () => {
-      const snapshots = collectProviderUpdateOutcomeSnapshots([
-        fulfilledOutcome(
-          true,
-          provider({
-            driver: driver("codex"),
-            updateState: terminalState("succeeded", "Provider updated."),
-          }),
-        ),
-        fulfilledOutcome(
-          false,
-          provider({
-            driver: driver("codex"),
-            updateState: terminalState("unchanged", "still outdated"),
-          }),
-        ),
-      ]);
-
-      expect(snapshots[0]?.updateState?.status).toBe("unchanged");
-      expect(
-        getProviderUpdateProgressToastView({ providers: snapshots, providerCount: 1 }),
-      ).toMatchObject({ phase: "unchanged" });
-    });
-
-    it("reports success only when every backend succeeded", () => {
-      const snapshots = collectProviderUpdateOutcomeSnapshots([
-        fulfilledOutcome(
-          true,
-          provider({
-            driver: driver("codex"),
-            updateState: terminalState("succeeded", "Provider updated."),
-          }),
-        ),
-        fulfilledOutcome(
-          false,
-          provider({
-            driver: driver("codex"),
-            updateState: terminalState("succeeded", "Provider updated."),
-          }),
-        ),
-      ]);
-
-      expect(
-        getProviderUpdateProgressToastView({ providers: snapshots, providerCount: 1 }),
-      ).toMatchObject({ phase: "succeeded" });
-    });
-
-    it("ignores backends that did not return the targeted instance", () => {
-      const primary = provider({
-        driver: driver("codex"),
-        updateState: terminalState("succeeded", "Provider updated."),
-      });
-      const snapshots = collectProviderUpdateOutcomeSnapshots([
-        fulfilledOutcome(true, primary),
-        fulfilledOutcome(false, null),
-      ]);
-
-      expect(snapshots).toEqual([primary]);
-    });
-
-    it("treats a rejected dispatch as not contributing a snapshot", () => {
-      const primary = provider({
-        driver: driver("codex"),
-        updateState: terminalState("succeeded", "Provider updated."),
-      });
-      const results: PromiseSettledResult<LocalProviderUpdateOutcome>[] = [
-        fulfilledOutcome(true, primary),
-        { status: "rejected", reason: new Error("WebSocket closed") },
-      ];
-
-      expect(collectProviderUpdateOutcomeSnapshots(results)).toEqual([primary]);
-      expect(firstRejectedProviderUpdateMessage(results)).toBe("WebSocket closed");
-    });
-  });
-
-  describe("per-environment update grouping", () => {
-    const environment = (
-      input: {
-        readonly environmentId: string;
-        readonly providers: ReadonlyArray<ServerProvider>;
-      } & Partial<Omit<LocalEnvironmentProvidersInput, "environmentId" | "providers">>,
-    ): LocalEnvironmentProvidersInput => ({
-      environmentId: input.environmentId as EnvironmentId,
-      label: input.label ?? input.environmentId,
-      isPrimary: input.isPrimary ?? false,
-      connectionState: input.connectionState ?? "ready",
-      providers: input.providers,
-    });
-
-    it("groups each environment's outdated one-click candidates", () => {
-      const result = buildLocalEnvironmentUpdateGroups([
-        environment({
-          environmentId: "env-windows",
-          label: "Windows",
-          isPrimary: true,
-          providers: [provider({ driver: driver("codex"), latestVersion: "1.1.0" })],
-        }),
-        environment({
-          environmentId: "env-wsl",
-          label: "WSL",
-          providers: [provider({ driver: driver("codex"), latestVersion: "1.1.0" })],
-        }),
-      ]);
-
-      expect(result.isAnySettling).toBe(false);
-      expect(result.groups.map((group) => group.label)).toEqual(["Windows", "WSL"]);
-      expect(result.groups.every((group) => group.candidates.length === 1)).toBe(true);
-    });
-
-    it("flags settling while a secondary backend is still connecting", () => {
-      const result = buildLocalEnvironmentUpdateGroups([
-        environment({
-          environmentId: "env-windows",
-          isPrimary: true,
-          providers: [provider({ driver: driver("codex") })],
-        }),
-        environment({ environmentId: "env-wsl", connectionState: "connecting", providers: [] }),
-      ]);
-
-      expect(result.isAnySettling).toBe(true);
-      expect(
-        result.groups.find((group) => group.environmentId === ("env-wsl" as EnvironmentId))
-          ?.isSettling,
-      ).toBe(true);
-    });
-
-    it("keeps only environments that have a one-click update on offer", () => {
-      const { groups } = buildLocalEnvironmentUpdateGroups([
-        environment({
-          environmentId: "env-windows",
-          isPrimary: true,
-          providers: [provider({ driver: driver("codex") })],
-        }),
-        environment({
-          environmentId: "env-wsl",
-          providers: [
-            provider({ driver: driver("codex"), advisoryStatus: "current", latestVersion: null }),
-          ],
-        }),
-      ]);
-
-      expect(environmentGroupsWithUpdates(groups).map((group) => group.environmentId)).toEqual([
-        "env-windows",
-      ]);
-    });
-
-    it("keys the notification by environment, driver and latest version", () => {
-      const noUpdates = buildLocalEnvironmentUpdateGroups([
-        environment({
-          environmentId: "env-windows",
-          isPrimary: true,
-          providers: [
-            provider({ driver: driver("codex"), advisoryStatus: "current", latestVersion: null }),
-          ],
-        }),
-      ]);
-      expect(localEnvironmentUpdateNotificationKey(noUpdates.groups)).toBeNull();
-
-      const both = buildLocalEnvironmentUpdateGroups([
-        environment({
-          environmentId: "env-windows",
-          isPrimary: true,
-          providers: [provider({ driver: driver("codex"), latestVersion: "1.1.0" })],
-        }),
-        environment({
-          environmentId: "env-wsl",
-          providers: [provider({ driver: driver("codex"), latestVersion: "1.1.0" })],
-        }),
-      ]);
-      const key = localEnvironmentUpdateNotificationKey(both.groups);
-      expect(key).toContain("env-windows=codex:1.1.0");
-      expect(key).toContain("env-wsl=codex:1.1.0");
-    });
-
-    it("labels environments by platform so they are distinguishable", () => {
-      expect(
-        deriveEnvironmentDisplayLabel({
-          isWsl: false,
-          wslDistro: null,
-          platformOs: "windows",
-          fallbackLabel: "Jgratton24",
-        }),
-      ).toBe("Windows");
-      expect(
-        deriveEnvironmentDisplayLabel({
-          isWsl: true,
-          wslDistro: null,
-          platformOs: "linux",
-          fallbackLabel: "Jgratton24",
-        }),
-      ).toBe("WSL");
-      expect(
-        deriveEnvironmentDisplayLabel({
-          isWsl: true,
-          wslDistro: "ubuntu",
-          platformOs: "linux",
-          fallbackLabel: "Jgratton24",
-        }),
-      ).toBe("WSL · ubuntu");
-      expect(
-        deriveEnvironmentDisplayLabel({
-          isWsl: false,
-          wslDistro: null,
-          platformOs: undefined,
-          fallbackLabel: "My Device",
-        }),
-      ).toBe("My Device");
-    });
-  });
-
-  describe("isTerminalProviderUpdatePhase", () => {
-    it("treats succeeded/failed/unchanged as terminal", () => {
-      expect(isTerminalProviderUpdatePhase("succeeded")).toBe(true);
-      expect(isTerminalProviderUpdatePhase("failed")).toBe(true);
-      expect(isTerminalProviderUpdatePhase("unchanged")).toBe(true);
-    });
-
-    it("treats running/initial as non-terminal so they are not persisted", () => {
-      // The per-environment update row uses this to decide what to store. A
-      // "running"/"initial" snapshot never re-polls, so persisting it would pin
-      // the row's spinner forever once pending clears (see the
-      // resolveEnvironmentUpdateRowStatus "keeps a non-terminal result on
-      // loading even after pending clears" case). Dropping these lets the live
-      // per-environment provider state drive the row so it self-heals.
-      expect(isTerminalProviderUpdatePhase("running")).toBe(false);
-      expect(isTerminalProviderUpdatePhase("initial")).toBe(false);
-    });
-  });
-
-  describe("resolveEnvironmentUpdateRowStatus", () => {
-    const group: LocalEnvironmentUpdateGroup = {
-      environmentId: "env-wsl" as EnvironmentId,
-      label: "WSL",
-      isPrimary: false,
-      isSettling: false,
-      candidates: [updateCandidate({ driver: driver("codex"), latestVersion: "1.1.0" })],
-      providers: [],
-    };
-    const runningResult: ProviderUpdateToastView = {
-      phase: "running",
-      type: "loading",
-      title: "Updating providers",
-      description: "Running provider update command.",
-    };
-    const succeededResult: ProviderUpdateToastView = {
-      phase: "succeeded",
-      type: "success",
-      title: "Provider updated",
-      description: "New sessions will use the updated provider.",
-    };
-    const successPill: ProviderUpdateSidebarPillView = {
-      key: "succeeded:codex",
-      tone: "success",
-      title: "Codex updated",
-      description: "New sessions will use the updated provider.",
-    };
-
-    it("prefers a transport error", () => {
-      expect(
-        resolveEnvironmentUpdateRowStatus({
-          group,
-          error: "boom",
-          result: succeededResult,
-          pill: successPill,
-          isPending: true,
-        }),
-      ).toMatchObject({ kind: "failed", text: "boom" });
-    });
-
-    it("uses a terminal result snapshot", () => {
-      expect(
-        resolveEnvironmentUpdateRowStatus({
-          group,
-          error: undefined,
-          result: succeededResult,
-          pill: null,
-          isPending: false,
-        }),
-      ).toMatchObject({ kind: "success" });
-    });
-
-    it("falls through a non-terminal result to live server state", () => {
-      // The dispatch snapshot is still "running", but server state already
-      // reports success — the row must not stay pinned on "Updating…".
-      expect(
-        resolveEnvironmentUpdateRowStatus({
-          group,
-          error: undefined,
-          result: runningResult,
-          pill: successPill,
-          isPending: true,
-        }),
-      ).toMatchObject({ kind: "success" });
-    });
-
-    it("shows the pending spinner before any signal arrives", () => {
-      expect(
-        resolveEnvironmentUpdateRowStatus({
-          group,
-          error: undefined,
-          result: runningResult,
-          pill: null,
-          isPending: true,
-        }),
-      ).toMatchObject({ kind: "loading" });
-    });
-
-    it("keeps a non-terminal result on loading even after pending clears", () => {
-      // The dispatch returned an incomplete ("running") snapshot and pending was
-      // cleared in finally — the row must not revert to the idle Update button.
-      expect(
-        resolveEnvironmentUpdateRowStatus({
-          group,
-          error: undefined,
-          result: runningResult,
-          pill: null,
-          isPending: false,
-        }),
-      ).toMatchObject({ kind: "loading" });
-    });
-
-    it("lists the providers when idle", () => {
-      expect(
-        resolveEnvironmentUpdateRowStatus({
-          group,
-          error: undefined,
-          result: undefined,
-          pill: null,
-          isPending: false,
-        }),
-      ).toMatchObject({ kind: "idle", text: "Codex" });
-    });
-  });
 });
 
 it("does not offer incompatible latest versions and restores suggestions after policy relaxation", () => {
@@ -1060,89 +456,153 @@ it("does not offer incompatible latest versions and restores suggestions after p
   }
 });
 
-describe("getProviderUpdateRunToastView", () => {
+describe("updating every machine", () => {
+  const environmentId = (value: string) => EnvironmentId.make(value);
+  const opencode = driver("opencode");
+  const behind = provider({
+    driver: opencode,
+    version: "2.0.24",
+    latestVersion: "2.0.26",
+    updateCommand: "npm install -g opencode-ai@latest",
+  });
   const updateState = (
-    status: "succeeded" | "failed",
+    status: "succeeded" | "failed" | "unchanged",
     message: string,
+    output: string | null = null,
   ): ServerProvider["updateState"] => ({
     status,
     startedAt: checkedAt,
     finishedAt: laterCheckedAt,
     message,
-    output: null,
+    output,
   });
-  const run = (
-    machineLabel: string,
-    providerDriver: string,
-    result: Parameters<typeof getProviderUpdateRunToastView>[0][number]["result"],
-  ) => ({
-    machineLabel,
-    driver: driver(providerDriver),
-    instanceId: instanceId(providerDriver),
-    result,
+  const after = (version: string, state: ServerProvider["updateState"]) =>
+    AsyncResult.success({
+      providers: [{ ...behind, version, ...(state ? { updateState: state } : {}) }],
+    });
+
+  const machines = collectProviderUpdateMachines([
+    { environmentId: environmentId("mac"), label: "Mac", connected: true, providers: [] },
+    { environmentId: environmentId("f"), label: "f", connected: true, providers: [behind] },
+    { environmentId: environmentId("art"), label: "art", connected: true, providers: [behind] },
+    {
+      environmentId: environmentId("basement"),
+      label: "basement",
+      connected: true,
+      providers: [behind],
+    },
+    {
+      environmentId: environmentId("offline"),
+      label: "offline",
+      connected: false,
+      providers: [behind],
+    },
+  ]);
+
+  it("targets every connected machine that is behind, not just this one", () => {
+    expect(machines.map((machine) => machine.label)).toEqual(["f", "art", "basement"]);
+    expect(providerUpdateNoticeKey(machines)).toBe("opencode:2.0.26");
+    expect(getProviderUpdateNoticeTitle(collectProviderUpdateCandidates([behind]))).toBe(
+      "Update Available: OpenCode v2.0.26",
+    );
   });
 
-  it("lists every failed update and ignores interrupted ones", () => {
-    const view = getProviderUpdateRunToastView([
-      run(
-        "Mac Studio",
-        "codex",
-        AsyncResult.success({
-          providers: [
-            provider({
-              driver: driver("codex"),
-              updateState: updateState("succeeded", "Provider updated."),
-            }),
-          ],
-        }),
-      ),
-      run(
-        "Mac Studio",
-        "claudeAgent",
-        AsyncResult.success({
-          providers: [
-            provider({
-              driver: driver("claudeAgent"),
-              updateState: updateState("failed", "npm exited with code 1."),
-            }),
-          ],
-        }),
-      ),
-      run("Laptop", "codex", AsyncResult.failure(Cause.die(new Error("WebSocket closed")))),
-      run("Server", "codex", AsyncResult.failure(Cause.interrupt())),
+  it("shows each machine's progress while updates run", () => {
+    const [f, art, basement] = providerUpdateRunsFor(machines) as [
+      ProviderUpdateRun,
+      ProviderUpdateRun,
+      ProviderUpdateRun,
+    ];
+    const runs = [
+      { ...f, result: after("2.0.26", updateState("succeeded", "Provider updated.")) },
+      art,
+      basement,
+    ];
+    expect(getProviderUpdateRunRows(runs).map((row) => [row.state, row.text])).toEqual([
+      ["updated", "f: OpenCode v2.0.24 → v2.0.26"],
+      ["running", "art: updating…"],
+      ["running", "basement: updating…"],
     ]);
+    expect(getProviderUpdateRunSummary(runs)).toBeNull();
+  });
 
-    expect(view).toEqual({
+  it("reports each machine's failure in one plain sentence", () => {
+    const [f, art, basement] = providerUpdateRunsFor(machines) as [
+      ProviderUpdateRun,
+      ProviderUpdateRun,
+      ProviderUpdateRun,
+    ];
+    const runs: ProviderUpdateRun[] = [
+      {
+        ...f,
+        result: after(
+          "2.0.24",
+          updateState(
+            "failed",
+            "Update command exited with code 243.",
+            "npm error code EACCES\nnpm error path /home/b/.npm/_cacache/index-v5/1f",
+          ),
+        ),
+      },
+      { ...art, result: after("2.0.26", updateState("succeeded", "Provider updated.")) },
+      { ...basement, result: AsyncResult.failure(Cause.die(new Error("WebSocket closed."))) },
+    ];
+    expect(getProviderUpdateRunRows(runs).map((row) => row.text)).toEqual([
+      "f: npm can't write its cache",
+      "art: OpenCode v2.0.24 → v2.0.26",
+      "basement: WebSocket closed",
+    ]);
+    expect(getProviderUpdateRunSummary(runs)).toEqual({
       type: "error",
-      title: "2 of 3 provider updates failed",
-      description: "Mac Studio · Claude: npm exited with code 1.\nLaptop · Codex: WebSocket closed",
+      title: "OpenCode updated on 1 of 3 machines",
     });
   });
 
-  it("reports success when every update succeeded", () => {
-    const succeeded = AsyncResult.success({
-      providers: [
-        provider({
-          driver: driver("codex"),
-          updateState: updateState("succeeded", "Provider updated."),
-        }),
-      ],
-    });
-
-    expect(
-      getProviderUpdateRunToastView([
-        run("Mac Studio", "codex", succeeded),
-        run("Laptop", "codex", succeeded),
-      ]),
-    ).toEqual({
+  it("says what changed when every machine updated, and ignores interrupted ones", () => {
+    const runs = providerUpdateRunsFor(machines).map((run, index): ProviderUpdateRun => ({
+      ...run,
+      result:
+        index === 2
+          ? AsyncResult.failure(Cause.interrupt())
+          : after("2.0.26", updateState("succeeded", "Provider updated.")),
+    }));
+    expect(getProviderUpdateRunRows(runs)).toHaveLength(2);
+    expect(getProviderUpdateRunSummary(runs)).toEqual({
       type: "success",
-      title: "2 providers updated",
-      description: "New sessions will use the updated providers.",
+      title: "OpenCode updated on 2 machines",
     });
-    expect(
-      getProviderUpdateRunToastView([
-        run("Server", "codex", AsyncResult.failure(Cause.interrupt())),
-      ]),
-    ).toBeNull();
+  });
+
+  it("names a version that did not move instead of calling it a success", () => {
+    const [f] = providerUpdateRunsFor(machines) as [ProviderUpdateRun];
+    const rows = getProviderUpdateRunRows([
+      {
+        ...f,
+        result: after(
+          "2.0.24",
+          updateState(
+            "unchanged",
+            "Update command completed, but czcode still detects an outdated provider version.",
+          ),
+        ),
+      },
+    ]);
+    expect(rows[0]?.text).toBe("f: the update ran, but OpenCode still reports v2.0.24");
+  });
+
+  it("turns common installer failures into plain sentences", () => {
+    const failure = (output: string) =>
+      describeProviderUpdateFailure({ message: "Update command exited with code 1.", output });
+    expect(failure("npm ERR! code EACCES\nnpm ERR! path /usr/lib/node_modules/opencode-ai")).toBe(
+      "the installer can't write to its install folder",
+    );
+    expect(failure("npm ERR! code ENOTFOUND registry.npmjs.org")).toBe(
+      "it couldn't reach the package registry",
+    );
+    expect(failure("npm ERR! code ENOSPC")).toBe("the disk is full");
+    expect(describeProviderUpdateFailure({ message: "Update timed out." })).toBe(
+      "the update timed out",
+    );
+    expect(failure("")).toBe("Update command exited with code 1");
   });
 });
