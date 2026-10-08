@@ -846,9 +846,17 @@ const layerMakeServer = Layer.unwrap(
                   ),
                 ),
                 Effect.provide(FetchHttpClient.layer),
-                // Unreadable Serve config: configure as before; release still checks.
-                Effect.catch(() => Effect.succeed({ _tag: "free" } as const)),
+                // Unreadable Serve config (the tailscale CLI can time out on a
+                // loaded host): the port may front the host, so leave it alone.
+                Effect.catch(() => Effect.succeed({ _tag: "unknown" } as const)),
               );
+              if (owner._tag === "unknown") {
+                yield* Effect.logWarning(
+                  "Could not read Tailscale Serve config; leaving the port alone",
+                  { servePort: config.tailscaleServePort },
+                );
+                return null;
+              }
               if (owner._tag === "other-environment" || owner._tag === "occupied") {
                 yield* Effect.logWarning(
                   "Tailscale Serve port already fronts another server; leaving it alone",
