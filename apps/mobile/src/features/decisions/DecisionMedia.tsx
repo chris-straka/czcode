@@ -3,7 +3,7 @@ import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Linking, Platform, Pressable, View } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -33,28 +33,10 @@ export function useDecisionMediaResolver(
       : null;
 }
 
-/**
- * Told when the owner plays a sound or video or installs a build, so a
- * decision can hold its verdict until they have (see `unseenMediaProblem`).
- */
-export const DecisionMediaEngagement = createContext<(key: string) => void>(() => {});
-
 /** Plays one sound; tap to play or pause, the loop toggle repeats it. */
-export function DecisionAudio({
-  uri,
-  label,
-  engageKey,
-}: {
-  uri: string;
-  label?: string;
-  engageKey?: string;
-}) {
+export function DecisionAudio({ uri, label }: { uri: string; label?: string }) {
   const player = useAudioPlayer({ uri }, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
-  const engage = useContext(DecisionMediaEngagement);
-  useEffect(() => {
-    if (status.playing && engageKey) engage(engageKey);
-  }, [engage, engageKey, status.playing]);
   const [loop, setLoop] = useState(false);
   useEffect(() => {
     player.loop = loop;
@@ -99,15 +81,8 @@ export function DecisionAudio({
   );
 }
 
-function DecisionVideo({ uri, engageKey }: { uri: string; engageKey: string }) {
+function DecisionVideo({ uri }: { uri: string }) {
   const player = useVideoPlayer({ uri });
-  const engage = useContext(DecisionMediaEngagement);
-  useEffect(() => {
-    const subscription = player.addListener("playingChange", ({ isPlaying }) => {
-      if (isPlaying) engage(engageKey);
-    });
-    return () => subscription.remove();
-  }, [engage, engageKey, player]);
   return (
     <VideoView
       player={player}
@@ -161,7 +136,6 @@ export function DecisionMedia({
   framed?: boolean;
 }) {
   const uri = useDecisionMediaUrl(environmentId, media);
-  const engage = useContext(DecisionMediaEngagement);
   if (!uri)
     return framed ? (
       <View className="bg-subtle" style={OPTION_FRAME_STYLE} />
@@ -192,9 +166,9 @@ export function DecisionMedia({
       );
     case "audio":
     case "voice":
-      return <DecisionAudio uri={uri} label={media.name} engageKey={media.key} />;
+      return <DecisionAudio uri={uri} label={media.name} />;
     case "video":
-      return <DecisionVideo uri={uri} engageKey={media.key} />;
+      return <DecisionVideo uri={uri} />;
     case "glb":
       return compact ? <View className="h-20 rounded-lg bg-subtle" /> : <DecisionModel uri={uri} />;
     case "apk":
@@ -203,7 +177,6 @@ export function DecisionMedia({
           tone="primary"
           label={`Install ${media.name}`}
           onPress={() => {
-            engage(media.key);
             if (Platform.OS !== "android") return void Linking.openURL(uri);
             void downloadAndInstallApk(
               uri,

@@ -1,10 +1,4 @@
-import {
-  answerSummary,
-  canAnswerFromCard,
-  VERDICT_BUTTONS,
-  optionMedia,
-  unseenMediaProblem,
-} from "@cz/client-runtime/decisions/draft";
+import { answerSummary, VERDICT_BUTTONS, optionMedia } from "@cz/client-runtime/decisions/draft";
 import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
 import {
   buildOneFeed,
@@ -38,11 +32,7 @@ import { useJobsOn } from "~/state/jobs";
 import { useNavigateBack } from "~/hooks/useNavigateBack";
 import { useVimKeys } from "~/hooks/useVimKeys";
 import { useAtomCommand } from "~/state/use-atom-command";
-import {
-  DECISION_OPTION_FRAME_CLASS,
-  DecisionMedia,
-  DecisionMediaEngagement,
-} from "../decisions/DecisionMedia";
+import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
 import { NoProjectsHero } from "../NoProjectsHero";
 import { SidebarUpdateArchitectureWarning } from "../sidebar/SidebarUpdatePill";
@@ -98,7 +88,7 @@ const entryKey = (entry: Pick<DecisionEntry, "environmentId" | "item">) =>
 
 interface PendingAnswer {
   readonly entry: DecisionEntry;
-  /** null: "No longer relevant", which withdraws the Decision. */
+  /** null: "Dismiss", which withdraws the Decision. */
   readonly answer: DecisionAnswerInput | null;
   readonly timer: ReturnType<typeof setTimeout>;
 }
@@ -822,11 +812,10 @@ function DecisionCard({
   embedded?: boolean;
   onOpen: () => void;
   onQuickAnswer: (patch: Partial<DecisionAnswerInput>) => void;
-  /** Withdraws it as no longer relevant. */
+  /** Dismisses it: withdraws it as no longer relevant. */
   onDismiss: () => void;
 }) {
   const { item } = entry;
-  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
   const optionsCarryMedia = item.kind === "pick" || item.kind === "rank";
   // A sound or a video plays right on the card, the thing itself before any text.
   const preview = optionsCarryMedia
@@ -837,13 +826,8 @@ function DecisionCard({
     optionsCarryMedia || preview
       ? []
       : item.media.filter((media) => media.type === "image").slice(0, 3);
-  // A card answers in place once nothing on it still needs watching, hearing,
-  // or installing; otherwise it offers Open.
-  const quick =
-    (item.kind === "review" || item.kind === "pitch") &&
-    (canAnswerFromCard(item) || unseenMediaProblem(item, engaged) === null)
-      ? VERDICT_BUTTONS[item.kind]
-      : null;
+  // A review or pitch answers right on the card; a wrong answer is undone from its toast.
+  const quick = item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
   const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Only single-choice picks answer from the card; the rest open the full view.
   const inlinePick = item.kind === "pick" && item.max_choices === 1 && item.options.length > 0;
@@ -864,18 +848,12 @@ function DecisionCard({
       data-decision-card={item.kind}
     >
       {preview ? (
-        <DecisionMediaEngagement
-          value={(key) =>
-            setEngaged((current) => (current.has(key) ? current : new Set(current).add(key)))
-          }
-        >
-          <DecisionMedia
-            environmentId={entry.environmentId}
-            media={preview}
-            compact={preview.type === "audio"}
-            {...(preview.type === "video" ? { className: "max-h-72" } : {})}
-          />
-        </DecisionMediaEngagement>
+        <DecisionMedia
+          environmentId={entry.environmentId}
+          media={preview}
+          compact={preview.type === "audio"}
+          {...(preview.type === "video" ? { className: "max-h-72" } : {})}
+        />
       ) : null}
       {pictures.length > 0 ? (
         <button
@@ -1003,7 +981,7 @@ function DecisionCard({
           </Button>
         ) : null}
         <Button size="xs" variant="ghost-muted" onClick={onDismiss}>
-          No longer relevant
+          Dismiss
         </Button>
       </div>
       {embedded ? null : (

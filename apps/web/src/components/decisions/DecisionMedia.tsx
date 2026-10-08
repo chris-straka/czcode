@@ -1,19 +1,13 @@
 import { decisionMediaUrl } from "@cz/client-runtime/decisions/mediaUrl";
 import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { BoxIcon, DownloadIcon, FileIcon } from "lucide-react";
-import { createContext, createElement, useContext, useEffect, useRef, useState } from "react";
+import { createElement, useEffect, useRef, useState } from "react";
 
 import { cn } from "~/lib/utils";
 import { usePreparedConnection } from "~/state/session";
 import { Button } from "../ui/button";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { WaveformPlayer } from "./WaveformPlayer";
-
-/**
- * Told when the owner plays, scrubs, or installs a media item, so a decision
- * can hold its verdict until they have (see `unseenMediaProblem`).
- */
-export const DecisionMediaEngagement = createContext<(key: string) => void>(() => {});
 
 /** Resolves any of a host's decision media to a loadable URL. */
 export function useDecisionMediaResolver(
@@ -181,7 +175,6 @@ export function DecisionMedia({
   className?: string;
 }) {
   const url = useDecisionMediaUrl(environmentId, media);
-  const engage = useContext(DecisionMediaEngagement);
   if (url === null) {
     return (
       <div
@@ -206,17 +199,7 @@ export function DecisionMedia({
             className="size-full object-cover"
           />
         ) : media.type === "video" ? (
-          <video
-            controls
-            preload="metadata"
-            src={url}
-            onPlay={() => engage(media.key)}
-            onTimeUpdate={(event) => {
-              // Scrubbing moves the playhead; a load can report a seek without one.
-              if (event.currentTarget.currentTime > 0.5) engage(media.key);
-            }}
-            className="size-full object-contain"
-          />
+          <video controls preload="metadata" src={url} className="size-full object-contain" />
         ) : (
           <BoxIcon className="size-6 text-muted-foreground" />
         )}
@@ -242,12 +225,7 @@ export function DecisionMedia({
     case "voice":
       return (
         <div className={cn("w-full", className)}>
-          <WaveformPlayer
-            url={url}
-            media={media}
-            compact={compact}
-            onEngage={() => engage(media.key)}
-          />
+          <WaveformPlayer url={url} media={media} compact={compact} />
         </div>
       );
     case "video":
@@ -256,11 +234,6 @@ export function DecisionMedia({
           controls
           preload="metadata"
           src={url}
-          onPlay={() => engage(media.key)}
-          onTimeUpdate={(event) => {
-            // Scrubbing moves the playhead; a load can report a seek without one.
-            if (event.currentTarget.currentTime > 0.5) engage(media.key);
-          }}
           className={cn("w-full rounded-md bg-black", compact ? "h-24" : "max-h-[70vh]", className)}
         />
       );
@@ -274,11 +247,7 @@ export function DecisionMedia({
       );
     case "apk":
       return (
-        <Button
-          render={<a href={url} download={media.name} />}
-          onClick={() => engage(media.key)}
-          className={className}
-        >
+        <Button render={<a href={url} download={media.name} />} className={className}>
           <DownloadIcon />
           Install {media.name}
         </Button>

@@ -92,8 +92,9 @@ older clients may carry `declined: true` instead: none of them, no new round.
 - `cost_note` (optional): what answering yes will spend ("runs Tripo, about
   $0.40").
 - `resume`: how work continues after the answer (see below).
-- A way out: the owner can mark any open decision **No longer relevant**,
-  which withdraws it. Asking again in the same thread under the same title
+- A way out: the owner can **Dismiss** any open decision, which withdraws
+  it. Answer buttons never wait for media to be played; every answer has
+  an Undo for a few seconds. Asking again in the same thread under the same title
   replaces the earlier open one, and archiving or deleting the asking thread
   withdraws its open decisions, so stale questions don't pile up.
 - `target_device` (optional): `phone`, `desktop`, or `any`. A playtest that
