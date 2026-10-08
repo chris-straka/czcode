@@ -227,8 +227,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         <SidebarGroup>
           <div className="flex flex-col gap-2">
             {/* Same inset, gap and icon as the section rows below, so the icons line up. */}
-            <div className="flex h-8 items-center gap-[var(--sidebar-control-gap)] rounded-[var(--control-radius)] px-[var(--sidebar-row-content-inset)] py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
-              <SearchIcon className="size-4 shrink-0 text-[var(--sidebar-icon-color)]" />
+            <div className="flex h-8 items-center gap-(--sidebar-control-gap) rounded-(--control-radius) px-(--sidebar-row-content-inset) py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+              <SearchIcon className="size-4 shrink-0 text-(--sidebar-icon-color)" />
               <SidebarInput
                 ref={searchInputRef}
                 nativeInput
