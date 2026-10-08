@@ -1,104 +1,111 @@
-import { expect, it } from "@effect/vitest";
-import {
-  ServerSelfUpdateError,
-  type DesktopUpdateState,
-  type DesktopUpdateStatusReport,
-} from "@cz/contracts";
-import * as Effect from "effect/Effect";
+import { describe, expect, it } from "@effect/vitest";
+import type { DesktopUpdateState } from "@cz/contracts";
 import * as Option from "effect/Option";
 
-import type * as DesktopAppUpdate from "./DesktopAppUpdate.ts";
-import { installIfIdle } from "./DesktopUpdateWhenIdle.ts";
+import {
+  MIN_RESTART_GAP_MS,
+  OWNER_IDLE_MS,
+  QUIET_MS,
+  SETTLE_MS,
+  decideRestart,
+  type RestartInput,
+} from "./DesktopUpdateWhenIdle.ts";
 
-function report(overrides: Partial<DesktopUpdateState>): Option.Option<DesktopUpdateStatusReport> {
-  return Option.some({
-    version: 1,
-    type: "desktopUpdateStatus",
-    state: {
-      enabled: true,
-      status: "downloaded",
-      channel: "latest",
-      currentVersion: "0.0.46-mac.1",
-      hostArch: "arm64",
-      appArch: "arm64",
-      runningUnderArm64Translation: false,
-      availableVersion: "0.0.46-mac.2",
-      downloadedVersion: "0.0.46-mac.2",
-      releaseNotes: [],
-      omittedReleaseCount: 0,
-      downloadPercent: 100,
-      checkedAt: null,
-      message: null,
-      errorContext: null,
-      canRetry: true,
-      ...overrides,
-    },
-  });
-}
+const NOW = 10 * 60 * 60 * 1000;
 
-function fakeUpdate() {
-  const calls: Array<string> = [];
-  const update: DesktopAppUpdate.DesktopAppUpdate["Service"] = {
-    available: true,
-    run: () =>
-      Effect.sync(() => {
-        calls.push("run");
-        return {
-          targetVersion: "0.0.46-mac.2",
-          method: "desktop-app" as const,
-          desktopUpdateToken: "token-1",
-        };
-      }),
-    commit: (token) =>
-      Effect.suspend(() => {
-        calls.push(`commit ${token}`);
-        return Effect.fail(new ServerSelfUpdateError({ reason: "stopped for the test" }));
-      }),
+function state(overrides: Partial<DesktopUpdateState> = {}): DesktopUpdateState {
+  return {
+    enabled: true,
+    status: "downloaded",
+    channel: "latest",
+    currentVersion: "0.0.46-mac.1",
+    hostArch: "arm64",
+    appArch: "arm64",
+    runningUnderArm64Translation: false,
+    availableVersion: "0.0.46-mac.2",
+    downloadedVersion: "0.0.46-mac.2",
+    releaseNotes: [],
+    omittedReleaseCount: 0,
+    downloadPercent: 100,
+    checkedAt: null,
+    message: null,
+    errorContext: null,
+    canRetry: true,
+    ...overrides,
   };
-  return { calls, update };
 }
 
-it.effect("installs a downloaded update when nothing is busy", () =>
-  Effect.gen(function* () {
-    const { calls, update } = fakeUpdate();
-    const result = yield* installIfIdle({
-      latestReport: Effect.succeed(report({})),
-      busy: Effect.succeed(null),
-      update,
-    }).pipe(Effect.flip);
-    expect(result.reason).toBe("stopped for the test");
-    expect(calls).toEqual(["run", "commit token-1"]);
-  }),
-);
+/** Idle, settled, nobody at the Mac, no recent restart: the install case. */
+function input(overrides: Partial<RestartInput> & { state?: DesktopUpdateState } = {}) {
+  const { state: updateState = state(), ...rest } = overrides;
+  return {
+    now: NOW,
+    report: Option.some({
+      version: 1 as const,
+      type: "desktopUpdateStatus" as const,
+      state: updateState,
+    }),
+    busy: null,
+    lastBusyAt: NOW - QUIET_MS,
+    downloadedSince: NOW - SETTLE_MS,
+    lastAutoRestartAt: NOW - MIN_RESTART_GAP_MS,
+    ownerIdleSeconds: OWNER_IDLE_MS / 1000,
+    screenLocked: false,
+    ...rest,
+  } satisfies RestartInput;
+}
 
-it.effect("waits while an agent is working", () =>
-  Effect.gen(function* () {
-    const { calls, update } = fakeUpdate();
-    const result = yield* installIfIdle({
-      latestReport: Effect.succeed(report({})),
-      busy: Effect.succeed("agent work"),
-      update,
+const waitReason = (overrides: Parameters<typeof input>[0]) => {
+  const decision = decideRestart(input(overrides));
+  return decision.action === "wait" ? decision.reason : decision.action;
+};
+
+describe("decideRestart", () => {
+  it("installs once everything has been quiet long enough", () => {
+    expect(decideRestart(input())).toEqual({ action: "install", version: "0.0.46-mac.2" });
+    expect(decideRestart(input({ lastAutoRestartAt: null }))).toMatchObject({ action: "install" });
+  });
+
+  it("never restarts while an agent turn runs or is about to start", () => {
+    expect(waitReason({ busy: "agents running" })).toBe("agents running");
+    expect(waitReason({ busy: "agent work about to start" })).toBe("agent work about to start");
+  });
+
+  it("treats a short gap between turns as busy", () => {
+    expect(waitReason({ lastBusyAt: NOW - QUIET_MS + 1 })).toMatch(/last 10 minutes/);
+  });
+
+  it("waits for the newest build when several land in a row", () => {
+    expect(waitReason({ downloadedSince: NOW - 60_000 })).toMatch(/newer build lands/);
+    expect(
+      waitReason({ state: state({ status: "downloading", availableVersion: "0.0.46-mac.3" }) }),
+    ).toMatch(/newer build is downloading/);
+    expect(waitReason({ state: state({ availableVersion: "0.0.46-mac.3" }) })).toMatch(
+      /newer build is downloading/,
+    );
+  });
+
+  it("restarts by itself at most once an hour", () => {
+    expect(waitReason({ lastAutoRestartAt: NOW - MIN_RESTART_GAP_MS + 1 })).toMatch(
+      /within the hour/,
+    );
+  });
+
+  it("asks instead of restarting while someone uses the Mac", () => {
+    expect(waitReason({ ownerIdleSeconds: 30 })).toMatch(/Restart to update/);
+    expect(waitReason({ ownerIdleSeconds: null })).toMatch(/Restart to update/);
+    expect(decideRestart(input({ ownerIdleSeconds: 30, screenLocked: true }))).toMatchObject({
+      action: "install",
     });
-    expect(result).toBe("busy");
-    expect(calls).toEqual([]);
-  }),
-);
+  });
 
-it.effect("leaves an update that is not downloaded, or failed to install, alone", () =>
-  Effect.gen(function* () {
-    const { calls, update } = fakeUpdate();
-    for (const latest of [
-      Option.none(),
-      report({ status: "downloading", downloadedVersion: null, downloadPercent: 40 }),
-      report({ errorContext: "install", message: "czcode couldn't move the old app aside." }),
-    ]) {
-      const result = yield* installIfIdle({
-        latestReport: Effect.succeed(latest),
-        busy: Effect.succeed(null),
-        update,
-      });
-      expect(result).toBe("nothing-to-install");
-    }
-    expect(calls).toEqual([]);
-  }),
-);
+  it("leaves no download, or a failed install, alone", () => {
+    expect(decideRestart(input({ report: Option.none() }))).toEqual({ action: "nothing" });
+    expect(
+      decideRestart(input({ state: state({ downloadedVersion: null, status: "downloading" }) })),
+    ).toEqual({ action: "nothing" });
+    expect(
+      decideRestart(input({ state: state({ status: "error", errorContext: "install" }) })),
+    ).toEqual({ action: "nothing" });
+  });
+});
