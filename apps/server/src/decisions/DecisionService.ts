@@ -138,6 +138,10 @@ function submissionProblem(input: DecisionSubmitInput): string | null {
   const media = input.media ?? [];
   const options = input.options ?? [];
   if (media.length > DECISION_LIMITS.maxMedia) return `At most ${DECISION_LIMITS.maxMedia} media.`;
+  const cueTimes = media.flatMap((ref) => (ref.cues ?? []).map((cue) => cue.at));
+  if (!cueTimes.every((at) => Number.isFinite(at) && at >= 0)) {
+    return "A cue's `at` is seconds from the start (0 or more).";
+  }
   if (options.length > DECISION_LIMITS.maxOptions) {
     return `At most ${DECISION_LIMITS.maxOptions} options.`;
   }

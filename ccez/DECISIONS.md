@@ -134,6 +134,21 @@ How to ask:
   recommended one first. If labels are numbered ("1 · …"), the server shows
   them in number order.
 - Start with a one-line question that says exactly what is being chosen.
+- **Plain words.** No jargon without a one-line meaning beside it. The owner
+  judges taste, not pipelines: "Judge the pipeline (sections, layers, loops)"
+  told him nothing (owner feedback, 2026-10-08). Say "the parts of the song
+  (intro, calm, tense)", "instruments that fade in as the game gets more
+  intense", "parts that repeat seamlessly while you keep playing", or define
+  the word once.
+- **Music gets a cue sheet.** For a sound or a piece of music, give its
+  media `cues`: one row per part, in time order, `{ "at": 0, "section":
+  "intro", "plays": "piano alone", "intensity": "low", "loop": false }`
+  (`at` in seconds, `plays` in plain words, `intensity` and `loop`
+  optional). Clients show it under the player as a table (Time, Part, What
+  plays, Intensity, Loops); clicking a row plays from there and the playing
+  row lights up. The rows also label the timeline, so `sections` isn't
+  needed alongside. From the CLI: `cz inbox submit --cues-file cues.json
+  theme.mp3`.
 - Each option gets its own distinct image (for a video: a thumbnail mock of
   that video), or no option gets one. Never attach the same image to every
   option: the owner can't tell the options apart (owner feedback,

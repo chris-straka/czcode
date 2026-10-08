@@ -39,6 +39,27 @@ const failureTag = <A, E extends { readonly _tag: string }, R>(effect: Effect.Ef
 
 it.layer(TestLayer)("DecisionService", (it) => {
   describe("submit", () => {
+    it.effect("keeps a sound's cue sheet, and rejects a cue before the start", () =>
+      Effect.gen(function* () {
+        const decisions = yield* DecisionService.DecisionService;
+        const song = (at: number) => ({
+          type: "audio" as const,
+          key: "00000000-0000-4000-8000-000000000001.mp3",
+          name: "theme.mp3",
+          mime: "audio/mpeg",
+          size: 1,
+          cues: [{ at, section: "calm", plays: "piano alone", intensity: "low", loop: true }],
+        });
+        const review = { ...pick(), kind: "review" as const, options: [] };
+        const item = yield* decisions.submit({ ...review, media: [song(0)] });
+        assert.deepStrictEqual(item.media[0]?.cues?.[0]?.plays, "piano alone");
+        assert.equal(
+          yield* failureTag(decisions.submit({ ...review, media: [song(-1)] })),
+          "DecisionInvalidError",
+        );
+      }),
+    );
+
     it.effect("rejects submissions that don't hold together", () =>
       Effect.gen(function* () {
         const decisions = yield* DecisionService.DecisionService;

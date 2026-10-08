@@ -577,7 +577,7 @@ function ListenPlayer({
   label: string;
 }) {
   const uri = useDecisionMediaUrl(entry.environmentId, media);
-  return uri ? <DecisionAudio uri={uri} label={label} /> : null;
+  return uri ? <DecisionAudio uri={uri} label={label} cues={media.cues} /> : null;
 }
 
 /** An image the owner draws on with a finger; strokes are stored in 0..1 coordinates. */
