@@ -83,28 +83,80 @@ export function parseSha256File(contents: string): string | null {
 
 /**
  * The detached script that swaps the bundle once the app has exited:
- * `sh -c <script> sh <pid> <app> <staged app> <relaunch 0|1> <failure file>`.
+ * `sh -c <script> sh <pid> <app> <staged app> <relaunch 0|1> <failure file>
+ * <launched file> <log file> <version>`.
+ *
  * The staged app sits next to the installed one, so both moves are renames
- * on one volume. If either move fails, the old app goes back in place and
- * the failure file gets one plain sentence for the next launch to show.
+ * on one volume. If either move fails, the old app goes back in place. On a
+ * relaunch the old app is kept until the new one proves it came up by
+ * writing the launched file (markMacUpdateLaunched); if it doesn't within
+ * 90 seconds, the new app is stopped, the old one goes back and opens.
+ * Every failure leaves one plain sentence in the failure file for the next
+ * launch to show, and every step is appended to the log file. An app that
+ * hasn't exited after two minutes is killed, so a hung quit still relaunches.
  * The app's path never changes, so the `cz` shim that `mac.sh --install`
- * writes keeps running the installed app's server.
+ * writes keeps running the installed app's server. `CZ_UPDATE_OPEN` replaces
+ * `open` and `CZ_UPDATE_LAUNCH_TRIES` (half seconds) shortens the wait, for
+ * tests.
  */
 export const MAC_SWAP_SCRIPT = `
-pid=$1 app=$2 staged=$3 relaunch=$4 failed=$5
-while kill -0 "$pid" 2>/dev/null; do sleep 0.5; done
+pid=$1 app=$2 staged=$3 relaunch=$4 failed=$5 launched=$6 log=$7 version=$8
+opener=\${CZ_UPDATE_OPEN:-open}
+say() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$log"; }
+fail() { echo "$1" > "$failed"; say "failed: $1"; }
+waited=0
+while kill -0 "$pid" 2>/dev/null; do
+  sleep 0.5
+  waited=$((waited + 1))
+  if [ "$waited" = 240 ]; then say "the app hadn't quit after 2 minutes; stopping it"; kill -9 "$pid" 2>/dev/null; fi
+done
 old="$(dirname "$app")/.czcode-old-$$.app"
+swapped=0
 if [ ! -d "$staged" ]; then
-  echo "The downloaded update went missing before it could be installed." > "$failed"
+  fail "The downloaded update went missing before it could be installed."
 elif ! mv "$app" "$old"; then
-  echo "czcode couldn't move the old app aside, so it kept the current version." > "$failed"
+  fail "czcode couldn't move the old app aside, so it kept the current version."
 elif ! mv "$staged" "$app"; then
   mv "$old" "$app"
-  echo "czcode couldn't put the new app in place, so it kept the current version." > "$failed"
+  fail "czcode couldn't put the new app in place, so it kept the current version."
 else
-  rm -rf "$old" "$(dirname "$staged")"
+  swapped=1
+  say "installed $version"
 fi
-if [ "$relaunch" = 1 ]; then open "$app"; fi
+if [ "$relaunch" != 1 ]; then
+  if [ "$swapped" = 1 ]; then rm -rf "$old" "$(dirname "$staged")"; fi
+  exit 0
+fi
+rm -f "$launched"
+say "relaunching"
+"$opener" "$app" || say "open failed"
+tries=0
+while [ ! -f "$launched" ] && [ "$tries" -lt "$launch_tries" ]; do sleep 0.5; tries=$((tries + 1)); done
+if [ -f "$launched" ]; then
+  say "relaunched: $(cat "$launched")"
+  if [ "$swapped" = 1 ]; then rm -rf "$old" "$(dirname "$staged")"; fi
+  exit 0
+fi
+if [ "$swapped" != 1 ]; then
+  say "the app didn't come back up after a failed install"
+  exit 1
+fi
+# The new app never came up: stop it (its main process runs the bundle's
+# executable with no server script) and put the old one back.
+exe="$app/Contents/MacOS/czcode"
+for p in $(ps -axo pid=,args= | awk -v exe="$exe" '$2 == exe && index($0, "bin.mjs") == 0 { print $1 }'); do
+  kill "$p" 2>/dev/null
+done
+sleep 2
+broken="$(dirname "$staged")/broken-$$.app"
+mkdir -p "$(dirname "$staged")"
+if mv "$app" "$broken" && mv "$old" "$app"; then
+  rm -rf "$(dirname "$staged")"
+  fail "czcode $version didn't start, so it went back to the previous version."
+  "$opener" "$app" || say "open failed"
+else
+  fail "czcode $version didn't start, and the previous version couldn't be put back; reinstall with ccez/release/mac-install.sh."
+fi
 `;
 
 /** A Mac update failure whose message is one plain sentence for the user. */

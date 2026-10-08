@@ -1,11 +1,13 @@
-// @effect-diagnostics nodeBuiltinImport:off globalFetch:off -- This macOS platform boundary streams a release zip to disk while hashing it, and spawns the detached swap script that must outlive the app.
+// @effect-diagnostics nodeBuiltinImport:off globalFetch:off globalDate:off -- This macOS platform boundary streams a release zip to disk while hashing it, and spawns the detached swap script that must outlive the app.
 /**
  * The Mac build's updater. It stands in for electron-updater, which can't
  * apply updates to an unsigned app: it reads the GitHub release feed
  * (macReleaseFeed.ts), downloads and checksums the zip as soon as a newer
  * build appears, stages it next to the installed app, and swaps the bundle
  * from a detached script after the app quits, either to restart into the
- * update or on an ordinary quit.
+ * update or on an ordinary quit. Each step goes to `update.log` in the app's
+ * user data folder, next to `update-failed.txt`, which carries the sentence
+ * the next launch shows when an update didn't take.
  */
 import * as NodeChildProcess from "node:child_process";
 import * as NodeCrypto from "node:crypto";
@@ -71,7 +73,20 @@ export const make = Effect.sync(() => {
   // .../czcode.app/Contents/MacOS/czcode -> .../czcode.app
   const bundlePath = NodePath.resolve(Electron.app.getPath("exe"), "../../..");
   const stagingDir = NodePath.join(NodePath.dirname(bundlePath), ".czcode-update");
-  const failureFile = NodePath.join(Electron.app.getPath("userData"), "update-failed.txt");
+  const userData = Electron.app.getPath("userData");
+  const failureFile = NodePath.join(userData, "update-failed.txt");
+  const launchedFile = NodePath.join(userData, "update-launched.txt");
+  const logFile = NodePath.join(userData, "update.log");
+  const say = (line: string) =>
+    NodeFSP.appendFile(logFile, `${new Date().toISOString()} ${line}\n`).catch(() => undefined);
+
+  // The swap script's relaunch watchdog waits for this: the window loaded,
+  // so the new app (and the backend it serves) came up.
+  Electron.app.once("browser-window-created", (_event, window) => {
+    window.webContents.once("did-finish-load", () => {
+      NodeFS.writeFile(launchedFile, Electron.app.getVersion(), () => undefined);
+    });
+  });
 
   let latest: MacRelease | null = null;
   let staged: { readonly version: string; readonly appPath: string } | null = null;
@@ -84,6 +99,7 @@ export const make = Effect.sync(() => {
   const startSwap = (relaunch: boolean) => {
     if (swapStarted || !staged) return;
     swapStarted = true;
+    void say(`quitting to install ${staged.version}${relaunch ? " and relaunch" : ""}`);
     NodeChildProcess.spawn(
       "/bin/sh",
       [
@@ -95,6 +111,9 @@ export const make = Effect.sync(() => {
         staged.appPath,
         relaunch ? "1" : "0",
         failureFile,
+        launchedFile,
+        logFile,
+        staged.version,
       ],
       { detached: true, stdio: "ignore" },
     ).unref();
@@ -151,6 +170,7 @@ export const make = Effect.sync(() => {
       // unsigned app won't open.
       await execFile("xattr", ["-dr", "com.apple.quarantine", appPath]).catch(() => undefined);
       staged = { version: release.version, appPath };
+      void say(`downloaded ${release.version}`);
       events.emit("update-downloaded", { version: release.version });
     } catch (error) {
       await NodeFSP.rm(stagingDir, { recursive: true, force: true }).catch(() => undefined);
@@ -176,15 +196,17 @@ export const make = Effect.sync(() => {
     if (failure !== null) {
       await NodeFSP.rm(failureFile, { force: true });
       autoDownload = false;
+      void say(`showing the last update's failure: ${failure.trim()}`);
       throw new MacUpdateError(failure.trim() || "The last update couldn't be installed.");
     }
+    // CZ_MAC_UPDATE_FEED points a test install at a local copy of the feed.
     const repository = readFeedRepository();
-    if (!repository) throw new MacUpdateError("This build has no update feed.");
+    const feedUrl =
+      process.env.CZ_MAC_UPDATE_FEED ??
+      (repository ? `https://api.github.com/repos/${repository}/releases?per_page=30` : null);
+    if (!feedUrl) throw new MacUpdateError("This build has no update feed.");
     events.emit("checking-for-update");
-    const response = await fetchOk(
-      `https://api.github.com/repos/${repository}/releases?per_page=30`,
-      "application/vnd.github+json",
-    );
+    const response = await fetchOk(feedUrl, "application/vnd.github+json");
     const release = newestMacRelease(await response.json());
     if (!release || release.build <= macBuildNumber(Electron.app.getVersion())) {
       latest = null;
