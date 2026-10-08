@@ -41,8 +41,10 @@ candidates() {
     echo "$path"
   done
   find SWE ResumeProjects -maxdepth 7 \( -name node_modules -o -name .git \) -prune -o \
-    -type d \( -name target -o -name .venv \) -print -prune 2> /dev/null |
+    \( -type d -o -type l \) \( -name target -o -name .venv \) -print -prune 2> /dev/null |
     while read -r path; do
+      # Moved ones are links now; they're revisited to keep git ignoring them.
+      [ -L "$path" ] && echo "$path" && continue
       case "$path" in
         */target) [ -f "$(dirname "$path")/Cargo.toml" ] && echo "$path" ;;
         */.venv) [ "$(du -sm "$path" | cut -f1)" -ge 1024 ] && echo "$path" ;;
@@ -70,12 +72,29 @@ in_use() {
   done
 }
 
+# Ignore rules like `/target/` match only folders, so git would list the
+# symlink as a new file (and `git add -A` would commit it). Exclude it in
+# the repo's own info/exclude.
+exclude_link() {
+  local top rel exclude
+  top=$(git -C "$(dirname "$1")" rev-parse --show-toplevel 2> /dev/null) || return 0
+  rel=${HOME}/$1
+  rel=/${rel#"$top"/}
+  exclude=$(git -C "$top" rev-parse --path-format=absolute --git-path info/exclude)
+  mkdir -p "$(dirname "$exclude")"
+  grep -qxF "$rel" "$exclude" 2> /dev/null || echo "$rel" >> "$exclude"
+}
+
 moved=()
 busy=()
 failed=0
 while read -r path; do
-  [ -d "$path" ] && [ ! -L "$path" ] || continue
   dest="$dest_root/$path"
+  if [ -L "$path" ]; then
+    [ "$(readlink "$path")" = "$dest" ] && ! $dry && exclude_link "$path"
+    continue
+  fi
+  [ -d "$path" ] || continue
   size=$(du -sh "$path" 2> /dev/null | cut -f1)
   reason=$(in_use "$path")
   if [ -n "$reason" ]; then
@@ -93,6 +112,7 @@ while read -r path; do
     rsync -aH --delete "$path/" "$dest/" && mv "$path" "$path.moving" &&
     ln -s "$dest" "$path"; then
     rm -rf "$path.moving"
+    exclude_link "$path"
     moved+=("$path ($size)")
     echo "moved ~/$path ($size) to $dest"
   else
