@@ -30,8 +30,12 @@ questions are answered in place: digits pick options, `i` types your own answer.
 The tab's count covers the decisions the current filter shows (`a` switches between this project
 and all). In a decision, `1`-`9` pick an option (or a verdict), `]`/`[` move between options,
 Enter sends, `c` adds a note, and `n`/`p` step to the next or previous decision. `j`/`k` scroll,
-`o` opens the focused image full screen, and `t` opens the thread that asked. Images show
-inline in Ghostty and kitty, including inside a neovim float.
+`o` opens the focused image full screen, and `t` opens the thread that asked.
+
+Images (decision options, renders, screenshots, images attached to messages, and a poster
+frame for videos) show inline in Ghostty and kitty, including inside a neovim float and over
+SSH from those terminals. Elsewhere, such as an SSH app on a phone, they show as a name you can
+open with `o`.
 
 ## Queue
 

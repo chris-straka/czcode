@@ -12,7 +12,29 @@ export interface TranscriptLine {
   readonly key: string;
   readonly tone: LineTone;
   readonly text: string;
+  /** An image attached to the message; the screen draws it inline or names it. */
+  readonly image?: { readonly attachmentId: string; readonly name: string };
 }
+
+type ItemWithAttachments = {
+  readonly attachments?:
+    | ReadonlyArray<{
+        readonly type: string;
+        readonly id: string;
+        readonly name: string;
+      }>
+    | undefined;
+};
+
+/** A message's image attachments, one line each, after its text. */
+const imageLines = (item: ItemWithAttachments): Array<Omit<TranscriptLine, "key">> =>
+  (item.attachments ?? [])
+    .filter((attachment) => attachment.type === "image")
+    .map((attachment) => ({
+      tone: "dim" as const,
+      text: `🖼 ${attachment.name}`,
+      image: { attachmentId: attachment.id, name: attachment.name },
+    }));
 
 const firstLine = (text: string) => text.split("\n").find((line) => line.trim() !== "") ?? "";
 
@@ -42,9 +64,12 @@ export function itemLines(
   const verbose = options.verbose ?? false;
   switch (item.type) {
     case "user_message":
-      return [{ tone: "user", text: `› ${item.text}` }];
+      return [{ tone: "user", text: `› ${item.text}` }, ...imageLines(item)];
     case "assistant_message":
-      return [{ tone: "assistant", text: item.text + (item.streaming ? " ▍" : "") }];
+      return [
+        { tone: "assistant", text: item.text + (item.streaming ? " ▍" : "") },
+        ...imageLines(item),
+      ];
     case "reasoning":
       if (verbose && item.text.trim() !== "")
         return [{ tone: "dim", text: `∴ ${item.text.trim()}` }];
