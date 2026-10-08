@@ -28,7 +28,9 @@ and a video has a timeline under it: click to jump, and on a review drag
 across it to mark a part (sound: like or change; video: keep, cut, or
 change) with a note, or use **Comment at** to pin a note to the moment
 playing. Click a mark's chip to jump there and edit its note; Space plays
-or pauses. The agent gets the marks and comments with your answer. An
+or pauses. Music can come with a cue sheet under the player: each part of
+the piece, when it starts, what plays, how intense it is and whether it
+loops. Click a row to play from there. The agent gets the marks and comments with your answer. An
 open Decision shows its media first, with any longer write-up under
 **Details**. Paste, drop or attach pictures on the note to send them with
 your answer.

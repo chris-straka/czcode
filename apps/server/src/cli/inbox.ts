@@ -6,6 +6,7 @@
  * @module InboxCli
  */
 import {
+  DecisionCue,
   type DecisionItemWithAnswer,
   DecisionKind,
   DecisionItemStatus,
@@ -130,6 +131,14 @@ export const stepsFromFile = (text: string, fileCount: number) =>
     Effect.mapError((error) => fail(`Can't read --steps-file: ${error.message}`)),
   );
 
+const CuesFile = Schema.fromJsonString(Schema.Array(DecisionCue));
+
+/** A cue sheet from `--cues-file`, for the first sound or video. */
+export const cuesFromFile = (text: string) =>
+  Schema.decodeEffect(CuesFile)(text).pipe(
+    Effect.mapError((error) => fail(`Can't read --cues-file: ${error.message}`)),
+  );
+
 /** "2h", "3d", "30m" after `now`, or an absolute date. */
 export const parseWhen = (value: string, now: number): number | null => {
   const relative = /^(\d+)(m|h|d)$/i.exec(value.trim());
@@ -186,6 +195,12 @@ const submitCommand = Command.make("submit", {
     ),
     Flag.optional,
   ),
+  cuesFile: Flag.String("cues-file").pipe(
+    Flag.withDescription(
+      "Music: a JSON array of {at, section, plays, intensity?, loop?}, the cue sheet under the first sound or video.",
+    ),
+    Flag.optional,
+  ),
   priority: Flag.String("priority").pipe(Flag.optional),
   createdBy: Flag.String("created-by").pipe(Flag.optional),
   thread: Flag.String("thread").pipe(Flag.optional),
@@ -228,6 +243,12 @@ const submitCommand = Command.make("submit", {
               yield* fs.readFile(file),
             ),
           );
+        }
+        if (Option.isSome(flags.cuesFile)) {
+          const cues = yield* cuesFromFile(yield* fs.readFileString(flags.cuesFile.value));
+          const index = media.findIndex((ref) => ref.type === "audio" || ref.type === "video");
+          if (index < 0) return yield* fail("--cues-file needs a sound or video file.");
+          media[index] = { ...media[index]!, cues };
         }
         const steps = Option.isSome(flags.stepsFile)
           ? yield* stepsFromFile(yield* fs.readFileString(flags.stepsFile.value), media.length)

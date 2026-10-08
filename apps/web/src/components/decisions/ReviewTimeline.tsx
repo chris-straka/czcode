@@ -76,6 +76,9 @@ export function ReviewTimeline({
   readonly leading?: ReactNode;
   readonly trailing?: ReactNode;
 }) {
+  // A cue sheet labels the timeline when there are no sections of their own.
+  const sections =
+    media.sections ?? media.cues?.map((cue) => ({ at: cue.at, label: cue.section })) ?? [];
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const [pending, setPending] = useState<{ start: number; end: number } | null>(null);
   const [note, setNote] = useState("");
@@ -131,9 +134,9 @@ export function ReviewTimeline({
         compact ? "gap-y-1" : "gap-y-2",
       )}
     >
-      {!compact && media.sections?.length && duration > 0 ? (
+      {!compact && sections.length > 0 && duration > 0 ? (
         <div className="relative col-start-2 h-4 text-2xs text-muted-foreground" aria-hidden>
-          {media.sections.map((section) => (
+          {sections.map((section) => (
             <span
               key={`${section.at}:${section.label}`}
               className="absolute top-0 truncate border-s border-border ps-1"

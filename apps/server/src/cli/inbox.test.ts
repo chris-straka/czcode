@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import { describe, expect, it } from "@effect/vitest";
 
-import { mediaTypeForFile, optionsFor, parseWhen, stepsFromFile } from "./inbox.ts";
+import { cuesFromFile, mediaTypeForFile, optionsFor, parseWhen, stepsFromFile } from "./inbox.ts";
 
 describe("cz inbox submit helpers", () => {
   it("makes one option per file for media kinds, and uses given labels otherwise", () => {
@@ -45,6 +45,20 @@ describe("cz inbox submit helpers", () => {
       ]);
       const bad = yield* Effect.flip(stepsFromFile('[{"id":"x"}]', 0));
       expect(bad.message).toContain("--steps-file");
+    }),
+  );
+
+  it.effect("reads a cue sheet, and says what's wrong with a bad one", () =>
+    Effect.gen(function* () {
+      const cues = yield* cuesFromFile(
+        JSON.stringify([
+          { at: 0, section: "intro", plays: "piano alone", loop: false },
+          { at: 6.2, section: "calm", plays: "piano, soft strings", intensity: "low", loop: true },
+        ]),
+      );
+      expect(cues.map((cue) => cue.section)).toEqual(["intro", "calm"]);
+      const error = yield* Effect.flip(cuesFromFile(JSON.stringify([{ at: "soon" }])));
+      expect(error.message).toContain("--cues-file");
     }),
   );
 });

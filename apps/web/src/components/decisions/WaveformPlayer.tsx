@@ -3,6 +3,7 @@ import { PauseIcon, PencilIcon, PlayIcon, ThumbsUpIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "../ui/button";
+import { CueSheet } from "./CueSheet";
 import { clock, ReviewTimeline, type TagChoice, type TimelineMark } from "./ReviewTimeline";
 
 const NO_MARKS: ReadonlyArray<TimelineMark> = [];
@@ -187,6 +188,9 @@ export function WaveformPlayer({
           </svg>
         )}
       />
+      {media.cues?.length ? (
+        <CueSheet cues={media.cues} time={time} onSeek={seek} compact={compact} />
+      ) : null}
     </div>
   );
 }

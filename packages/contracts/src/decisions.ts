@@ -56,6 +56,21 @@ export const DecisionMediaType = Schema.Literals([
 ]);
 export type DecisionMediaType = typeof DecisionMediaType.Type;
 
+/** One row of a cue sheet (see `DecisionMediaRef.cues`). */
+export const DecisionCue = Schema.Struct({
+  /** Seconds from the start. */
+  at: Schema.Number,
+  /** The part, like "intro", "calm", "tense". */
+  section: Schema.String,
+  /** What plays, in plain words: "piano alone", "piano, strings fade in". */
+  plays: Schema.String,
+  /** How intense, in words or a level: "low", "3 of 5". */
+  intensity: Schema.optionalKey(Schema.String),
+  /** Repeats seamlessly while the game keeps playing. */
+  loop: Schema.optionalKey(Schema.Boolean),
+});
+export type DecisionCue = typeof DecisionCue.Type;
+
 export const DecisionMediaRef = Schema.Struct({
   type: DecisionMediaType,
   /** Server storage key from an upload. Never a URL. */
@@ -68,6 +83,13 @@ export const DecisionMediaRef = Schema.Struct({
   sections: Schema.optionalKey(
     Schema.Array(Schema.Struct({ at: Schema.Number, label: Schema.String })),
   ),
+  /**
+   * Audio and video: a cue sheet, one row per part in time order: where it
+   * starts, its name, what plays in plain words, how intense, and whether it
+   * repeats while the game keeps playing. Shown under the player; it also
+   * labels the timeline when `sections` is absent.
+   */
+  cues: Schema.optionalKey(Schema.Array(DecisionCue)),
   /** Short-lived signed URL, filled in by the server when it returns an item. */
   url: Schema.optionalKey(Schema.String),
 });

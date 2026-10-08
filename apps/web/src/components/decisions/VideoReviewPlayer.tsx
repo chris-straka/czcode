@@ -2,6 +2,7 @@ import type { DecisionMediaRef } from "@cz/contracts";
 import { PencilIcon, ScissorsIcon, ThumbsUpIcon } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { CueSheet } from "./CueSheet";
 import { clock, ReviewTimeline, type TagChoice, type TimelineMark } from "./ReviewTimeline";
 import { claimPlayback } from "./WaveformPlayer";
 
@@ -68,6 +69,7 @@ export function VideoReviewPlayer({
           </span>
         )}
       />
+      {media.cues?.length ? <CueSheet cues={media.cues} time={time} onSeek={seek} /> : null}
     </div>
   );
 }

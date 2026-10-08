@@ -1,6 +1,7 @@
 import type {
   DecisionAnswerInput,
   DecisionAudioMark,
+  DecisionCue,
   DecisionItem,
   DecisionMediaRef,
   DecisionPassageComment,
@@ -211,4 +212,13 @@ export function contextMedia(
     }),
   );
   return item.media.filter((media) => media.url && !owned.has(media.key));
+}
+
+/** The cue that's playing at `time`: the last one starting at or before it. */
+export function playingCue(cues: ReadonlyArray<DecisionCue>, time: number): number {
+  let playing = -1;
+  cues.forEach((cue, index) => {
+    if (cue.at <= time && (playing < 0 || cue.at >= cues[playing]!.at)) playing = index;
+  });
+  return playing;
 }

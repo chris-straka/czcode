@@ -1,5 +1,6 @@
 import { decisionMediaUrl } from "@cz/client-runtime/decisions/mediaUrl";
-import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
+import { playingCue } from "@cz/client-runtime/decisions/draft";
+import type { DecisionCue, DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -33,53 +34,101 @@ export function useDecisionMediaResolver(
       : null;
 }
 
-/** Plays one sound; tap to play or pause, the loop toggle repeats it. */
-export function DecisionAudio({ uri, label }: { uri: string; label?: string }) {
+/**
+ * Plays one sound; tap to play or pause, the loop toggle repeats it. With a
+ * cue sheet, its rows sit under the player: tap one to play from there.
+ */
+export function DecisionAudio({
+  uri,
+  label,
+  cues,
+}: {
+  uri: string;
+  label?: string;
+  cues?: ReadonlyArray<DecisionCue> | undefined;
+}) {
   const player = useAudioPlayer({ uri }, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const [loop, setLoop] = useState(false);
   useEffect(() => {
     player.loop = loop;
   }, [loop, player]);
+  const playing = cues ? playingCue(cues, status.currentTime) : -1;
   return (
-    <View className="flex-row items-center gap-3">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          status.playing ? `Pause ${label ?? "sound"}` : `Play ${label ?? "sound"}`
-        }
-        onPress={() => {
-          if (status.playing) player.pause();
-          else {
-            if (status.didJustFinish || status.currentTime >= status.duration)
-              void player.seekTo(0);
-            player.play();
+    <View className="gap-2">
+      <View className="flex-row items-center gap-3">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            status.playing ? `Pause ${label ?? "sound"}` : `Play ${label ?? "sound"}`
           }
-        }}
-        className="h-11 w-11 items-center justify-center rounded-full bg-primary active:opacity-70"
-      >
-        <Text className="text-lg text-primary-foreground">{status.playing ? "❚❚" : "▶"}</Text>
-      </Pressable>
-      <View className="h-1 flex-1 overflow-hidden rounded-full bg-subtle">
-        <View
-          className="h-1 bg-primary"
-          style={{
-            width: `${status.duration ? (status.currentTime / status.duration) * 100 : 0}%`,
+          onPress={() => {
+            if (status.playing) player.pause();
+            else {
+              if (status.didJustFinish || status.currentTime >= status.duration)
+                void player.seekTo(0);
+              player.play();
+            }
           }}
-        />
+          className="h-11 w-11 items-center justify-center rounded-full bg-primary active:opacity-70"
+        >
+          <Text className="text-lg text-primary-foreground">{status.playing ? "❚❚" : "▶"}</Text>
+        </Pressable>
+        <View className="h-1 flex-1 overflow-hidden rounded-full bg-subtle">
+          <View
+            className="h-1 bg-primary"
+            style={{
+              width: `${status.duration ? (status.currentTime / status.duration) * 100 : 0}%`,
+            }}
+          />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Loop"
+          accessibilityState={{ selected: loop }}
+          onPress={() => setLoop((value) => !value)}
+          className={loop ? "rounded-full bg-subtle-strong px-3 py-2" : "rounded-full px-3 py-2"}
+        >
+          <Text className="text-xs text-foreground-muted">Loop</Text>
+        </Pressable>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Loop"
-        accessibilityState={{ selected: loop }}
-        onPress={() => setLoop((value) => !value)}
-        className={loop ? "rounded-full bg-subtle-strong px-3 py-2" : "rounded-full px-3 py-2"}
-      >
-        <Text className="text-xs text-foreground-muted">Loop</Text>
-      </Pressable>
+      {cues?.map((cue, index) => (
+        <Pressable
+          key={`${cue.at}:${cue.section}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Play ${cue.section} from ${cueClock(cue.at)}`}
+          accessibilityState={{ selected: index === playing }}
+          onPress={() => {
+            void player.seekTo(cue.at);
+            player.play();
+          }}
+          className={
+            index === playing
+              ? "flex-row gap-3 rounded-lg bg-subtle-strong px-2 py-1.5"
+              : "flex-row gap-3 rounded-lg px-2 py-1.5"
+          }
+        >
+          <Text className="w-10 text-xs text-foreground-muted">{cueClock(cue.at)}</Text>
+          <View className="flex-1">
+            <Text className="text-sm font-cz-medium text-foreground">{cue.section}</Text>
+            <Text className="text-xs text-foreground-muted">
+              {[
+                cue.plays,
+                cue.intensity ? `intensity ${cue.intensity}` : null,
+                cue.loop ? "loops" : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </Text>
+          </View>
+        </Pressable>
+      ))}
     </View>
   );
 }
+
+const cueClock = (seconds: number) =>
+  `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 
 function DecisionVideo({ uri }: { uri: string }) {
   const player = useVideoPlayer({ uri });
@@ -166,7 +215,7 @@ export function DecisionMedia({
       );
     case "audio":
     case "voice":
-      return <DecisionAudio uri={uri} label={media.name} />;
+      return <DecisionAudio uri={uri} label={media.name} cues={media.cues} />;
     case "video":
       return <DecisionVideo uri={uri} />;
     case "glb":
