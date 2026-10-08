@@ -259,7 +259,28 @@ export function FleetScreen(props: {
     h(Text, null, ` ${formatUsedOfTotal(totals.memoryUsedBytes, totals.memoryTotalBytes)}`),
   );
 
+  // Every entry in `lines` is exactly one terminal row (spacers included, no
+  // wrapping), so the scroll window below can count rows by counting lines.
   const lines: Array<ReactNode> = [];
+  const gaugeWidth = (detailWidth: number) => 6 + meterWidth + detailWidth + 2;
+  const pushGaugeRows = (key: string, gauges: ReadonlyArray<readonly [ReactNode, number]>) => {
+    const room = Math.max(20, columns - 6);
+    let row: Array<ReactNode> = [];
+    let used = 0;
+    const flush = () => {
+      if (row.length === 0) return;
+      lines.push(h(Box, { key: `${key}:${lines.length}`, marginLeft: 4 }, ...row));
+      row = [];
+      used = 0;
+    };
+    for (const [gauge, detailWidth] of gauges) {
+      const width = gaugeWidth(detailWidth);
+      if (used > 0 && used + width > room) flush();
+      row.push(gauge);
+      used += width;
+    }
+    flush();
+  };
   rows.forEach((row, index) => {
     const isSelected = index === selected;
     const pointer = h(Text, { color: "cyan" }, isSelected ? "› " : "  ");
@@ -280,14 +301,15 @@ export function FleetScreen(props: {
           : null,
         (awake || busy) && resources ? `${resources.cpuCount} cores` : null,
       ].filter(Boolean);
+      if (index > 0) lines.push(h(Text, { key: `sp:${machine.environmentId}` }, " "));
       lines.push(
         h(
           Box,
-          { key: `m:${machine.environmentId}`, marginTop: index === 0 ? 0 : 1 },
+          { key: `m:${machine.environmentId}` },
           pointer,
           h(Text, { color: mark.color }, `${mark.mark} `),
           h(Text, { bold: true }, machine.label),
-          h(Text, { dimColor: true }, `  ${facts.join(" · ")}`),
+          h(Text, { dimColor: true, wrap: "truncate" }, `  ${facts.join(" · ")}`),
           machine.warnings.length > 0
             ? h(
                 Text,
@@ -305,60 +327,66 @@ export function FleetScreen(props: {
           .filter((device) => device.kind === "zram")
           .reduce((sum, device) => sum + (device.memoryBytes ?? 0), 0);
         const cpu = resources.cpuUtilization ?? 0;
-        const vitals = [
-          h(Gauge, {
-            key: "cpu",
-            label: "CPU",
-            ratio: cpu,
-            width: meterWidth,
-            detailWidth: 5,
-            detail: `${Math.round(cpu * 100)}%`,
-            ...tone,
-          }),
-          h(Gauge, {
-            key: "ram",
-            label: "RAM",
-            ratio: resources.totalMemoryBytes > 0 ? memUsed / resources.totalMemoryBytes : 0,
-            width: meterWidth,
-            detailWidth: 10,
-            detail: formatUsedOfTotal(memUsed, resources.totalMemoryBytes),
-            ...tone,
-          }),
+        const vitals: Array<readonly [ReactNode, number] | null> = [
+          [
+            h(Gauge, {
+              key: "cpu",
+              label: "CPU",
+              ratio: cpu,
+              width: meterWidth,
+              detailWidth: 5,
+              detail: `${Math.round(cpu * 100)}%`,
+              ...tone,
+            }),
+            5,
+          ],
+          [
+            h(Gauge, {
+              key: "ram",
+              label: "RAM",
+              ratio: resources.totalMemoryBytes > 0 ? memUsed / resources.totalMemoryBytes : 0,
+              width: meterWidth,
+              detailWidth: 10,
+              detail: formatUsedOfTotal(memUsed, resources.totalMemoryBytes),
+              ...tone,
+            }),
+            10,
+          ],
           resources.swap && resources.swap.totalBytes > 0
-            ? h(Gauge, {
-                key: "swap",
-                label: "Swap",
-                ratio: resources.swap.usedBytes / resources.swap.totalBytes,
-                width: meterWidth,
-                detailWidth: 22,
-                detail: `${formatUsedOfTotal(resources.swap.usedBytes, resources.swap.totalBytes)}${zramRam > 0 ? ` zram ${formatBytes(zramRam)}` : ""}`,
-                ...tone,
-              })
+            ? [
+                h(Gauge, {
+                  key: "swap",
+                  label: "Swap",
+                  ratio: resources.swap.usedBytes / resources.swap.totalBytes,
+                  width: meterWidth,
+                  detailWidth: 22,
+                  detail: `${formatUsedOfTotal(resources.swap.usedBytes, resources.swap.totalBytes)}${zramRam > 0 ? ` zram ${formatBytes(zramRam)}` : ""}`,
+                  ...tone,
+                }),
+                22,
+              ]
             : null,
-        ].filter(Boolean);
-        const disks = (resources.disks ?? []).map((disk) =>
-          h(Gauge, {
-            key: `disk:${disk.mount}`,
-            label: disk.mount,
-            ratio: disk.totalBytes > 0 ? 1 - disk.freeBytes / disk.totalBytes : 0,
-            width: meterWidth,
-            detailWidth: 13,
-            detail: `${formatBytes(disk.freeBytes)} free`,
-            ...tone,
-          }),
+        ];
+        const disks = (resources.disks ?? []).map(
+          (disk) =>
+            [
+              h(Gauge, {
+                key: `disk:${disk.mount}`,
+                label: disk.mount,
+                ratio: disk.totalBytes > 0 ? 1 - disk.freeBytes / disk.totalBytes : 0,
+                width: meterWidth,
+                detailWidth: 13,
+                detail: `${formatBytes(disk.freeBytes)} free`,
+                ...tone,
+              }),
+              13,
+            ] as const,
         );
-        lines.push(
-          h(Box, { key: `v:${machine.environmentId}`, marginLeft: 4, flexWrap: "wrap" }, ...vitals),
+        pushGaugeRows(
+          `v:${machine.environmentId}`,
+          vitals.filter((gauge): gauge is readonly [ReactNode, number] => gauge !== null),
         );
-        if (disks.length > 0) {
-          lines.push(
-            h(
-              Box,
-              { key: `d:${machine.environmentId}`, marginLeft: 4, flexWrap: "wrap" },
-              ...disks,
-            ),
-          );
-        }
+        pushGaugeRows(`d:${machine.environmentId}`, disks);
         if (!awake) {
           const since = formatSince(resources.sampledAt, now);
           lines.push(
@@ -407,7 +435,8 @@ export function FleetScreen(props: {
           h(
             Text,
             { color: agent.needsYou ? "yellow" : agent.stuck ? "red" : "cyan", wrap: "truncate" },
-            agent.activity,
+            // First line only: a multi-line activity would add rows.
+            agent.activity.split("\n")[0] ?? "",
           ),
         ),
         h(
@@ -420,7 +449,11 @@ export function FleetScreen(props: {
   });
 
   // Keep the selection on screen: show a window of lines around it.
-  const visible = Math.max(5, height - 7);
+  // Rows above and below the list: ct's tab bar and scope line (2), this
+  // screen's header (wraps on narrow floats), its margin (1), the footer (1),
+  // and a spare row for ct's status line.
+  const headerRows = Math.ceil(100 / Math.max(20, columns - 2));
+  const visible = Math.max(5, height - (2 + headerRows + 1 + 1 + 1));
   const selectedLine = lines.findIndex((line) => {
     const key = (line as { key?: string } | null)?.key ?? "";
     return current?.kind === "agent"
