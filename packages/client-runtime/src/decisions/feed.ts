@@ -6,7 +6,7 @@
 import type { DecisionItem, DecisionKind } from "@cz/contracts";
 
 /** Projects that sort ahead of the rest, highest first (ccez/DECISIONS.md). */
-const DEFAULT_PROJECT_ORDER: readonly string[] = ["hll"];
+export const DEFAULT_PROJECT_ORDER: readonly string[] = ["hll"];
 
 // "hll", "hll-bevy", and "hll:art" all belong to the hll project.
 function projectRank(project: string, order: readonly string[]): number {

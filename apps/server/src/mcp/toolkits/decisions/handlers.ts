@@ -1,3 +1,4 @@
+import { decisionSubmitWarnings } from "@cz/contracts";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -19,11 +20,13 @@ const make = Effect.gen(function* () {
         const scope = yield* McpInvocationContext.McpInvocationContext;
         // A client caller (not an agent in a thread) has no thread to link.
         const threadId = scope.thread?.threadId ?? null;
-        return yield* decisions.submit({
+        const item = yield* decisions.submit({
           ...input,
           thread: threadId,
           created_by: threadId ? `thread/${threadId}` : "mcp",
         });
+        const warnings = decisionSubmitWarnings(input);
+        return warnings.length > 0 ? { ...item, warnings } : item;
       }),
     ),
     upload_decision_media: McpToolAccess.writes((input) =>

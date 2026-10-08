@@ -41,7 +41,6 @@ import { useQueuedThreadKeys } from "../../state/use-thread-outbox";
 import {
   ThreadListV2PendingRow,
   ThreadListV2Row,
-  ThreadListV2SettledShelfHeader,
   ThreadListV2ShowMoreRow,
   ThreadListV2SnoozedShelfHeader,
   ThreadListV2WorkingShelfHeader,
@@ -67,6 +66,8 @@ import {
 import { createSwipeRowActivation } from "./swipe-row-activation";
 import { SwipeableScrollGateProvider, useSwipeableScrollGate } from "./thread-swipe-actions";
 import { useMaterialFabScroll } from "./MaterialFabScrollContext";
+import { FeedNeedsYou } from "./FeedNeedsYou";
+import { useThreadDigests } from "../../state/decisions";
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
 
@@ -460,13 +461,15 @@ export function HomeScreen(props: HomeScreenProps) {
     lastSettledResetKeyRef.current = settledResetKey;
     setSettledVisibleCount(THREAD_LIST_V2_SETTLED_INITIAL_COUNT);
   }
+  // Finished threads always show as rows; there's no Settled section to fold.
+  const settledShelfExpanded = true;
   const showMoreSettled = useCallback(
     () => setSettledVisibleCount((count) => count + THREAD_LIST_V2_SETTLED_PAGE_COUNT),
     [],
   );
   const {
     loaded: shelfPreferencesLoaded,
-    settledShelfExpanded,
+    settledShelfExpanded: _settledShelfPreference,
     snoozedShelfExpanded,
     workingShelfEnabled,
     workingShelfExpanded,
@@ -656,6 +659,16 @@ export function HomeScreen(props: HomeScreenProps) {
     if (swipeEnabled) activateVisibleRows(threadListV2Items);
   }, [activateVisibleRows, swipeEnabled, threadListV2Items]);
 
+  // The folder each shown thread worked in (games/hll rather than SWE).
+  const digestThreads = useMemo(
+    () =>
+      threadListV2Items
+        .flatMap((item) => (item.type === "v2-thread" ? [item.item.thread] : []))
+        .slice(0, 60),
+    [threadListV2Items],
+  );
+  const threadDigests = useThreadDigests(digestThreads);
+
   const renderV2Item = useCallback(
     ({ item }: { readonly item: ThreadListV2ListItem }) => {
       if (item.type === "v2-pending") {
@@ -702,16 +715,8 @@ export function HomeScreen(props: HomeScreenProps) {
           />
         );
       }
-      if (item.type === "v2-settled-shelf") {
-        return (
-          <ThreadListV2SettledShelfHeader
-            count={item.count}
-            disabled={item.disabled}
-            expanded={item.expanded}
-            onToggle={toggleSettledShelf}
-          />
-        );
-      }
+      // Finished threads continue the list without a "Settled" header.
+      if (item.type === "v2-settled-shelf") return null;
       const thread = item.item.thread;
       return (
         <ThreadListV2Row
@@ -728,9 +733,10 @@ export function HomeScreen(props: HomeScreenProps) {
           project={
             projectByKey.get(scopedProjectKey(thread.environmentId, thread.projectId)) ?? null
           }
-          projectTitle={v2ProjectTitleByProjectKey.get(
-            scopedProjectKey(thread.environmentId, thread.projectId),
-          )}
+          projectTitle={
+            threadDigests.get(`${thread.environmentId}:${thread.id}`)?.workingSubpath ??
+            v2ProjectTitleByProjectKey.get(scopedProjectKey(thread.environmentId, thread.projectId))
+          }
           providerInstance={resolveProviderInstance(thread)}
           providers={providersByEnvironmentId.get(thread.environmentId)}
           environmentLabel={
@@ -752,7 +758,9 @@ export function HomeScreen(props: HomeScreenProps) {
           onRenameThread={handleRenameThread}
           onRegenerateThreadTitle={handleRegenerateThreadTitle}
           titleRegenerationSupported={titleRegenerationEnvironmentIds.has(thread.environmentId)}
-          settlementSupported={settlementEnvironmentIds.has(thread.environmentId)}
+          // No settling in the one feed: finished threads are plain rows and
+          // Archive is the way out.
+          settlementSupported={false}
           onSettleThread={handleSettleThread}
           snoozeSupported={snoozeEnvironmentIds.has(thread.environmentId)}
           pinningSupported={pinningEnvironmentIds.has(thread.environmentId)}
@@ -778,6 +786,7 @@ export function HomeScreen(props: HomeScreenProps) {
       );
     },
     [
+      threadDigests,
       handleDeleteThread,
       activeReorderEnvironmentIds,
       handleMoveThread,
@@ -828,6 +837,7 @@ export function HomeScreen(props: HomeScreenProps) {
     () => ({
       projectByKey,
       projectTitleByProjectKey: v2ProjectTitleByProjectKey,
+      threadDigests,
       listEnvironments,
       savedConnectionsById: props.savedConnectionsById,
       searchQuery: props.searchQuery,
@@ -841,6 +851,7 @@ export function HomeScreen(props: HomeScreenProps) {
       props.savedConnectionsById,
       listEnvironments,
       threadSearchMatchByKey,
+      threadDigests,
       v2ProjectTitleByProjectKey,
       workingShelfEnabled,
     ],
@@ -912,8 +923,16 @@ export function HomeScreen(props: HomeScreenProps) {
   const listHeader = Platform.OS === "ios" ? undefined : <HomeTopContentSpacer />;
 
   // Project scoping lives in the header filter menu (no inline chip row on
-  // mobile — the menu is the one filter surface).
-  const v2ListHeader = listHeader;
+  // mobile — the menu is the one filter surface). Cards that need the owner
+  // lead the list, as in the one feed on the desktop.
+  const v2ListHeader = hasSearchQuery ? (
+    listHeader
+  ) : (
+    <>
+      {listHeader}
+      <FeedNeedsYou />
+    </>
+  );
 
   // Use the v2 project scope for its empty state. Snoozed threads need no
   // special empty state: their shelf header is a list row even while collapsed.

@@ -7,7 +7,7 @@
  *
  * @module kitty
  */
-import { execFileSync } from "node:child_process";
+import * as NodeChildProcess from "node:child_process";
 
 /** Row/column diacritics from the Kitty spec (rowcolumn-diacritics.txt), first 64. */
 const DIACRITICS = [
@@ -28,7 +28,7 @@ function nvimForwardsImages(socket: string): boolean {
   let forwards = forwardsByNvim.get(socket);
   if (forwards === undefined) {
     try {
-      const answer = execFileSync(
+      const answer = NodeChildProcess.execFileSync(
         "nvim",
         ["--server", socket, "--remote-expr", "exists('#KittyPassthrough#TermRequest')"],
         { timeout: 2000, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },

@@ -1,12 +1,29 @@
 import { resolveAssetUrl } from "@cz/client-runtime/state/assets";
 import type { DecisionMediaRef, EnvironmentId } from "@cz/contracts";
 import { BoxIcon, DownloadIcon, FileIcon } from "lucide-react";
-import { createElement, useEffect, useRef, useState } from "react";
+import { createContext, createElement, useContext, useEffect, useRef, useState } from "react";
 
 import { cn } from "~/lib/utils";
 import { usePreparedConnection } from "~/state/session";
 import { Button } from "../ui/button";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
+
+/**
+ * Told when the owner plays, scrubs, or installs a media item, so a decision
+ * can hold its verdict until they have (see `unseenMediaProblem`).
+ */
+export const DecisionMediaEngagement = createContext<(key: string) => void>(() => {});
+
+/** Resolves any of a host's decision media to a loadable URL. */
+export function useDecisionMediaResolver(
+  environmentId: EnvironmentId,
+): (media: DecisionMediaRef | null | undefined) => string | null {
+  const connection = usePreparedConnection(environmentId);
+  return (media) =>
+    media?.url && connection._tag === "Some"
+      ? resolveAssetUrl(connection.value.httpBaseUrl, media.url)
+      : null;
+}
 
 /** The media's signed URL, resolved against the host it lives on. */
 export function useDecisionMediaUrl(
@@ -138,21 +155,73 @@ function ModelView({ src, className }: { src: string; className?: string }) {
   );
 }
 
-/** One media attachment, sized for a card (`compact`) or the full view. */
+/**
+ * The one frame every option's media shares, so options of different shapes
+ * (a 2:1 floor plan next to a 16:9 render) line up: fixed aspect, contained,
+ * on a neutral letterbox.
+ */
+export const DECISION_OPTION_FRAME_CLASS =
+  "aspect-[4/3] w-full overflow-hidden rounded-md bg-muted/60";
+
+/**
+ * One media attachment, sized for a card (`compact`), an option tile
+ * (`framed`), or the full view.
+ */
 export function DecisionMedia({
   environmentId,
   media,
   compact = false,
+  framed = false,
   className,
 }: {
   environmentId: EnvironmentId;
   media: DecisionMediaRef;
   compact?: boolean;
+  framed?: boolean;
   className?: string;
 }) {
   const url = useDecisionMediaUrl(environmentId, media);
+  const engage = useContext(DecisionMediaEngagement);
   if (url === null) {
-    return <div className={cn("rounded-md bg-muted", compact ? "h-20" : "h-48", className)} />;
+    return (
+      <div
+        className={cn(
+          "rounded-md bg-muted",
+          framed ? DECISION_OPTION_FRAME_CLASS : compact ? "h-20" : "h-48",
+          className,
+        )}
+      />
+    );
+  }
+  if (framed && (media.type === "image" || media.type === "video" || media.type === "glb")) {
+    return (
+      <div
+        className={cn(DECISION_OPTION_FRAME_CLASS, "flex items-center justify-center", className)}
+      >
+        {media.type === "image" ? (
+          <img
+            alt={media.caption ?? media.name}
+            src={url}
+            loading="lazy"
+            className="size-full object-contain"
+          />
+        ) : media.type === "video" ? (
+          <video
+            controls
+            preload="metadata"
+            src={url}
+            onPlay={() => engage(media.key)}
+            onTimeUpdate={(event) => {
+              // Scrubbing moves the playhead; a load can report a seek without one.
+              if (event.currentTarget.currentTime > 0.5) engage(media.key);
+            }}
+            className="size-full object-contain"
+          />
+        ) : (
+          <BoxIcon className="size-6 text-muted-foreground" />
+        )}
+      </div>
+    );
   }
   switch (media.type) {
     case "image":
@@ -170,13 +239,30 @@ export function DecisionMedia({
       );
     case "audio":
     case "voice":
-      return <audio controls preload="none" src={url} className={cn("w-full", className)} />;
+      return (
+        <audio
+          controls
+          preload="none"
+          src={url}
+          onPlay={() => engage(media.key)}
+          onTimeUpdate={(event) => {
+            // Scrubbing moves the playhead; a load can report a seek without one.
+            if (event.currentTarget.currentTime > 0.5) engage(media.key);
+          }}
+          className={cn("w-full", className)}
+        />
+      );
     case "video":
       return (
         <video
           controls
           preload="metadata"
           src={url}
+          onPlay={() => engage(media.key)}
+          onTimeUpdate={(event) => {
+            // Scrubbing moves the playhead; a load can report a seek without one.
+            if (event.currentTarget.currentTime > 0.5) engage(media.key);
+          }}
           className={cn("w-full rounded-md bg-black", compact ? "h-24" : "max-h-[70vh]", className)}
         />
       );
@@ -190,7 +276,11 @@ export function DecisionMedia({
       );
     case "apk":
       return (
-        <Button render={<a href={url} download={media.name} />} className={className}>
+        <Button
+          render={<a href={url} download={media.name} />}
+          onClick={() => engage(media.key)}
+          className={className}
+        >
           <DownloadIcon />
           Install {media.name}
         </Button>

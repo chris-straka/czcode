@@ -41,6 +41,24 @@ export function usePanelAnimationSettings(): {
   return { active: durationMs > 0 && !prefersReducedMotion && !suppressed, durationMs };
 }
 
+/** How long the composer takes to tuck its controls away when the panel setting is off. */
+const COMPOSER_DEFAULT_ANIMATION_MS = 220;
+
+/**
+ * Composer motion: its collapse on scroll always animates (both ways), at the
+ * panel duration when one is set. Only reduced motion and the first painted
+ * frame of a navigation skip it.
+ */
+export function useComposerAnimationSettings(): { active: boolean; durationMs: number } {
+  const panelDurationMs = useClientSettings((settings) => settings.panelAnimationDurationMs);
+  const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const suppressed = useContext(PanelAnimationSuppressionContext);
+  return {
+    active: !prefersReducedMotion && !suppressed,
+    durationMs: panelDurationMs > 0 ? panelDurationMs : COMPOSER_DEFAULT_ANIMATION_MS,
+  };
+}
+
 /** Keeps closing panel content mounted until its opt-in transition ends. */
 export function usePanelPresence<T>(
   open: boolean,

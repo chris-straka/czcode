@@ -4,7 +4,7 @@
  * @module hostWakeRules
  */
 import type { HostWakeInfo } from "@cz/contracts";
-import type { NetworkInterfaceInfo } from "node:os";
+import type * as NodeOS from "node:os";
 
 const PRIVATE_IPV4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
 // Virtual interfaces never carry a Wake-on-LAN packet to this machine.
@@ -12,7 +12,7 @@ const VIRTUAL_INTERFACE = /^(lo|tailscale|docker|br-|veth|virbr|utun|wg)/;
 
 /** The LAN address, MAC, and broadcast of the wired (or first real) interface. */
 export function wakeInterface(
-  interfaces: NodeJS.Dict<ReadonlyArray<NetworkInterfaceInfo>>,
+  interfaces: NodeJS.Dict<ReadonlyArray<NodeOS.NetworkInterfaceInfo>>,
 ): Omit<HostWakeInfo, "hostName"> | null {
   const candidates = Object.entries(interfaces)
     .filter(([name]) => !VIRTUAL_INTERFACE.test(name))

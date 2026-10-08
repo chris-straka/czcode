@@ -125,16 +125,9 @@ export function buildThreadActionMenuItems(
             : { id: "pin" as const, label: "Pin thread", icon: "pin" },
         ]
       : []),
-    // Both lifecycle actions stay available on pinned threads: settling
-    // clears the pin ("done" beats "keep on top"), and snoozing hides the
-    // card until wake with the pin intact.
-    ...(state.supports.settlement
-      ? [
-          state.isSettled
-            ? { id: "unsettle" as const, label: "Un-settle thread", icon: "circle-check" }
-            : { id: "settle" as const, label: "Settle thread", icon: "circle-check" },
-        ]
-      : []),
+    // No Settle item: the one feed moves finished threads out of the way on
+    // its own, and Archive is the manual way out. Settling stays in the data
+    // model for upstream code that relies on it.
     ...(state.supports.snooze
       ? [
           state.isSnoozed
@@ -181,27 +174,6 @@ export function buildThreadActionMenuItems(
     // this is a setting, and it sits with the other per-thread settings
     // rather than the lifecycle verbs above. Disabled keeps long-running
     // threads out of the settled shelf no matter how quiet they get.
-    ...(state.supports.autoSettleOptOut
-      ? [
-          {
-            id: "auto-settle" as const,
-            label: "Auto-settle behavior",
-            icon: "timer",
-            children: [
-              {
-                id: "auto-settle:enabled" as const,
-                label: "Enabled",
-                checked: state.autoSettleEnabled,
-              },
-              {
-                id: "auto-settle:disabled" as const,
-                label: "Disabled",
-                checked: !state.autoSettleEnabled,
-              },
-            ],
-          },
-        ]
-      : []),
     {
       id: "copy",
       label: "Copy",

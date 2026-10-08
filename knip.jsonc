@@ -62,12 +62,23 @@
     "apps/web": {
       // Vitest loads this through the per-file @vitest-environment directive.
       "ignoreDependencies": ["jsdom"],
-      // Worktree setup (scripts/setup-worktree.ts) runs this directly.
-      "entry": ["scripts/warm-dep-cache.ts"],
+      // Worktree setup (scripts/setup-worktree.ts) runs this directly. The
+      // sidebars are upstream code the fork's one-feed layout no longer mounts;
+      // they stay so upstream syncs merge cleanly.
+      "entry": [
+        "scripts/warm-dep-cache.ts",
+        "src/components/Sidebar.tsx",
+        "src/components/LegacySidebar.tsx",
+      ],
       // UI component modules are copied and adapted as cohesive sets. Keep their
       // named subcomponents even before they have callers; the file audit still
       // reports an entire component module when nothing imports it.
-      "ignoreIssues": { "src/components/ui/*.tsx": ["exports", "nsExports", "duplicates"] },
+      "ignoreIssues": {
+        "src/components/ui/*.tsx": ["exports", "nsExports", "duplicates"],
+        // Upstream sidebar helpers, kept with the unmounted sidebars above.
+        "src/components/sidebar/SidebarChrome.tsx": ["exports"],
+        "src/components/threadSidebarWidth.ts": ["exports"],
+      },
     },
     "apps/mobile": {
       // Expo loads plugins and the fingerprint config by string; Metro embeds the browser entry in the native WebView.

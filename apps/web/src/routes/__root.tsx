@@ -1,5 +1,4 @@
 import { type ServerLifecycleWelcomePayload } from "@cz/contracts";
-import { scopedProjectKey, scopeProjectRef } from "@cz/client-runtime/environment";
 import { squashAtomCommandFailure } from "@cz/client-runtime/state/runtime";
 import {
   Outlet,
@@ -8,7 +7,6 @@ import {
   createRootRoute,
   type ErrorComponentProps,
   useLocation,
-  useNavigate,
   useRouter,
 } from "@tanstack/react-router";
 import { Check, Copy } from "lucide";
@@ -53,12 +51,6 @@ import { cn } from "../lib/utils";
 import { applyAppearanceFontVariables } from "~/appearanceFonts";
 import { applyAppearanceContrast } from "~/appearanceContrast";
 import { useClientSettings } from "../hooks/useSettings";
-import {
-  deriveLogicalProjectKeyFromSettings,
-  derivePhysicalProjectKeyFromPath,
-  selectProjectGroupingSettings,
-} from "../logicalProject";
-import { useUiStateStore } from "../uiStateStore";
 import { syncBrowserChromeTheme } from "../hooks/useTheme";
 import { configureClientTracing } from "../observability/clientTracing";
 import { resolveInitialServerAuthGateState } from "../environments/primary";
@@ -73,7 +65,7 @@ import {
   primaryServerConfigEventAtom,
   primaryServerWelcomeAtom,
 } from "../state/server";
-import { readProject, setActiveEnvironmentId, useActiveEnvironmentId } from "../state/entities";
+import { setActiveEnvironmentId, useActiveEnvironmentId } from "../state/entities";
 import {
   createKeybindingsUpdateToastController,
   type KeybindingsUpdateToastController,
@@ -141,13 +133,6 @@ function RootRouteView() {
   const pathname = useLocation({ select: (location) => location.pathname });
   const { authGateState } = Route.useRouteContext();
   const primaryEnvironmentAuthenticated = authGateState.status === "authenticated";
-  const returningFromWelcomeRef = useRef(pathname === "/welcome");
-
-  useEffect(() => {
-    if (pathname === "/welcome") {
-      returningFromWelcomeRef.current = true;
-    }
-  }, [pathname]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -238,9 +223,7 @@ function RootRouteView() {
           {primaryEnvironmentAuthenticated ? <LegacyThreadMigrationToast /> : null}
           <ProjectCloneToastCoordinator />
           <HostedStaticEnvironmentBootstrap />
-          {primaryEnvironmentAuthenticated ? (
-            <EventRouter skipInitialBootstrapNavigation={returningFromWelcomeRef.current} />
-          ) : null}
+          {primaryEnvironmentAuthenticated ? <EventRouter /> : null}
           {primaryEnvironmentAuthenticated ? <ProviderUpdateLaunchNotification /> : null}
           {/* Hosted Nightly is "hosted-static", not authenticated, and needs it too. */}
           <NightlyMobileBetaNotice />
@@ -478,14 +461,7 @@ function AuthenticatedTracingBootstrap() {
   return null;
 }
 
-function EventRouter({
-  skipInitialBootstrapNavigation,
-}: {
-  readonly skipInitialBootstrapNavigation: boolean;
-}) {
-  const navigate = useNavigate();
-  const pathname = useLocation({ select: (loc) => loc.pathname });
-  const projectGroupingSettings = useClientSettings(selectProjectGroupingSettings);
+function EventRouter() {
   const primaryEnvironment = usePrimaryEnvironment();
   const openInEditor = useAtomCommand(shellEnvironment.openInEditor, {
     reportFailure: false,
@@ -493,9 +469,6 @@ function EventRouter({
   const serverConfig = useAtomValue(primaryServerConfigAtom);
   const serverConfigEvent = useAtomValue(primaryServerConfigEventAtom);
   const serverWelcome = useAtomValue(primaryServerWelcomeAtom);
-  const readPathname = useEffectEvent(() => pathname);
-  const handledBootstrapThreadIdRef = useRef<string | null>(null);
-  const skipInitialBootstrapNavigationRef = useRef(skipInitialBootstrapNavigation);
   const handledConfigEventRef = useRef(serverConfigEvent);
   const [keybindingsToastController] = useState<KeybindingsUpdateToastController>(() =>
     createKeybindingsUpdateToastController({}),
@@ -504,47 +477,9 @@ function EventRouter({
   const handleWelcome = useEffectEvent((payload: ServerLifecycleWelcomePayload | null) => {
     if (!payload) return;
 
+    // The feed is home: the server's bootstrap thread is a card in it, so
+    // opening the app no longer jumps into that thread.
     setActiveEnvironmentId(payload.environment.environmentId);
-    void (async () => {
-      if (!payload.bootstrapProjectId || !payload.bootstrapThreadId) {
-        return;
-      }
-      const bootstrapProject = readProject(
-        scopeProjectRef(payload.environment.environmentId, payload.bootstrapProjectId),
-      );
-      const bootstrapProjectKey =
-        (bootstrapProject
-          ? deriveLogicalProjectKeyFromSettings(bootstrapProject, projectGroupingSettings)
-          : null) ??
-        (serverConfig?.cwd
-          ? derivePhysicalProjectKeyFromPath(payload.environment.environmentId, serverConfig.cwd)
-          : null) ??
-        scopedProjectKey(
-          scopeProjectRef(payload.environment.environmentId, payload.bootstrapProjectId),
-        );
-      useUiStateStore.getState().setProjectExpanded(bootstrapProjectKey, true);
-
-      if (readPathname() !== "/") {
-        return;
-      }
-      if (skipInitialBootstrapNavigationRef.current) {
-        skipInitialBootstrapNavigationRef.current = false;
-        handledBootstrapThreadIdRef.current = payload.bootstrapThreadId;
-        return;
-      }
-      if (handledBootstrapThreadIdRef.current === payload.bootstrapThreadId) {
-        return;
-      }
-      await navigate({
-        to: "/$environmentId/$threadId",
-        params: {
-          environmentId: payload.environment.environmentId,
-          threadId: payload.bootstrapThreadId,
-        },
-        replace: true,
-      });
-      handledBootstrapThreadIdRef.current = payload.bootstrapThreadId;
-    })().catch(() => undefined);
   });
 
   const handleServerConfigUpdated = useEffectEvent(() => {

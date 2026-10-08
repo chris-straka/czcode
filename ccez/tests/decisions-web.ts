@@ -9,17 +9,17 @@
  * Runs a throwaway server on a temp cz home, so it never touches ~/.cz.
  * Needs Google Chrome installed.
  */
-import assert from "node:assert/strict";
-import { type ChildProcess, spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import * as NodeAssert from "node:assert/strict";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
+import * as NodeModule from "node:module";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
 
 import type { Browser, Page } from "playwright-core";
 
 const repo = new URL("../..", import.meta.url).pathname;
-const { chromium } = createRequire(join(repo, "apps/desktop/package.json"))(
+const { chromium } = NodeModule.createRequire(NodePath.join(repo, "apps/desktop/package.json"))(
   "playwright-core",
 ) as typeof import("playwright-core");
 
@@ -57,12 +57,14 @@ function glb(): Buffer {
   return out;
 }
 
-async function startServer(home: string): Promise<{ child: ChildProcess; pairingUrl: string }> {
+async function startServer(
+  home: string,
+): Promise<{ child: NodeChildProcess.ChildProcess; pairingUrl: string }> {
   const port = 47_000 + Math.floor(Math.random() * 1_000);
-  const child = spawn(
+  const child = NodeChildProcess.spawn(
     process.execPath,
     [
-      join(repo, "apps/server/dist/bin.mjs"),
+      NodePath.join(repo, "apps/server/dist/bin.mjs"),
       "serve",
       "--base-dir",
       home,
@@ -120,7 +122,7 @@ async function api<T>(
       bytes: init.bytes?.toString("base64"),
     },
   );
-  assert.ok(result.status < 300, `${path}: ${result.status} ${result.text}`);
+  NodeAssert.ok(result.status < 300, `${path}: ${result.status} ${result.text}`);
   return JSON.parse(result.text) as T;
 }
 
@@ -305,7 +307,7 @@ async function readAnswers(page: Page, ids: Record<string, string>) {
         answers[kind] = result.answer;
         break;
       }
-      assert.ok(Date.now() < deadline, `${kind} was never answered`);
+      NodeAssert.ok(Date.now() < deadline, `${kind} was never answered`);
       await page.waitForTimeout(500);
     }
   }
@@ -315,30 +317,30 @@ async function readAnswers(page: Page, ids: Record<string, string>) {
 function check(answers: Record<string, Record<string, unknown>>) {
   const { pick, review, listen, look, read, playtest, rank, pitch, request, timeline } =
     answers as Record<string, any>;
-  assert.deepEqual(pick.option_ids, ["blue"]);
-  assert.equal(review.choice, "changes");
-  assert.equal(review.redlines.length, 1);
-  assert.ok(review.redlines[0].points.length > 1);
-  assert.deepEqual(
+  NodeAssert.deepEqual(pick.option_ids, ["blue"]);
+  NodeAssert.equal(review.choice, "changes");
+  NodeAssert.equal(review.redlines.length, 1);
+  NodeAssert.ok(review.redlines[0].points.length > 1);
+  NodeAssert.deepEqual(
     listen.reactions.map((r: any) => [r.option_id, r.verdict]),
     [["kick", "keep"]],
   );
-  assert.equal(listen.more_like_these, true);
-  assert.equal(look.choice, "approve");
-  assert.equal(read.choice, "send_back");
-  assert.equal(read.passage_comments[0].quote, "rambles");
-  assert.equal(read.passage_comments[0].note, "Cut this");
-  assert.equal(playtest.playtest.good, "The jump");
-  assert.deepEqual(rank.rank, ["b", "a", "c"]);
-  assert.equal(pitch.choice, "later");
-  assert.equal(request.uploads.length, 1);
-  assert.equal(request.comment, "Here you go");
-  assert.equal(timeline.choice, "redo");
-  assert.equal(timeline.redo_from, "s2");
+  NodeAssert.equal(listen.more_like_these, true);
+  NodeAssert.equal(look.choice, "approve");
+  NodeAssert.equal(read.choice, "send_back");
+  NodeAssert.equal(read.passage_comments[0].quote, "rambles");
+  NodeAssert.equal(read.passage_comments[0].note, "Cut this");
+  NodeAssert.equal(playtest.playtest.good, "The jump");
+  NodeAssert.deepEqual(rank.rank, ["b", "a", "c"]);
+  NodeAssert.equal(pitch.choice, "later");
+  NodeAssert.equal(request.uploads.length, 1);
+  NodeAssert.equal(request.comment, "Here you go");
+  NodeAssert.equal(timeline.choice, "redo");
+  NodeAssert.equal(timeline.redo_from, "s2");
 }
 
-const home = mkdtempSync(join(tmpdir(), "cz-decisions-e2e-"));
-let server: ChildProcess | undefined;
+const home = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "cz-decisions-e2e-"));
+let server: NodeChildProcess.ChildProcess | undefined;
 let browser: Browser | undefined;
 let page: Page | undefined;
 try {
@@ -371,10 +373,10 @@ try {
 
   await answerAll(page);
   check(await readAnswers(page, ids));
-  assert.deepEqual(pageErrors, [], "the page threw");
+  NodeAssert.deepEqual(pageErrors, [], "the page threw");
   console.log(`decisions-web: all ${Object.keys(ids).length} kinds answered through the UI`);
 } catch (error) {
-  const shot = join(tmpdir(), "cz-decisions-e2e-failure.png");
+  const shot = NodePath.join(NodeOS.tmpdir(), "cz-decisions-e2e-failure.png");
   await page?.screenshot({ path: shot, fullPage: true }).catch(() => {});
   console.error(`decisions-web failed; screenshot: ${shot}`);
   throw error;
@@ -387,5 +389,5 @@ try {
     await exited;
     clearTimeout(stuck);
   }
-  rmSync(home, { recursive: true, force: true });
+  NodeFS.rmSync(home, { recursive: true, force: true });
 }

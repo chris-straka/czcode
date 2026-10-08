@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { InboxIcon } from "lucide-react";
 
-import { useOpenDecisions } from "~/state/decisions";
+import { useFilteredOpenDecisions } from "~/state/decisions";
 import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -9,7 +9,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 export function SidebarDecisionsItem() {
   const navigate = useNavigate();
   const { isMobile, setOpenMobile } = useSidebar();
-  const count = useOpenDecisions().entries.length;
+  // Counts what the Decisions feed shows under its filters, so the two agree.
+  const count = useFilteredOpenDecisions().entries.length;
   const label = count > 0 ? `Decisions (${count} open)` : "Decisions";
   return (
     <SidebarMenuItem className="shrink-0">
