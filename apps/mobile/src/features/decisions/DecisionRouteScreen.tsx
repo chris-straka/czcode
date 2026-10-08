@@ -299,11 +299,13 @@ function DecisionAnswerForm({
           )}
           {item.options.length > 0 && item.kind !== "rank" ? (
             <>
-              <MaterialButton
-                tone="secondary"
-                label="None of these"
-                onPress={() => submit({}, "none")}
-              />
+              {item.kind === "pick" ? (
+                <MaterialButton
+                  tone="secondary"
+                  label="None of these"
+                  onPress={() => submit({}, "none")}
+                />
+              ) : null}
               <MaterialButton
                 tone="text"
                 label="None of these, try again"
