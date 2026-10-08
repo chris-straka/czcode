@@ -72,6 +72,8 @@ interface DecisionViewProps {
   readonly entry: DecisionEntry;
   readonly position?: { readonly index: number; readonly total: number };
   readonly onSubmit: (answer: DecisionAnswerInput) => void;
+  /** Withdraws it as no longer relevant. */
+  readonly onDismiss: () => void;
   readonly onUpload: UploadDecisionMedia;
   readonly onClose: () => void;
   readonly onSkip?: () => void;
@@ -101,6 +103,7 @@ export function DecisionView({
   entry,
   position,
   onSubmit,
+  onDismiss,
   onUpload,
   onClose,
   onSkip,
@@ -210,6 +213,11 @@ export function DecisionView({
     return () => window.removeEventListener("keydown", listener);
   }, []);
 
+  // Judge a video from the video: it comes first and a long write-up folds
+  // under Details, as does a long text beside pictures.
+  const mediaFirst =
+    item.media.some((media) => media.type === "video") ||
+    (item.body_md.length > 800 && item.media.some((media) => media.type === "image"));
   const keyHints = [
     "j/k scroll",
     item.kind === "pick" || verdicts
@@ -289,7 +297,7 @@ export function DecisionView({
               <p className="text-sm text-warning-foreground">{item.cost_note}</p>
             ) : null}
           </div>
-          {item.kind !== "read" && item.body_md ? (
+          {item.kind !== "read" && item.body_md && !mediaFirst ? (
             <div className="max-w-2xl">
               <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
             </div>
@@ -301,6 +309,16 @@ export function DecisionView({
               </DecisionMediaEngagement>
             </FullScreenContext>
           </UploadContext>
+          {item.kind !== "read" && item.body_md && mediaFirst ? (
+            <details className="max-w-2xl rounded-md border border-border px-3 py-2">
+              <summary className="cursor-pointer text-sm text-muted-foreground">
+                Details: script, notes
+              </summary>
+              <div className="pt-2">
+                <ChatMarkdown text={item.body_md} cwd={undefined} environmentId={environmentId} />
+              </div>
+            </details>
+          ) : null}
         </div>
       </div>
       {fullScreen ? (
@@ -409,6 +427,9 @@ export function DecisionView({
             {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
               <span className="text-xs text-muted-foreground">{problem}</span>
             ) : null}
+            <Button variant="ghost-muted" size="sm" onClick={onDismiss}>
+              No longer relevant
+            </Button>
             <span className="ms-auto hidden text-2xs text-muted-foreground sm:inline">
               {keyHints.join(" · ")}
             </span>

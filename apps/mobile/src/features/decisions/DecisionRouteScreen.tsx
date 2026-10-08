@@ -70,10 +70,12 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
     ) ?? null;
   const entry = frozen ?? live;
   const answerCommand = useAtomCommand(decisionEnvironment.answer, "answer decision");
+  const withdrawCommand = useAtomCommand(decisionEnvironment.withdraw, "dismiss decision");
   const uploadCommand = useAtomCommand(decisionEnvironment.upload, "upload decision media");
-  const [pending, setPending] = useState<{ answer: DecisionAnswerInput; left: number } | null>(
-    null,
-  );
+  const [pending, setPending] = useState<{
+    answer: DecisionAnswerInput | null;
+    left: number;
+  } | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => () => void (timer.current && clearInterval(timer.current)), []);
 
@@ -108,7 +110,8 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
     return result._tag === "Success" ? (result.value as DecisionMediaRef) : null;
   };
 
-  const submit = (answer: DecisionAnswerInput) => {
+  /** Answers, or with null dismisses as no longer relevant, after an undo countdown. */
+  const submit = (answer: DecisionAnswerInput | null) => {
     setFrozen(entry);
     setPending({ answer, left: UNDO_WINDOW_MS / 1000 });
     let left = UNDO_WINDOW_MS / 1000;
@@ -116,10 +119,14 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
       left -= 1;
       if (left > 0) return setPending((current) => (current ? { ...current, left } : current));
       if (timer.current) clearInterval(timer.current);
-      void answerCommand({
-        environmentId: entry.environmentId,
-        input: { id: entry.item.id, answer },
-      }).then(goNext);
+      void (
+        answer === null
+          ? withdrawCommand({ environmentId: entry.environmentId, input: { id: entry.item.id } })
+          : answerCommand({
+              environmentId: entry.environmentId,
+              input: { id: entry.item.id, answer },
+            })
+      ).then(goNext);
     }, 1000);
   };
 
@@ -143,6 +150,11 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
                 },
               ]
             : []),
+          {
+            accessibilityLabel: "No longer relevant",
+            icon: "xmark.circle.fill" as const,
+            onPress: () => submit(null),
+          },
           ...(params.session === "1"
             ? [{ accessibilityLabel: "Skip", icon: "chevron.right" as const, onPress: goNext }]
             : []),
@@ -151,7 +163,9 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
       {pending ? (
         <View className="m-4 flex-row items-center gap-3 rounded-xl bg-subtle p-4">
           <Text className="flex-1 text-foreground">
-            Answered: {answerSummary(entry.item, pending.answer)}
+            {pending.answer === null
+              ? "Dismissed: no longer relevant"
+              : `Answered: ${answerSummary(entry.item, pending.answer)}`}
           </Text>
           <MaterialButton
             tone="text"

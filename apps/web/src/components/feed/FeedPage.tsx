@@ -3,6 +3,7 @@ import {
   canAnswerFromCard,
   VERDICT_BUTTONS,
   optionMedia,
+  unseenMediaProblem,
 } from "@cz/client-runtime/decisions/draft";
 import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
 import {
@@ -35,7 +36,11 @@ import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
 import { useJobsOn } from "~/state/jobs";
 import { useNavigateBack } from "~/hooks/useNavigateBack";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
+import {
+  DECISION_OPTION_FRAME_CLASS,
+  DecisionMedia,
+  DecisionMediaEngagement,
+} from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
 import { NoProjectsHero } from "../NoProjectsHero";
 import { SidebarUpdateArchitectureWarning } from "../sidebar/SidebarUpdatePill";
@@ -61,7 +66,8 @@ const entryKey = (entry: Pick<DecisionEntry, "environmentId" | "item">) =>
 
 interface PendingAnswer {
   readonly entry: DecisionEntry;
-  readonly answer: DecisionAnswerInput;
+  /** null: "No longer relevant", which withdraws the Decision. */
+  readonly answer: DecisionAnswerInput | null;
   readonly timer: ReturnType<typeof setTimeout>;
 }
 
@@ -93,6 +99,7 @@ export function FeedPage() {
   const { presentationById } = useEnvironments();
   const answerCommand = useAtomCommand(decisionEnvironment.answer, "answer decision");
   const uploadCommand = useAtomCommand(decisionEnvironment.upload, "upload decision media");
+  const withdrawCommand = useAtomCommand(decisionEnvironment.withdraw, "dismiss decision");
   const selectedProjects = useFeedFilterStore((state) => state.projects);
   const group = useFeedFilterStore((state) => state.group);
   const [tabChoice, setTab] = useState<"needs" | "threads" | null>(null);
@@ -298,13 +305,19 @@ export function FeedPage() {
         next.delete(key);
         return next;
       });
-      const result = await answerCommand({
-        environmentId: item.entry.environmentId,
-        input: { id: item.entry.item.id, answer: item.answer },
-      });
+      const result =
+        item.answer === null
+          ? await withdrawCommand({
+              environmentId: item.entry.environmentId,
+              input: { id: item.entry.item.id },
+            })
+          : await answerCommand({
+              environmentId: item.entry.environmentId,
+              input: { id: item.entry.item.id, answer: item.answer },
+            });
       if (result._tag === "Success") setSent((current) => new Set(current).add(key));
     },
-    [answerCommand],
+    [answerCommand, withdrawCommand],
   );
 
   useEffect(
@@ -327,14 +340,16 @@ export function FeedPage() {
 
   const closeDecision = () => showDecision(null);
 
-  const answer = (entry: DecisionEntry, value: DecisionAnswerInput) => {
+  /** Answers, or with null dismisses as no longer relevant, after an undo window. */
+  const answer = (entry: DecisionEntry, value: DecisionAnswerInput | null) => {
     const key = entryKey(entry);
     const timer = setTimeout(() => void send(key), UNDO_WINDOW_MS);
     setPending((current) => new Map(current).set(key, { entry, answer: value, timer }));
     toastManager.add({
       type: "success",
       title: entry.item.title || entry.item.question,
-      description: answerSummary(entry.item, value),
+      description:
+        value === null ? "Dismissed: no longer relevant" : answerSummary(entry.item, value),
       timeout: UNDO_WINDOW_MS,
       actionProps: { children: "Undo", onClick: () => undo(key) },
     });
@@ -387,6 +402,7 @@ export function FeedPage() {
       age={ageLabel(entry.item.created_at, now)}
       onOpen={() => showDecision(entryKey(entry), { session: false })}
       onQuickAnswer={(patch) => quickAnswer(entry, patch)}
+      onDismiss={() => answer(entry, null)}
     />
   );
 
@@ -548,6 +564,7 @@ export function FeedPage() {
                 }
               : {})}
             onSubmit={(value) => answer(opened, value)}
+            onDismiss={() => answer(opened, null)}
             onUpload={upload}
             onClose={closeDecision}
           />
@@ -699,18 +716,28 @@ function DecisionCard({
   embedded = false,
   onOpen,
   onQuickAnswer,
+  onDismiss,
 }: {
   entry: DecisionEntry;
   age: string;
   embedded?: boolean;
   onOpen: () => void;
   onQuickAnswer: (patch: Partial<DecisionAnswerInput>) => void;
+  /** Withdraws it as no longer relevant. */
+  onDismiss: () => void;
 }) {
   const { item } = entry;
-  // A card answers in place only when nothing on it needs watching, hearing,
-  // or installing first; otherwise it offers Open.
+  const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
+  // A sound or a video plays right on the card, the thing itself before any text.
+  const preview =
+    item.kind === "pick" || item.kind === "rank"
+      ? undefined
+      : item.media.find((media) => media.type === "audio" || media.type === "video");
+  // A card answers in place once nothing on it still needs watching, hearing,
+  // or installing; otherwise it offers Open.
   const quick =
-    (item.kind === "review" || item.kind === "pitch") && canAnswerFromCard(item)
+    (item.kind === "review" || item.kind === "pitch") &&
+    (canAnswerFromCard(item) || unseenMediaProblem(item, engaged) === null)
       ? VERDICT_BUTTONS[item.kind]
       : null;
   const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
@@ -758,6 +785,20 @@ function DecisionCard({
           <p className="text-xs text-warning-foreground">{item.cost_note}</p>
         ) : null}
       </button>
+      {preview ? (
+        <DecisionMediaEngagement
+          value={(key) =>
+            setEngaged((current) => (current.has(key) ? current : new Set(current).add(key)))
+          }
+        >
+          <DecisionMedia
+            environmentId={entry.environmentId}
+            media={preview}
+            compact={preview.type === "audio"}
+            {...(preview.type === "video" ? { className: "max-h-72" } : {})}
+          />
+        </DecisionMediaEngagement>
+      ) : null}
       {inlinePick ? (
         pictures ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -828,11 +869,16 @@ function DecisionCard({
           ))}
         </div>
       ) : null}
-      {inlinePick || quick ? null : (
-        <Button size="sm" variant="outline" onClick={onOpen}>
-          Open
+      <div className="flex flex-wrap items-center gap-2">
+        {inlinePick || quick ? null : (
+          <Button size="sm" variant="outline" onClick={onOpen}>
+            Open
+          </Button>
+        )}
+        <Button size="xs" variant="ghost-muted" className="ms-auto" onClick={onDismiss}>
+          No longer relevant
         </Button>
-      )}
+      </div>
     </article>
   );
 }

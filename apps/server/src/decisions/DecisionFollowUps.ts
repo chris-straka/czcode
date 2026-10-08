@@ -6,6 +6,8 @@
  *
  * Each decision gets one run at most (the queue keys runs by decision), and
  * the last day's answers are re-checked on boot so a restart loses none.
+ * When the asking thread is archived or deleted, its open questions are
+ * withdrawn: nobody is left to act on the answer.
  *
  * @module DecisionFollowUps
  */
@@ -226,6 +228,29 @@ const make = Effect.gen(function* () {
       }
       yield* Stream.runForEach(decisions.changes, safely);
     }),
+  );
+
+  // A thread that was archived or deleted moved on: its open questions go too.
+  yield* Effect.forkScoped(
+    Stream.runForEach(orchestrator.streamDomainEvents, (event) =>
+      event.type === "thread.archived" || event.type === "thread.deleted"
+        ? decisions.withdrawForThread(event.payload.id).pipe(
+            Effect.tap((count) =>
+              count > 0
+                ? Effect.logInfo("Withdrew a moved-on thread's decisions.", {
+                    thread: event.payload.id,
+                    count,
+                  })
+                : Effect.void,
+            ),
+            Effect.catchCause((cause) =>
+              Effect.logWarning("Withdrawing a thread's decisions failed.", { cause }),
+            ),
+          )
+        : Effect.void,
+    ).pipe(
+      Effect.catchCause((cause) => Effect.logWarning("Decision thread watch stopped.", { cause })),
+    ),
   );
 });
 

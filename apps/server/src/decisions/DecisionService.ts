@@ -81,6 +81,11 @@ export class DecisionService extends Context.Service<
       DecisionItem,
       DecisionNotFoundError | DecisionClosedError | DecisionStorageError
     >;
+    /**
+     * Withdraws a thread's open items: the thread moved on (archived or
+     * deleted). Returns how many.
+     */
+    readonly withdrawForThread: (thread: string) => Effect.Effect<number, DecisionStorageError>;
     /** Returns once the item leaves `open`, or as it is when `timeout` passes. */
     readonly wait: (
       id: string,
@@ -230,6 +235,9 @@ export function defaultTargetDevice(
   return input.kind === "playtest" && hasBuild ? "phone" : "any";
 }
 
+/** Two questions are about the same thing when their titles match, ignoring case and spacing. */
+const sameSubject = (title: string) => title.trim().toLowerCase().replace(/\s+/g, " ");
+
 const make = Effect.gen(function* () {
   const config = yield* ServerConfig.ServerConfig;
   const fs = yield* FileSystem.FileSystem;
@@ -367,6 +375,20 @@ const make = Effect.gen(function* () {
       };
       yield* writeItem(item, null).pipe(storage("submit"));
       yield* PubSub.publish(changes, id);
+      // Asking again about the same thing replaces the earlier question.
+      if (item.thread !== null) {
+        const subject = sameSubject(item.title);
+        const open = yield* list({ status: "open", project: item.project });
+        for (const earlier of open) {
+          if (
+            earlier.item.id !== id &&
+            earlier.item.thread === item.thread &&
+            sameSubject(earlier.item.title) === subject
+          ) {
+            yield* close(earlier.item.id, "withdrawn", null, now);
+          }
+        }
+      }
       return item;
     },
   );
@@ -432,6 +454,18 @@ const make = Effect.gen(function* () {
       return (yield* get(id)).item;
     },
   );
+
+  const withdrawForThread: DecisionService["Service"]["withdrawForThread"] = Effect.fn(
+    "DecisionService.withdrawForThread",
+  )(function* (thread) {
+    const open = yield* list({ status: "open" });
+    const now = yield* Clock.currentTimeMillis;
+    let withdrawn = 0;
+    for (const { item } of open) {
+      if (item.thread === thread && (yield* close(item.id, "withdrawn", null, now))) withdrawn += 1;
+    }
+    return withdrawn;
+  });
 
   const wait: DecisionService["Service"]["wait"] = (id, timeout) =>
     Effect.scoped(
@@ -499,6 +533,7 @@ const make = Effect.gen(function* () {
     get,
     answer,
     withdraw,
+    withdrawForThread,
     wait,
     putMedia,
     mediaPath,

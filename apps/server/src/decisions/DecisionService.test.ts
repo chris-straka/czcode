@@ -230,6 +230,35 @@ it.layer(TestLayer)("DecisionService", (it) => {
         assert.equal(yield* failureTag(decisions.get("missing")), "DecisionNotFoundError");
       }),
     );
+
+    it.effect("replaces a thread's earlier question on the same subject", () =>
+      Effect.gen(function* () {
+        const decisions = yield* DecisionService.DecisionService;
+        const first = yield* decisions.submit(pick({ project: "supersede", thread: "t1" }));
+        const other = yield* decisions.submit(
+          pick({ project: "supersede", thread: "t1", title: "Something else" }),
+        );
+        const elsewhere = yield* decisions.submit(pick({ project: "supersede", thread: "t2" }));
+        const again = yield* decisions.submit(
+          pick({ project: "supersede", thread: "t1", title: "  andras   CONCEPTS " }),
+        );
+        const open = (yield* decisions.list({ project: "supersede" })).map(({ item }) => item.id);
+        assert.deepStrictEqual(new Set(open), new Set([other.id, elsewhere.id, again.id]));
+        assert.equal((yield* decisions.get(first.id)).item.status, "withdrawn");
+      }),
+    );
+
+    it.effect("withdraws every open question of a thread that moved on", () =>
+      Effect.gen(function* () {
+        const decisions = yield* DecisionService.DecisionService;
+        yield* decisions.submit(pick({ project: "moved-on", thread: "gone" }));
+        yield* decisions.submit(pick({ project: "moved-on", thread: "gone", title: "Two" }));
+        const kept = yield* decisions.submit(pick({ project: "moved-on", thread: "alive" }));
+        assert.equal(yield* decisions.withdrawForThread("gone"), 2);
+        const open = (yield* decisions.list({ project: "moved-on" })).map(({ item }) => item.id);
+        assert.deepStrictEqual(open, [kept.id]);
+      }),
+    );
   });
 
   it.effect("wakes a waiting agent when the owner answers", () =>
