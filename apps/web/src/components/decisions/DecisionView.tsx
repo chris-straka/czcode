@@ -291,7 +291,7 @@ export function DecisionView({
       </WorkspacePageHeader>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 sm:px-6">
+        <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 wrap-anywhere sm:px-6">
           {/* Text keeps a reading width (~70 characters); option images use the full column. */}
           <div className="max-w-2xl space-y-1">
             <h1 className="text-lg font-semibold text-foreground">{title}</h1>
