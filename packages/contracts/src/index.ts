@@ -66,4 +66,5 @@ export * from "./resetQueue.ts";
 export * from "./mobileRelease.ts";
 export * from "./hostWake.ts";
 export * from "./threadControl.ts";
+export * from "./scheduleJobs.ts";
 export * from "./secretRequest.ts";

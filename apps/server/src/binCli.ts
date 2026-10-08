@@ -20,6 +20,7 @@ import { browserCommand } from "./cli/browser.ts";
 import { inboxCommand } from "./cli/inbox.ts";
 import { pairCommand } from "./cli/pair.ts";
 import { hostCommand } from "./cli/host.ts";
+import { jobsCommand } from "./cli/jobs.ts";
 import { queueCommand } from "./cli/queue.ts";
 import { threadCommand } from "./cli/thread.ts";
 import { sharedServerCommandFlags } from "./cli/config.ts";
@@ -58,6 +59,7 @@ export const makeCli = () =>
       pairCommand,
       inboxCommand,
       queueCommand,
+      jobsCommand,
       threadCommand,
       hostCommand,
       tuiCommand,
