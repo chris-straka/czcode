@@ -23,6 +23,7 @@ ResumeProjects/durable                chris-straka/durable
 ResumeProjects/ebpf-observe           chris-straka/ebpf-observe
 ResumeProjects/fluxhouse              chris-straka/fluxhouse
 ResumeProjects/game-store             chris-straka/game-store
+ResumeProjects/grammar-decode         chris-straka/grammar-decode
 ResumeProjects/inference-operator     chris-straka/inference-operator
 ResumeProjects/kyc-verify             chris-straka/kyc-verify
 ResumeProjects/lsmstore               chris-straka/lsmstore
@@ -49,6 +50,8 @@ ResumeProjects/recon                  chris-straka/recon
 ResumeProjects/risk-scorer            chris-straka/risk-scorer
 ResumeProjects/shardkv                chris-straka/shardkv
 ResumeProjects/shardkv-cpp            chris-straka/shardkv-cpp
+ResumeProjects/simlab                 chris-straka/simlab
+ResumeProjects/splat-render           chris-straka/splat-render
 ResumeProjects/sqlstore               chris-straka/sqlstore
 ResumeProjects/stable-rail            chris-straka/stable-rail
 ResumeProjects/techart-lab            chris-straka/techart-lab
