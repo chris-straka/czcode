@@ -38,7 +38,7 @@ interface ModelViewerElement extends HTMLElement {
  * A 3D model with orbit, its animations, a textured/clay toggle, and its size
  * (the Look view). `<model-viewer>` loads only when a model is shown.
  */
-export function ModelView({ src, className }: { src: string; className?: string }) {
+function ModelView({ src, className }: { src: string; className?: string }) {
   const ref = useRef<ModelViewerElement | null>(null);
   const [ready, setReady] = useState(false);
   const [animations, setAnimations] = useState<string[]>([]);

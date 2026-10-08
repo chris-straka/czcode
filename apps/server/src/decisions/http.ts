@@ -33,7 +33,7 @@ import { signPayload, timingSafeEqualBase64Url } from "../auth/utils.ts";
 import { assetFileResponse } from "../http.ts";
 import * as DecisionService from "./DecisionService.ts";
 
-export const DECISION_MEDIA_ROUTE_PREFIX = "/api/decision-media";
+const DECISION_MEDIA_ROUTE_PREFIX = "/api/decision-media";
 const SIGNING_SECRET_NAME = "decision-media-signing-key";
 const MEDIA_URL_TTL_MS = 6 * 60 * 60 * 1000;
 
