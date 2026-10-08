@@ -25,6 +25,8 @@ import { useProjects } from "../state/entities";
 import { SidebarProvider } from "./ui/sidebar";
 import { useNavigateBack } from "../hooks/useNavigateBack";
 import { FeedModal } from "./feed/FeedModal";
+import { openCommandPalette } from "../commandPaletteBus";
+import { typingTarget } from "../hooks/useVimKeys";
 import { FeedPage } from "./feed/FeedPage";
 
 // Ends just past the third traffic light (see the desktop preload).
@@ -88,6 +90,27 @@ function ProjectProjectionRetention() {
   return null;
 }
 
+/**
+ * "/" opens search from anywhere, as in ccez-llm and vim. Settings keeps "/"
+ * for its own search, and a field keeps the character.
+ */
+function useSlashOpensSearch(pathname: string) {
+  useEffect(() => {
+    if (pathname === "/settings" || pathname.startsWith("/settings/")) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      if (typingTarget(target)) return;
+      if (target instanceof HTMLElement && target.closest("[role=dialog], [role=menu]")) return;
+      event.preventDefault();
+      openCommandPalette();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pathname]);
+}
+
 /** Routes the feed itself answers; everything else opens over it as its own view. */
 function isFeedRoute(pathname: string): boolean {
   return pathname === "/" || pathname === "/threads" || pathname === "/decisions";
@@ -100,6 +123,7 @@ function isFeedRoute(pathname: string): boolean {
  */
 function OneFeedShell({ pathname, children }: { pathname: string; children: ReactNode }) {
   const navigateBack = useNavigateBack();
+  useSlashOpensSearch(pathname);
   if (pathname === "/welcome") return children;
   const isSettings = pathname === "/settings" || pathname.startsWith("/settings/");
   return (

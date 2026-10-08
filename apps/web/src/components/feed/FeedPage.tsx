@@ -60,21 +60,32 @@ import { FeedThreadGroups, ThreadsViewControls } from "./FeedThreadGroups";
 import { FeedTopBar } from "./FeedTopBar";
 import { MorningBriefCard } from "./MorningBriefCard";
 
-/** Moves focus to the next, previous, first, or last card, row or group in the feed. */
-function focusFeedItem(step: 1 | -1 | "first" | "last") {
+/**
+ * Moves focus through the feed's cards, rows and groups: by `step` items, to
+ * an end, or by half a screen ("half"), keeping the focused item in view.
+ */
+function focusFeedItem(step: number | "first" | "last" | "half-down" | "half-up") {
   const items = [
     ...document.querySelectorAll<HTMLElement>("[data-feed-page] [data-feed-item]"),
   ].filter((item) => item.offsetParent !== null);
   if (items.length === 0) return;
   const current = items.indexOf(document.activeElement as HTMLElement);
-  const next =
-    step === "first"
-      ? items[0]
-      : step === "last"
-        ? items.at(-1)
-        : current === -1
-          ? items[step === 1 ? 0 : items.length - 1]
-          : items[Math.min(items.length - 1, Math.max(0, current + step))];
+  let next: HTMLElement | undefined;
+  if (step === "first") next = items[0];
+  else if (step === "last") next = items.at(-1);
+  else if (step === "half-down" || step === "half-up") {
+    const from = items[current]?.getBoundingClientRect().top ?? 0;
+    const offset = (step === "half-down" ? 1 : -1) * (window.innerHeight / 2);
+    const goal = from + offset;
+    next =
+      step === "half-down"
+        ? (items.find((item) => item.getBoundingClientRect().top >= goal) ?? items.at(-1))
+        : (items.findLast((item) => item.getBoundingClientRect().top <= goal) ?? items[0]);
+  } else
+    next =
+      current === -1
+        ? items[step > 0 ? 0 : items.length - 1]
+        : items[Math.min(items.length - 1, Math.max(0, current + step))];
   next?.focus();
   next?.scrollIntoView({ block: "nearest" });
 }
@@ -448,13 +459,25 @@ export function FeedPage() {
     />
   );
 
-  // j/k step through cards, rows and groups; gg and G jump to the ends; Enter opens.
+  // ccez-llm motions over cards, rows and groups: j/k one, d/u three, Ctrl+D/U
+  // half a screen, gg/G the ends; l or Enter opens the focused one.
   useVimKeys(
     {
-      down: () => focusFeedItem(1),
-      up: () => focusFeedItem(-1),
+      move: (direction, size) =>
+        focusFeedItem(
+          size === "half"
+            ? direction > 0
+              ? "half-down"
+              : "half-up"
+            : direction * (size === "skip" ? 3 : 1),
+        ),
       top: () => focusFeedItem("first"),
       bottom: () => focusFeedItem("last"),
+      open: () => {
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && focused.closest("[data-feed-page] [data-feed-item]"))
+          focused.click();
+      },
     },
     (location.pathname === "/" ||
       location.pathname === "/threads" ||
