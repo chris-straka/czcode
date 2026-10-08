@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 import { ArrowLeftIcon } from "lucide-react";
 
-import { mainScroller, useVimKeys } from "~/hooks/useVimKeys";
+import { mainScroller, typingTarget, useVimKeys, vimScrollDistance } from "~/hooks/useVimKeys";
 import { Button } from "../ui/button";
 
 /** True when Esc should leave the field rather than the view: a text field with something in it. */
@@ -40,14 +40,39 @@ export function FeedModal({
     return scrollerRef.current;
   };
   useVimKeys({
-    down: () => scroller()?.scrollBy({ top: 120 }),
-    up: () => scroller()?.scrollBy({ top: -120 }),
+    move: (direction, size) => {
+      const element = scroller();
+      if (element) element.scrollBy({ top: direction * vimScrollDistance(size, element) });
+    },
     top: () => scroller()?.scrollTo({ top: 0 }),
     bottom: () => {
       const element = scroller();
       element?.scrollTo({ top: element.scrollHeight });
     },
+    back: onClose,
   });
+  // Space plays or pauses the view's first clip or sound, like a media player;
+  // on a button or link it keeps its usual meaning.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== " " || event.defaultPrevented || event.repeat) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      const target = event.target;
+      if (typingTarget(target)) return;
+      if (
+        target instanceof HTMLElement &&
+        target.closest("button, a, [role=button], [role=slider]")
+      )
+        return;
+      const media = rootRef.current?.querySelector<HTMLMediaElement>("video, audio");
+      if (!media) return;
+      event.preventDefault();
+      if (media.paused) void media.play().catch(() => {});
+      else media.pause();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   useEffect(() => {
     // The composer's editor claims Esc even when empty; an empty one has no
     // menu open, so Esc there leaves the view before the editor sees it.
