@@ -71,6 +71,10 @@ export function followUpFor(item: DecisionItem, answer: DecisionAnswer): FollowU
   };
 }
 
+/** 83.4 reads "1:23". */
+const seconds = (value: number) =>
+  `${Math.floor(value / 60)}:${String(Math.floor(value % 60)).padStart(2, "0")}`;
+
 function describeAnswer(item: DecisionItem, answer: DecisionAnswer): string {
   const label = (id: string) => item.options.find((option) => option.id === id)?.label ?? id;
   const parts = [
@@ -78,6 +82,14 @@ function describeAnswer(item: DecisionItem, answer: DecisionAnswer): string {
     answer.rank?.length ? `ranked ${answer.rank.map(label).join(" > ")}` : null,
     answer.choice,
     answer.retry ? "none of these, try again" : null,
+    answer.marks?.length
+      ? `marked ${answer.marks
+          .map(
+            (mark) =>
+              `${mark.tag === "like" ? "liked" : "change"} ${seconds(mark.start)}-${seconds(mark.end)}${mark.note ? ` (${mark.note})` : ""}`,
+          )
+          .join(", ")}`
+      : null,
     answer.comment ? `comment: ${answer.comment}` : null,
   ].filter((part) => part !== null && part !== "");
   return parts.length > 0 ? parts.join("; ") : "see the decision";

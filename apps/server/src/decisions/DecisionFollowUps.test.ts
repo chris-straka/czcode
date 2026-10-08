@@ -64,6 +64,21 @@ describe("followUpFor", () => {
     assert.equal(plan?.threadId, "thread-1");
   });
 
+  it("tells the agent which stretches of audio were marked", () => {
+    const plan = followUpFor(
+      item({ kind: "review" }),
+      answer({
+        choice: "changes",
+        option_ids: null,
+        marks: [
+          { media_idx: 0, start: 12.4, end: 31, tag: "change", note: "too busy" },
+          { media_idx: 0, start: 64, end: 70, tag: "like" },
+        ],
+      }),
+    );
+    assert.include(plan?.prompt, "marked change 0:12-0:31 (too busy), liked 1:04-1:10");
+  });
+
   it("leaves blocking items to the waiting agent, and items without a plan alone", () => {
     assert.isNull(followUpFor(item({ blocking: true }), answer()));
     assert.isNull(followUpFor(item({ resume: null }), answer()));

@@ -2,6 +2,7 @@ import {
   answerSummary,
   canAnswerFromCard,
   VERDICT_BUTTONS,
+  optionMedia,
 } from "@cz/client-runtime/decisions/draft";
 import { filterChips } from "@cz/client-runtime/decisions/feed";
 import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
@@ -27,6 +28,7 @@ import {
 import { useProjects, useThreadShells } from "~/state/entities";
 import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
 import { useJobsOn } from "~/state/jobs";
+import { useNavigateBack } from "~/hooks/useNavigateBack";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
@@ -96,15 +98,25 @@ export function FeedPage() {
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
   });
-  const searchOpen =
-    location.pathname === "/decisions" && typeof location.search.open === "string"
-      ? location.search.open
-      : null;
-  const [openKey, setOpenKey] = useState<string | null>(searchOpen);
-  useEffect(() => {
-    if (searchOpen) setOpenKey(searchOpen);
-  }, [searchOpen]);
-  const [session, setSession] = useState(false);
+  // The open Decision lives in the URL (/decisions?open=…), so Back closes it.
+  const onDecisions = location.pathname === "/decisions";
+  const openKey =
+    onDecisions && typeof location.search.open === "string" ? location.search.open : null;
+  const session = onDecisions && location.search.session === "1";
+  const navigateBack = useNavigateBack();
+  /** Opens a Decision; inside Review all, stepping replaces the entry so Back leaves the session. */
+  const showDecision = (key: string | null, options: { session?: boolean } = {}) => {
+    const inSession = options.session ?? session;
+    if (key === null) {
+      navigateBack();
+      return;
+    }
+    void navigate({
+      to: "/decisions",
+      search: { open: key, ...(inSession ? { session: "1" as const } : {}) },
+      replace: openKey !== null,
+    });
+  };
   const [pending, setPending] = useState<ReadonlyMap<string, PendingAnswer>>(new Map());
   const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const pendingRef = useRef(pending);
@@ -234,11 +246,7 @@ export function FeedPage() {
     });
   };
 
-  const closeDecision = () => {
-    setOpenKey(null);
-    setSession(false);
-    if (location.pathname === "/decisions") void navigate({ to: "/", replace: true });
-  };
+  const closeDecision = () => showDecision(null);
 
   const answer = (entry: DecisionEntry, value: DecisionAnswerInput) => {
     const key = entryKey(entry);
@@ -251,13 +259,8 @@ export function FeedPage() {
       timeout: UNDO_WINDOW_MS,
       actionProps: { children: "Undo", onClick: () => undo(key) },
     });
-    if (session) {
-      const next = visible.find((candidate) => entryKey(candidate) !== key);
-      setOpenKey(next ? entryKey(next) : null);
-      if (!next) closeDecision();
-    } else {
-      closeDecision();
-    }
+    const next = session ? visible.find((candidate) => entryKey(candidate) !== key) : undefined;
+    showDecision(next ? entryKey(next) : null);
   };
   const quickAnswer = (entry: DecisionEntry, patch: Partial<DecisionAnswerInput>) =>
     answer(entry, {
@@ -301,7 +304,7 @@ export function FeedPage() {
       entry={entry}
       embedded={embedded}
       age={ageLabel(entry.item.created_at, now)}
-      onOpen={() => setOpenKey(entryKey(entry))}
+      onOpen={() => showDecision(entryKey(entry), { session: false })}
       onQuickAnswer={(patch) => quickAnswer(entry, patch)}
     />
   );
@@ -312,8 +315,7 @@ export function FeedPage() {
         badge={filtered.entries.length}
         reviewing={visible.length > 0}
         onReviewAll={() => {
-          setSession(true);
-          setOpenKey(visible[0] ? entryKey(visible[0]) : null);
+          if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
         }}
       />
       {/* The page never scrolls sideways; only the chip row does. */}
@@ -328,10 +330,9 @@ export function FeedPage() {
                 excerpt: briefDigests.get(`${thread.environmentId}:${thread.id}`)?.excerpt ?? null,
               })}
               machineLabel={machineLabel}
-              onOpenDecision={(entry) => setOpenKey(entryKey(entry))}
+              onOpenDecision={(entry) => showDecision(entryKey(entry), { session: false })}
               onReviewAll={() => {
-                setSession(true);
-                setOpenKey(visible[0] ? entryKey(visible[0]) : null);
+                if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
               }}
             />
           ) : null}
@@ -452,11 +453,7 @@ export function FeedPage() {
         </div>
       </div>
       {opened && upload ? (
-        <FeedModal
-          label={opened.item.title || opened.item.question}
-          onClose={closeDecision}
-          showClose={false}
-        >
+        <FeedModal label={opened.item.title || opened.item.question} onClose={closeDecision}>
           <DecisionView
             key={openKey}
             entry={opened}
@@ -466,12 +463,12 @@ export function FeedPage() {
                   onSkip: () => {
                     const index = visible.indexOf(opened);
                     const next = visible[index + 1] ?? visible[0];
-                    setOpenKey(next ? entryKey(next) : null);
+                    if (next) showDecision(entryKey(next));
                   },
                   onPrevious: () => {
                     const index = visible.indexOf(opened);
                     const previous = visible[index - 1] ?? visible.at(-1);
-                    setOpenKey(previous ? entryKey(previous) : null);
+                    if (previous) showDecision(entryKey(previous));
                   },
                 }
               : {})}
@@ -674,7 +671,7 @@ function AnsweredList({ feed, now }: { readonly feed: DecisionFeed; readonly now
     const { item, answer } = entry;
     const chosen = item.options.filter((option) => answer?.option_ids?.includes(option.id));
     const pictures = chosen.flatMap((option) => {
-      const media = option.media_idx === null ? undefined : item.media[option.media_idx];
+      const media = optionMedia(item, option);
       return media?.type === "image" ? [media] : [];
     });
     return (
@@ -761,8 +758,7 @@ function DecisionCard({
     (item.kind === "review" || item.kind === "pitch") && canAnswerFromCard(item)
       ? VERDICT_BUTTONS[item.kind]
       : null;
-  const mediaOf = (option: (typeof item.options)[number]) =>
-    option.media_idx === null ? undefined : item.media[option.media_idx];
+  const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Only single-choice picks answer from the card; the rest open the full view.
   const inlinePick = item.kind === "pick" && item.max_choices === 1 && item.options.length > 0;
   const pictures = inlinePick && item.options.some((option) => mediaOf(option)?.type === "image");
