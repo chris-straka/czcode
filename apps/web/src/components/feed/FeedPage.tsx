@@ -56,7 +56,7 @@ import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { FeedModal } from "./FeedModal";
 import { FeedThreadCard } from "./FeedThreadCard";
 import { FeedGroupToggle, type FeedProjectChoice, FeedProjectsMenu } from "./FeedFilters";
-import { FeedThreadGroups } from "./FeedThreadGroups";
+import { FeedThreadGroups, ThreadsViewControls } from "./FeedThreadGroups";
 import { FeedTopBar } from "./FeedTopBar";
 import { MorningBriefCard } from "./MorningBriefCard";
 
@@ -123,6 +123,7 @@ export function FeedPage() {
   const withdrawCommand = useAtomCommand(decisionEnvironment.withdraw, "dismiss decision");
   const selectedProjects = useFeedFilterStore((state) => state.projects);
   const group = useFeedFilterStore((state) => state.group);
+  const threadsView = useFeedFilterStore((state) => state.threadsView);
   const [showAnswered, setShowAnswered] = useState(false);
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
@@ -302,6 +303,12 @@ export function FeedPage() {
   });
   // Needs you (/) and Threads (/threads) are two pages; a Decision opens over Needs you.
   const tab: "needs" | "threads" = location.pathname === "/threads" ? "threads" : "needs";
+  const openProject =
+    tab === "threads" && typeof location.search.project === "string"
+      ? location.search.project
+      : null;
+  // The project grid needs room; every other view reads as one column.
+  const wide = tab === "threads" && openProject === null && threadsView === "grid";
   // Each page keeps its own scroll position across switches.
   const scrollerRef = useRef<HTMLDivElement>(null);
   const scrollTops = useRef({ needs: 0, threads: 0 });
@@ -474,27 +481,41 @@ export function FeedPage() {
       />
       {/* The page never scrolls sideways; only the chip row does. A long URL or word wraps. */}
       <div ref={scrollerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4 wrap-anywhere">
+        <div
+          className={cn(
+            "mx-auto w-full min-w-0 space-y-3 px-4 py-4 wrap-anywhere",
+            wide ? "max-w-7xl" : "max-w-2xl",
+          )}
+        >
           <SidebarUpdateArchitectureWarning />
-          <ToggleGroup
-            aria-label="Feed"
-            value={[tab]}
-            onValueChange={(value) => {
-              const next = value[0];
-              if ((next === "needs" || next === "threads") && next !== tab) {
-                void navigate({ to: next === "threads" ? "/threads" : "/" });
-              }
-            }}
-          >
-            <Toggle size="sm" value="needs">
-              Needs you
-              <span className="tabular-nums text-warning-foreground">{needsYou.length}</span>
-            </Toggle>
-            <Toggle size="sm" value="threads">
-              Threads
-              <span className="tabular-nums text-muted-foreground">{groupedThreads.length}</span>
-            </Toggle>
-          </ToggleGroup>
+          <div className="flex flex-wrap items-center gap-2">
+            <ToggleGroup
+              aria-label="Feed"
+              value={[tab]}
+              onValueChange={(value) => {
+                const next = value[0];
+                if ((next === "needs" || next === "threads") && next !== tab) {
+                  void navigate({ to: next === "threads" ? "/threads" : "/" });
+                }
+              }}
+            >
+              <Toggle size="sm" value="needs">
+                Needs you
+                <span className="tabular-nums text-warning-foreground">{needsYou.length}</span>
+              </Toggle>
+              <Toggle size="sm" value="threads">
+                Threads
+                <span className="tabular-nums text-muted-foreground">{groupedThreads.length}</span>
+              </Toggle>
+            </ToggleGroup>
+            {tab === "threads" && openProject === null ? (
+              <ThreadsViewControls
+                projects={[
+                  ...new Set(groupedThreads.map((thread) => feedProjectKey(folderOf(thread)))),
+                ]}
+              />
+            ) : null}
+          </div>
           {/* Beside the search bar on wider screens; here on a phone. */}
           <div className="flex flex-wrap items-center gap-1.5 md:hidden">{filters}</div>
           {selectedBlurbs.map(({ project, description }) => (
@@ -526,7 +547,9 @@ export function FeedPage() {
                   thread.hasPendingApprovals ||
                   thread.hasPendingUserInput
                 }
+                project={openProject}
                 now={now}
+                enabled={openKey === null}
               />
             )
           ) : feed.isPending && threads.length === 0 ? (

@@ -423,6 +423,10 @@
       "types": "./src/decisions/oneFeed.ts",
       "default": "./src/decisions/oneFeed.ts"
     },
+    "./decisions/threadBoard": {
+      "types": "./src/decisions/threadBoard.ts",
+      "default": "./src/decisions/threadBoard.ts"
+    },
     "./decisions/draft": {
       "types": "./src/decisions/draft.ts",
       "default": "./src/decisions/draft.ts"

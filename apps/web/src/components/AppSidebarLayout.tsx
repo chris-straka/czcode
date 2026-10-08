@@ -27,7 +27,8 @@ import { useNavigateBack } from "../hooks/useNavigateBack";
 import { FeedModal } from "./feed/FeedModal";
 import { FeedPage } from "./feed/FeedPage";
 
-const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
+// Ends just past the third traffic light (see the desktop preload).
+const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 78px)";
 
 // Moves through the app's route history like a browser's back/forward buttons.
 function NavigationHistoryShortcuts() {
@@ -147,6 +148,9 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   });
   const sidebarProviderStyle = {
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
+    // No sidebar toggle sits in the title bar any more, so headers start
+    // right at the window controls instead of leaving room for one.
+    "--workspace-titlebar-content-left": "var(--workspace-controls-left)",
     ...(isMacosDesktop && !isWindowFullscreen
       ? { "--workspace-controls-left": MACOS_TRAFFIC_LIGHTS_LEFT_INSET }
       : {}),

@@ -32,7 +32,7 @@ type Overlay =
     };
 
 /**
- * Tabs across the top (digits or Tab to switch), one screen below, a status line
+ * Tabs across the top (digits, H/L or Tab to switch), one screen below, a status line
  * at the bottom. Keys stay off `\` and `|` (the owner's float toggle and
  * terminal-normal exit) and Cmd chords; Esc always goes back.
  */
@@ -88,7 +88,9 @@ export function App({ atoms, cwd }: { readonly atoms: TuiAtoms; readonly cwd: st
       if (input === "q") return exit();
       const digit = Number(input);
       if (digit >= 1 && digit <= TABS.length) return setTab(TABS[digit - 1] ?? "Threads");
-      if (key.tab) return setTab(TABS[(TABS.indexOf(tab) + 1) % TABS.length] ?? "Threads");
+      const step = key.tab || input === "L" ? 1 : input === "H" ? -1 : 0;
+      if (step !== 0)
+        return setTab(TABS[(TABS.indexOf(tab) + step + TABS.length) % TABS.length] ?? "Threads");
       if (input === "n" && tab === "Threads") setOverlay({ kind: "new-thread" });
       if (input === "a" && scope !== null) {
         setAllProjects(!allProjects);
