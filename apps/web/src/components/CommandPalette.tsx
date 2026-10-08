@@ -47,6 +47,7 @@ import {
   ArrowLeftIcon,
   ChartNoAxesColumnIcon,
   ServerIcon,
+  ClockIcon,
   CheckIcon,
   ChevronRightIcon,
   CornerLeftUpIcon,
@@ -2247,6 +2248,17 @@ function OpenCommandPaletteDialog(props: {
     icon: <ServerIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/fleet" });
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:schedules",
+    searchTerms: ["schedules", "jobs", "timers", "cron", "nightly", "recurring", "scheduled"],
+    title: "Open schedules",
+    icon: <ClockIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/schedules" });
     },
   });
 

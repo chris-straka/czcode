@@ -419,6 +419,10 @@
       "types": "./src/decisions/draft.ts",
       "default": "./src/decisions/draft.ts"
     },
+    "./state/jobs": {
+      "types": "./src/state/jobs.ts",
+      "default": "./src/state/jobs.ts"
+    },
     "./state/queue": {
       "types": "./src/state/queue.ts",
       "default": "./src/state/queue.ts"

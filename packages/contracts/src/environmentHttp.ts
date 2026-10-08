@@ -92,6 +92,7 @@ import {
   ThreadStopResult,
 } from "./threadControl.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
+import { ScheduleJobList } from "./scheduleJobs.ts";
 import {
   PullRequestDiffInput,
   PullRequestDiffResult,
@@ -937,6 +938,15 @@ const webhookEndpoint = {
 const WEBHOOK_PATH = "/api/hooks/:hookId/:token";
 
 /** Lists threads and stops their runs, for `cz thread` (fork). */
+/** Every recurring job on this machine: cz scheduled tasks and registered timers (fork). */
+class EnvironmentJobsHttpApi extends HttpApiGroup.make("jobs").add(
+  HttpApiEndpoint.get("list", "/api/jobs", {
+    headers: OptionalBearerHeaders,
+    success: ScheduleJobList,
+    error: [EnvironmentScopeRequiredError, EnvironmentInternalError],
+  }).middleware(EnvironmentAuthenticatedAuth),
+) {}
+
 class EnvironmentThreadsHttpApi extends HttpApiGroup.make("threads")
   .add(
     HttpApiEndpoint.get("list", "/api/threads", {
@@ -981,4 +991,5 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMobileReleaseHttpApi)
   .add(EnvironmentHostWakeHttpApi)
   .add(EnvironmentThreadsHttpApi)
+  .add(EnvironmentJobsHttpApi)
   .add(EnvironmentWebhooksHttpApi) {}
