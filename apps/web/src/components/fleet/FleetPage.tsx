@@ -303,13 +303,14 @@ export function FleetPage() {
                 </span>
               </Stat>
               <Stat label="CPU in use">
-                <span className="text-sm tabular-nums text-foreground">
-                  {totals.cpuBusyCores.toFixed(1)} of {totals.cpuCores} cores
+                <span className="text-xl font-semibold tabular-nums text-foreground">
+                  {totals.cpuBusyCores.toFixed(1)}
+                  <span className="text-muted-foreground">/{totals.cpuCores} cores</span>
                 </span>
                 <Meter ratio={cpuRatio} />
               </Stat>
               <Stat label="Memory in use">
-                <span className="text-sm tabular-nums text-foreground">
+                <span className="text-xl font-semibold tabular-nums text-foreground">
                   {formatUsedOfTotal(totals.memoryUsedBytes, totals.memoryTotalBytes)}
                 </span>
                 <Meter ratio={memoryRatio} />
