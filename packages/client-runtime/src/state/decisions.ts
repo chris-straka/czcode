@@ -103,6 +103,6 @@ export function threadDigestKey(
   return threads.map((thread) => `${thread.id}@${thread.version ?? ""}`).join("\n");
 }
 
-export function threadDigestIdsFromKey(key: string): ReadonlyArray<string> {
+function threadDigestIdsFromKey(key: string): ReadonlyArray<string> {
   return key === "" ? [] : key.split("\n").map((entry) => entry.slice(0, entry.lastIndexOf("@")));
 }

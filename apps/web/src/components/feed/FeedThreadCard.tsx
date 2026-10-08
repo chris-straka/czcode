@@ -40,7 +40,7 @@ const STATUS_BADGE: Record<
   idle: { label: "Idle", variant: "secondary" },
 };
 
-export function FeedStatusBadge({ status }: { readonly status: FeedThreadStatus }) {
+function FeedStatusBadge({ status }: { readonly status: FeedThreadStatus }) {
   const { label, variant } = STATUS_BADGE[status];
   return (
     <Badge variant={variant} size="sm">

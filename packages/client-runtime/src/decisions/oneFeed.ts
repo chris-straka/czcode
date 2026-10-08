@@ -72,7 +72,7 @@ function chipsMatch(filter: OneFeedFilter, item: DecisionItem): boolean {
   );
 }
 
-export function machineMatches(filter: MachineFilter, environmentId: EnvironmentId): boolean {
+function machineMatches(filter: MachineFilter, environmentId: EnvironmentId): boolean {
   return filter.type === "all" || filter.environmentId === environmentId;
 }
 
@@ -204,7 +204,7 @@ export function shortMachineLabel(label: string): string {
  * Where a decision can be acted on. A playtest that ships an Android build is
  * a phone item even when it was asked before devices were targeted.
  */
-export function effectiveTargetDevice(
+function effectiveTargetDevice(
   item: Pick<DecisionItem, "target_device" | "kind" | "media">,
 ): "phone" | "desktop" | "any" {
   if (item.target_device && item.target_device !== "any") return item.target_device;
@@ -213,7 +213,7 @@ export function effectiveTargetDevice(
 }
 
 /** True when a decision can be acted on from this kind of device. */
-export function isForDevice(
+function isForDevice(
   item: Pick<DecisionItem, "target_device" | "kind" | "media">,
   device: FeedDevice,
 ): boolean {

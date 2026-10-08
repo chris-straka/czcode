@@ -47,7 +47,7 @@ export class ThreadControlNotFoundError extends Schema.TaggedError<ThreadControl
 ) {}
 
 /** At most this many threads per digest request; the feed asks for visible cards. */
-export const THREAD_DIGEST_MAX_THREADS = 100;
+const THREAD_DIGEST_MAX_THREADS = 100;
 
 export const ThreadDigestInput = Schema.Struct({
   threadIds: Schema.Array(Schema.String).check(Schema.isMaxLength(THREAD_DIGEST_MAX_THREADS)),

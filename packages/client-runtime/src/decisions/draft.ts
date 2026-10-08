@@ -163,7 +163,7 @@ export function answerSummary(item: DecisionItem, answer: DecisionAnswerInput): 
  * must be played, scrubbed, or installed before a verdict counts; pictures
  * and models show in place, so seeing the view is enough for them.
  */
-export function mediaToEngage(item: Pick<DecisionItem, "kind" | "media">): ReadonlyArray<string> {
+function mediaToEngage(item: Pick<DecisionItem, "kind" | "media">): ReadonlyArray<string> {
   if (item.kind === "pick" || item.kind === "rank" || item.kind === "request") return [];
   return item.media
     .filter((media) => media.type === "video" || media.type === "audio" || media.type === "apk")

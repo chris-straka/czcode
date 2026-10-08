@@ -153,7 +153,7 @@ export function useProjectBlurbs(): ReadonlyMap<string, DecisionProjectBlurb> {
  * The feed filter in effect: machine (this one by default), chips, and this
  * device's kind. Pages and badges read it so their counts agree.
  */
-export function useFeedFilter(): OneFeedFilter {
+function useFeedFilter(): OneFeedFilter {
   const machine = useFeedFilterStore((state) => state.machine);
   const projects = useFeedFilterStore((state) => state.projects);
   const kinds = useFeedFilterStore((state) => state.kinds);
