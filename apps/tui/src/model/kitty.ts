@@ -55,11 +55,15 @@ export function inlineImagesSupported(
   if (env.CZ_TUI_IMAGES === "1") return true;
   if (env.TMUX) return false;
   const program = env.TERM_PROGRAM?.toLowerCase() ?? "";
+  const term = env.TERM ?? "";
+  // TERM survives ssh (TERM_PROGRAM doesn't), so Ghostty or kitty on the Mac
+  // ssh'd into a host still gets images; a phone's ssh app says xterm-256color.
   const terminal =
     program === "ghostty" ||
     program === "wezterm" ||
     env.KITTY_WINDOW_ID !== undefined ||
-    (env.TERM ?? "").includes("kitty");
+    term.includes("kitty") ||
+    term.includes("ghostty");
   const socket = env.NVIM?.trim();
   return terminal && (!socket || forwardsImages(socket));
 }

@@ -1,4 +1,4 @@
-import { Box, Text, useStdout } from "ink";
+import { Box, Text } from "ink";
 import { createElement as h, useEffect, useState } from "react";
 
 import {
@@ -10,6 +10,7 @@ import {
   transmitSequence,
 } from "../model/kitty.ts";
 import { letterbox } from "../model/decisionTiles.ts";
+import { makeImageStore } from "../model/imageStore.ts";
 
 /** The neutral surround of a framed image or a text-only tile. */
 export const LETTERBOX = "#1c1c22";
@@ -17,7 +18,12 @@ export const LETTERBOX = "#1c1c22";
 // Image ids share one store per terminal, so two `ct` floats in one Ghostty
 // window start from ids spread by process id. The id is also the placeholder's
 // 24-bit colour, so it stays below 0x1000000.
-let nextImageId = 0x100000 + ((process.pid * 40_503) % 0xe00000);
+export const terminalImages = makeImageStore({
+  write: (sequence) => process.stdout.write(sequence),
+  transmit: transmitSequence,
+  remove: deleteSequence,
+  firstId: 0x100000 + ((process.pid * 40_503) % 0xe00000),
+});
 
 /**
  * Draws a PNG inline with Kitty placeholders, sized to fit. Falls back to a
@@ -25,6 +31,8 @@ let nextImageId = 0x100000 + ((process.pid * 40_503) % 0xe00000);
  */
 export function InlineImage(props: {
   readonly png: Uint8Array | null;
+  /** Names the picture (a file path, plus frame for a turntable): same key, same terminal image. */
+  readonly sourceKey: string;
   readonly label: string;
   readonly maxColumns: number;
   readonly maxRows: number;
@@ -34,19 +42,18 @@ export function InlineImage(props: {
    */
   readonly framed?: boolean;
 }) {
-  const { stdout } = useStdout();
-  const [id] = useState(() => (nextImageId += 1));
   const supported = inlineImagesSupported();
   const size = props.png ? pngSize(props.png) : null;
   const cells = size ? fitCells(size, props.maxColumns, props.maxRows) : null;
+  const storeKey = cells ? `${props.sourceKey}@${cells.columns}x${cells.rows}` : null;
+  const [id, setId] = useState<number | null>(null);
 
+  // Sent once per picture and size; repaints and remounts reuse the terminal's copy.
   useEffect(() => {
-    if (!supported || !props.png || !cells) return;
-    stdout.write(transmitSequence(id, props.png, cells.columns, cells.rows));
-    return () => {
-      stdout.write(deleteSequence(id));
-    };
-  }, [supported, props.png, cells?.columns, cells?.rows, id, stdout]);
+    if (!supported || !props.png || !cells || storeKey === null) return;
+    setId(terminalImages.acquire(storeKey, { png: props.png, ...cells }));
+    return () => terminalImages.release(storeKey);
+  }, [supported, storeKey]);
 
   const fallback = !props.png
     ? `${props.label}: loading…`
@@ -68,7 +75,7 @@ export function InlineImage(props: {
       },
       child,
     );
-  if (fallback !== null || !cells) {
+  if (fallback !== null || !cells || id === null) {
     const text = h(
       Text,
       { dimColor: true, wrap: "truncate" },

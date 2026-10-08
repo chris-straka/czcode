@@ -13,6 +13,7 @@ import { parentNvim, passEscapeLua, processAncestors, runInParentNvim } from "./
 import { makeTuiRuntime } from "./runtime/connection.ts";
 import { makeTuiAtoms } from "./state/atoms.ts";
 import { App } from "./ui/App.ts";
+import { terminalImages } from "./ui/InlineImage.ts";
 
 export type { LocalServer, RunTuiOptions } from "./api.ts";
 
@@ -50,6 +51,12 @@ export const runTui: TuiModule["runTui"] = async (options: RunTuiOptions) => {
     await app.waitUntilExit();
   } finally {
     process.off("SIGHUP", onHangup);
+    // Free the images ct sent; the terminal keeps them otherwise.
+    try {
+      terminalImages.clear();
+    } catch {
+      // The terminal may already be gone (hangup).
+    }
     tuiRuntime.registry.dispose();
     // Unmounting queued atom removals that run a tick later and re-arm the
     // registry's idle timers, which would keep the process (and the shell's

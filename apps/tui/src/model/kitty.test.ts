@@ -55,6 +55,11 @@ describe("kitty placeholders", () => {
     expect(inlineImagesSupported({ TERM: "xterm-kitty" })).toBe(true);
     expect(inlineImagesSupported({ TERM_PROGRAM: "ghostty", TMUX: "/tmp/x" })).toBe(false);
     expect(inlineImagesSupported({ TERM_PROGRAM: "Apple_Terminal" })).toBe(false);
+    // Over ssh: Ghostty's TERM comes along; a phone ssh app's doesn't name a graphics terminal.
+    expect(inlineImagesSupported({ TERM: "xterm-ghostty", SSH_CONNECTION: "1 2 3 4" })).toBe(true);
+    expect(inlineImagesSupported({ TERM: "xterm-256color", SSH_CONNECTION: "1 2 3 4" })).toBe(
+      false,
+    );
     // Inside neovim, only when that neovim forwards the images.
     const inNvim = { TERM_PROGRAM: "ghostty", NVIM: "/tmp/nvim.sock" };
     expect(inlineImagesSupported(inNvim, () => true)).toBe(true);
