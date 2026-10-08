@@ -44,6 +44,7 @@ import { Textarea } from "../ui/textarea";
 import { ExpandedImageDialog } from "../chat/ExpandedImageDialog";
 import type { ExpandedImageItem } from "../chat/ExpandedImagePreview";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { VideoReviewPlayer } from "./VideoReviewPlayer";
 import { WaveformPlayer } from "./WaveformPlayer";
 import {
   DECISION_OPTION_FRAME_CLASS,
@@ -126,8 +127,9 @@ export function DecisionView({
   const verdicts = VERDICT_BUTTONS[item.kind];
   const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: "retry" | "none") =>
     onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
-  // Any pick can be turned down, with or without asking for another round.
+  // Options can be sent back for another round; a pick can also be turned down outright.
   const declinable = item.options.length > 0 && item.kind !== "rank";
+  const pick = item.kind === "pick";
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fullScreen, setFullScreen] = useState<{
     readonly images: ReadonlyArray<ExpandedImageItem>;
@@ -188,7 +190,7 @@ export function DecisionView({
           onClose();
           return true;
         case "0":
-          if (!declinable) return false;
+          if (!pick) return false;
           submit({}, "none");
           return true;
         case "r":
@@ -417,9 +419,11 @@ export function DecisionView({
             )}
             {declinable ? (
               <>
-                <Button variant="outline" onClick={() => submit({}, "none")}>
-                  None of these
-                </Button>
+                {pick ? (
+                  <Button variant="outline" onClick={() => submit({}, "none")}>
+                    None of these
+                  </Button>
+                ) : null}
                 <Button variant="ghost" onClick={() => submit({}, "retry")}>
                   <RepeatIcon />
                   None of these, try again
@@ -818,6 +822,22 @@ function ReviewBody({ entry, draft, update }: BodyProps) {
       {entry.item.media.map((media, index) =>
         media.type === "audio" && resolveMedia(media) ? (
           <WaveformPlayer
+            key={media.key}
+            url={resolveMedia(media)!}
+            media={media}
+            marks={draft.marks.filter((mark) => mark.media_idx === index)}
+            onMarks={(marks) =>
+              update({
+                marks: [
+                  ...draft.marks.filter((mark) => mark.media_idx !== index),
+                  ...marks.map((mark) => ({ ...mark, media_idx: index })),
+                ],
+              })
+            }
+            onEngage={() => engage(media.key)}
+          />
+        ) : media.type === "video" && resolveMedia(media) ? (
+          <VideoReviewPlayer
             key={media.key}
             url={resolveMedia(media)!}
             media={media}

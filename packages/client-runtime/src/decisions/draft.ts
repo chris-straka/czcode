@@ -120,6 +120,8 @@ export function draftToAnswer(
     rank: null as readonly string[] | null,
     comment,
     voice_key: draft.voiceKey,
+    // Stretches and comments marked on a sound's or video's timeline, whatever the kind.
+    ...(draft.marks.length > 0 ? { marks: draft.marks } : {}),
   };
   if (noneOfThese === "retry" || noneOfThese === true) return { ...base, retry: true };
   if (noneOfThese === "none") return { ...base, declined: true };
@@ -135,7 +137,6 @@ export function draftToAnswer(
           (reaction) => reaction.verdict !== null || reaction.note,
         ),
         more_like_these: draft.moreLikeThese,
-        ...(draft.marks.length > 0 ? { marks: draft.marks } : {}),
       };
     case "request":
       return { ...base, uploads: draft.uploads };
@@ -144,12 +145,7 @@ export function draftToAnswer(
     case "timeline":
       return { ...base, choice: draft.choice, redo_from: draft.redoFrom };
     case "review":
-      return {
-        ...base,
-        choice: draft.choice,
-        redlines: draft.redlines,
-        ...(draft.marks.length > 0 ? { marks: draft.marks } : {}),
-      };
+      return { ...base, choice: draft.choice, redlines: draft.redlines };
     case "read":
       return { ...base, choice: draft.choice, passage_comments: draft.passageComments };
     default:

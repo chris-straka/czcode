@@ -64,7 +64,7 @@ describe("followUpFor", () => {
     assert.equal(plan?.threadId, "thread-1");
   });
 
-  it("tells the agent which stretches of audio were marked", () => {
+  it("tells the agent which stretches of sound or video were marked, and pinned comments", () => {
     const plan = followUpFor(
       item({ kind: "review" }),
       answer({
@@ -73,10 +73,15 @@ describe("followUpFor", () => {
         marks: [
           { media_idx: 0, start: 12.4, end: 31, tag: "change", note: "too busy" },
           { media_idx: 0, start: 64, end: 70, tag: "like" },
+          { media_idx: 1, start: 3, end: 9, tag: "cut" },
+          { media_idx: 1, start: 20, end: 20, tag: "note", note: "logo too small" },
         ],
       }),
     );
-    assert.include(plan?.prompt, "marked change 0:12-0:31 (too busy), liked 1:04-1:10");
+    assert.include(
+      plan?.prompt,
+      "marked change 0:12-0:31 (too busy), liked 1:04-1:10, cut 0:03-0:09, note at 0:20 (logo too small)",
+    );
   });
 
   it("leaves blocking items to the waiting agent, and items without a plan alone", () => {

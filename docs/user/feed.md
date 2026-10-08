@@ -20,9 +20,11 @@ returns to the feed where you left it.
 
 ## Decisions
 
-A sound or video plays right on its card. Sound plays from its waveform:
-click to jump, and on a review drag across it to mark a part you like or
-want changed, with a note; the agent gets the marks with your answer. A
+A sound or video plays right on its card. Sound plays from its waveform,
+and a video has a timeline under it: click to jump, and on a review drag
+across it to mark a part (sound: like or change; video: keep, cut, or
+change) with a note, or use **Comment at** to pin a note to the moment
+playing. The agent gets the marks and comments with your answer. A
 Decision with a video shows the video first, with the write-up under
 **Details**.
 
