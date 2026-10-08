@@ -149,7 +149,11 @@ function SidebarUpdateControl() {
       : "Update available"
     : showCheckIcon
       ? "Checking for updates…"
-      : "Check for updates";
+      : state?.status === "up-to-date"
+        ? "Up to date. Click to check again."
+        : state?.status === "error" && state.message
+          ? `${state.message} Click to try again.`
+          : "Check for updates";
   const disabled = showCheckIcon
     ? true
     : showUpdateDetails
