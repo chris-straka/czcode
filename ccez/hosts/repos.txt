@@ -115,7 +115,7 @@ SWE/games/interpreter                 chris-straka/interpreter
 SWE/games/night-bakery                chris-straka/night-bakery
 SWE/games/seven-locked-vault              chris-straka/seven-locked-vault
 SWE/games/_tools                       chris-straka/game-tools
-SWE/games/old-sun                     chris-straka/old-sun
+SWE/games/giants-dusk                 chris-straka/giants-dusk
 SWE/genforge                          chris-straka/genforge
 SWE/launchdesk                        chris-straka/launchdesk
 SWE/launchkit                         chris-straka/launchkit
