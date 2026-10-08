@@ -2,6 +2,8 @@
  * ScheduleJobsService - every recurring job on this machine for the
  * Schedules view: czcode's scheduled tasks, plus the timers registered in the
  * host's jobs.toml with their live state from systemd (or launchd on macOS).
+ * A job run through ccez/hosts/job-run.sh also leaves a run record, which
+ * says more than systemd can: "attention" runs and a one-line summary.
  * Timers found on the host but missing from jobs.toml are listed too, marked
  * unregistered, so a job an agent forgot to register still shows.
  *
@@ -52,6 +54,16 @@ const TimerListing = Schema.fromJsonString(
 );
 const decodeTimerListing = Schema.decodeUnknownOption(TimerListing);
 
+/** What ccez/hosts/job-run.sh writes after each run, in `<state>/<name>.json`. */
+const RunRecord = Schema.fromJsonString(
+  Schema.Struct({
+    status: Schema.Literals(["ok", "attention", "failed"]),
+    startedAt: Schema.String,
+    summary: Schema.optionalKey(Schema.String),
+  }),
+);
+const decodeRunRecord = Schema.decodeUnknownOption(RunRecord);
+
 /** How far back the journal is read to rebuild runs. */
 const JOURNAL_SINCE = "-8d";
 
@@ -70,29 +82,60 @@ const make = Effect.gen(function* () {
       Effect.orElseSucceed(() => null),
     );
   const scopeArgs = (scope: JobEntry["scope"]) => (scope === "user" ? ["--user"] : []);
+  const stateDir = path.join(
+    environment.HOME ?? environment.USERPROFILE ?? "",
+    ".local",
+    "state",
+    "cz-host",
+    "jobs",
+  );
+
+  /** The job's last run as job-run.sh recorded it, with its log; none when it doesn't use job-run.sh. */
+  const runRecord = Effect.fn("ScheduleJobsService.runRecord")(function* (name: string) {
+    const text = yield* fs
+      .readFileString(path.join(stateDir, `${name}.json`))
+      .pipe(Effect.orElseSucceed(() => ""));
+    return Option.getOrNull(
+      Option.map(decodeRunRecord(text), (record) => ({
+        status: record.status,
+        at: Date.parse(record.startedAt) || null,
+        reason: record.status === "ok" ? null : (record.summary ?? null),
+      })),
+    );
+  });
+
+  const showTimer = (scope: JobEntry["scope"], unit: string) =>
+    run("systemctl", [
+      ...scopeArgs(scope),
+      "show",
+      unit,
+      "--timestamp=unix",
+      "-p",
+      "LoadState",
+      "-p",
+      "Unit",
+      "-p",
+      "TimersCalendar",
+      "-p",
+      "NextElapseUSecRealtime",
+      "-p",
+      "LastTriggerUSec",
+    ]).pipe(Effect.map((text) => parseSystemctlShow(text ?? "")));
 
   /** A registered systemd timer: schedule, next run, and runs from the journal. */
   const systemdJob = Effect.fn("ScheduleJobsService.systemdJob")(function* (entry: JobEntry) {
     const unit = entry.unit!;
-    const timer = parseSystemctlShow(
-      (yield* run("systemctl", [
-        ...scopeArgs(entry.scope),
-        "show",
-        unit,
-        "--timestamp=unix",
-        "-p",
-        "Unit",
-        "-p",
-        "TimersCalendar",
-        "-p",
-        "NextElapseUSecRealtime",
-        "-p",
-        "LastTriggerUSec",
-      ])) ?? "",
-    );
+    // Without a scope, a loaded user timer wins over a system one.
+    let scope = entry.scope ?? "user";
+    let timer = yield* showTimer(scope, unit);
+    if (!entry.scope && timer.get("LoadState") !== "loaded") {
+      scope = "system";
+      timer = yield* showTimer(scope, unit);
+    }
+    const loaded = timer.get("LoadState") === "loaded";
     const service = timer.get("Unit") || unit.replace(/\.timer$/, ".service");
     const journal = yield* run("journalctl", [
-      ...scopeArgs(entry.scope),
+      ...scopeArgs(scope),
       "-u",
       service,
       "--since",
@@ -110,22 +153,30 @@ const make = Effect.gen(function* () {
         : [];
     });
     const runs = runsFromJournal(entries);
-    const latest = runs.at(-1) ?? null;
+    const record = yield* runRecord(entry.name);
+    const journalLatest = runs.at(-1) ?? null;
+    // The record knows "attention" and the summary; the journal knows a run in progress.
+    const latest =
+      record && journalLatest?.status !== "running" ? record : (journalLatest ?? record);
     const scheduled = scheduledRun(runs, unixTimestampMs(timer.get("LastTriggerUSec")));
     const onCalendar = onCalendarOf(timer.get("TimersCalendar"));
+    const scopeFlag = scope === "user" ? "--user " : "";
     return {
-      id: entry.id,
+      id: entry.name,
       source: "systemd",
-      what: entry.what,
+      what: entry.description,
       project: entry.project ?? null,
       unit,
-      schedule: onCalendar ? calendarInWords(onCalendar) : timer.size ? "Timer" : "Timer not found",
+      schedule: onCalendar ? calendarInWords(onCalendar) : loaded ? "Timer" : "Timer not found",
       lastRun: latest ?? { status: "never", at: null, reason: null },
-      lastScheduledRun: scheduled && scheduled !== latest ? scheduled : null,
+      lastScheduledRun:
+        scheduled?.status === "failed" && scheduled.at !== latest?.at ? scheduled : null,
       nextRunAt: unixTimestampMs(timer.get("NextElapseUSecRealtime")),
       output: entry.output
         ? outputOf(entry.output)
-        : { kind: "log", ref: `journalctl -u ${service}` },
+        : record
+          ? { kind: "path", ref: path.join(stateDir, `${entry.name}.log`) }
+          : { kind: "log", ref: `journalctl ${scopeFlag}-u ${service}` },
       registered: true,
     } satisfies ScheduleJob;
   });
@@ -137,19 +188,21 @@ const make = Effect.gen(function* () {
     const printed = (yield* run("launchctl", ["print", `gui/${uid}/${label}`])) ?? "";
     const exit = /last exit code = (\S+)/.exec(printed)?.[1];
     const found = printed.length > 0;
+    const record = yield* runRecord(entry.name);
     return {
-      id: entry.id,
+      id: entry.name,
       source: "launchd",
-      what: entry.what,
+      what: entry.description,
       project: entry.project ?? null,
       unit: label,
       schedule: found ? "launchd" : "Job not loaded",
       lastRun:
-        exit === undefined || exit === "(never exited)"
+        record ??
+        (exit === undefined || exit === "(never exited)"
           ? { status: "never", at: null, reason: null }
           : exit === "0"
             ? { status: "ok", at: null, reason: null }
-            : { status: "failed", at: null, reason: `Exit code ${exit}` },
+            : { status: "failed", at: null, reason: `Exit code ${exit}` }),
       lastScheduledRun: null,
       nextRunAt: null,
       output: entry.output ? outputOf(entry.output) : null,

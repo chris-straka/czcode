@@ -120,6 +120,27 @@ is in `~/.local/state/cz-host/jobs/<name>.log`, every run is in
 The Mac isn't part of the host jobs: it has no SSH server for the others to
 reach, so `health` and `fleet-status.sh` only check that it's online.
 
+### Recurring jobs agents add
+
+czcode's Schedules view (the clock in the top bar) lists every recurring job
+on a host: the host jobs above, cz's own scheduled tasks, and any timer an
+agent installs. An agent that installs a systemd timer (or a launchd job on
+the Mac) registers it in the same step:
+
+```sh
+cz jobs add --unit feeds-watch.timer --description "Pull public data for launchkit and mediaforge" \
+  --project scrapers --output ~/data/feeds
+```
+
+That adds a `[[job]]` to `~/.config/cz-host/jobs.toml`, which `host-jobs.sh`
+keeps when it rewrites its own entries. The view reads the schedule, next
+run and runs from systemd. Run the job's command through `job-run.sh <name>`
+(exit 0 ok, 2 needs the owner, anything else failed; the last line of output
+is the summary) and the view shows that summary too. `cz jobs list` shows the
+same as the view; `--all` adds timers nobody registered, which the view also
+lists, marked unregistered. `cz jobs remove <name>` unregisters a job and
+leaves its timer alone.
+
 ## Where heavy work goes
 
 Before starting a long build, render or test run, agents ask which host has

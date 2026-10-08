@@ -30,7 +30,9 @@ export function describeJob(job: ScheduleJob): string {
   const last =
     job.lastRun.status === "failed"
       ? `FAILED ${when(job.lastRun.at)}: ${job.lastRun.reason ?? ""}`
-      : `${job.lastRun.status} ${when(job.lastRun.at)}`;
+      : job.lastRun.reason
+        ? `${job.lastRun.status} ${when(job.lastRun.at)}: ${job.lastRun.reason}`
+        : `${job.lastRun.status} ${when(job.lastRun.at)}`;
   const missed =
     scheduled?.status === "failed"
       ? `  (scheduled run FAILED ${when(scheduled.at)}: ${scheduled.reason ?? ""})`
@@ -39,8 +41,15 @@ export function describeJob(job: ScheduleJob): string {
 }
 
 const addCommand = Command.make("add", {
-  id: Flag.String("id").pipe(Flag.withDescription("Short id, like feeds-watch."), Flag.optional),
-  what: Flag.String("what").pipe(Flag.withDescription("One plain sentence: what the job does.")),
+  name: Flag.String("name").pipe(
+    Flag.withDescription(
+      "Short and unique on this host, like feeds-watch; defaults to the unit's.",
+    ),
+    Flag.optional,
+  ),
+  description: Flag.String("description").pipe(
+    Flag.withDescription("One plain sentence: what the job does."),
+  ),
   unit: Flag.String("unit").pipe(
     Flag.withDescription("The systemd timer, like feeds-watch.timer."),
     Flag.optional,
@@ -66,30 +75,32 @@ const addCommand = Command.make("add", {
       const unit = Option.getOrUndefined(flags.unit);
       const launchd = Option.getOrUndefined(flags.launchd);
       // Defaults to the timer's name ("feeds-watch.timer" is "feeds-watch").
-      const id = Option.getOrElse(flags.id, () => (unit ?? launchd ?? "").replace(/\.timer$/, ""));
+      const name = Option.getOrElse(flags.name, () =>
+        (unit ?? launchd ?? "").replace(/\.timer$/, ""),
+      );
       const project = Option.getOrUndefined(flags.project);
       const output = Option.getOrUndefined(flags.output);
       yield* addJob(file, {
-        id,
-        what: flags.what,
+        name,
+        description: flags.description,
         ...(unit ? { unit } : {}),
         ...(flags.user ? { scope: "user" as const } : {}),
         ...(launchd ? { launchd } : {}),
         ...(project ? { project } : {}),
         ...(output ? { output } : {}),
       });
-      yield* Console.log(`Registered ${id} in ${file}.`);
+      yield* Console.log(`Registered ${name} in ${file}.`);
     }),
   ),
 );
 
-const removeCommand = Command.make("remove", { id: Argument.String("id") }).pipe(
+const removeCommand = Command.make("remove", { name: Argument.String("name") }).pipe(
   Command.withDescription("Unregister a job (the timer itself is left alone)."),
   Command.withHandler((flags) =>
     Effect.gen(function* () {
       const file = yield* jobsFilePath(yield* HostProcessEnvironment);
-      const removed = yield* removeJob(file, flags.id);
-      yield* Console.log(removed ? `Removed ${flags.id}.` : `No job ${flags.id} in ${file}.`);
+      const removed = yield* removeJob(file, flags.name);
+      yield* Console.log(removed ? `Removed ${flags.name}.` : `No job ${flags.name} in ${file}.`);
     }),
   ),
 );

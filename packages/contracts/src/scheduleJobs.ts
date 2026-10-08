@@ -10,12 +10,15 @@ import * as Schema from "effect/Schema";
 export const ScheduleJobSource = Schema.Literals(["cz-task", "systemd", "launchd"]);
 export type ScheduleJobSource = typeof ScheduleJobSource.Type;
 
-/** How a run ended: ok, failed (with why), running now, or never run. */
+/**
+ * How a run ended: ok, attention (it ran and found something for the owner,
+ * said in `reason`), failed (with why), running now, or never run.
+ */
 export const ScheduleJobRun = Schema.Struct({
-  status: Schema.Literals(["ok", "failed", "running", "never"]),
+  status: Schema.Literals(["ok", "attention", "failed", "running", "never"]),
   /** Unix epoch ms the run started; null when it never ran. */
   at: Schema.NullOr(Schema.Number),
-  /** One line saying why a failed run failed, from the log or exit status. */
+  /** One line: why a failed run failed, or what an attention run found. */
   reason: Schema.NullOr(Schema.String),
 });
 export type ScheduleJobRun = typeof ScheduleJobRun.Type;

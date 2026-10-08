@@ -25,6 +25,12 @@ const journal = [
   .map(([us, message]) => JSON.stringify({ __REALTIME_TIMESTAMP: String(us), MESSAGE: message }))
   .join("\n");
 
+/** host-jobs.sh's health timer is a user unit; feeds-watch is a system one. */
+const userShow = (args: ReadonlyArray<string>) =>
+  args.includes("cz-job-health.timer")
+    ? "LoadState=loaded\nUnit=cz-job-health.service\nTimersCalendar={ OnCalendar=*-*-* 03:30:00 ; next_elapse=@1791459000 }\nNextElapseUSecRealtime=@1791459000\n"
+    : "LoadState=not-found\n";
+
 /** Answers like systemd on f did on 2026-10-07. */
 const fakeRunner = ProcessRunner.ProcessRunner.of({
   run: (input) =>
@@ -39,7 +45,9 @@ const fakeRunner = ProcessRunner.ProcessRunner.of({
                   { unit: "feeds-watch.timer", next: 1791460800000000, last: 1791374400000000 },
                   { unit: "fwupd-refresh.timer", next: 1791419668457592, last: 1791415993531720 },
                 ])
-            : "Unit=feeds-watch.service\nTimersCalendar={ OnCalendar=*-*-* 06:00:00 ; next_elapse=@1791460800 }\nNextElapseUSecRealtime=@1791460800\nLastTriggerUSec=@1791374400\n",
+            : input.args.includes("--user")
+              ? userShow(input.args)
+              : "LoadState=loaded\nUnit=feeds-watch.service\nTimersCalendar={ OnCalendar=*-*-* 06:00:00 ; next_elapse=@1791460800 }\nNextElapseUSecRealtime=@1791460800\nLastTriggerUSec=@1791374400\n",
       stderr: "",
       code: 0,
       timedOut: false,
@@ -52,7 +60,7 @@ const fakeRunner = ProcessRunner.ProcessRunner.of({
 
 describe("ScheduleJobsService", () => {
   it.effect(
-    "lists a registered timer with its failed scheduled run and finds unregistered ones",
+    "lists registered timers, user or system, with run records and failed scheduled runs, and finds unregistered ones",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -60,8 +68,25 @@ describe("ScheduleJobsService", () => {
         const dir = yield* fs.makeTempDirectoryScoped({ prefix: "cz-schedules-" });
         const file = path.join(dir, "jobs.toml");
         yield* addJob(file, {
-          id: "feeds-watch",
-          what: "Pull public data for launchkit and mediaforge",
+          name: "health",
+          description: "Disk, SMART, logs",
+          unit: "cz-job-health.timer",
+        });
+        const state = path.join(dir, ".local", "state", "cz-host", "jobs");
+        yield* fs.makeDirectory(state, { recursive: true });
+        yield* fs.writeFileString(
+          path.join(state, "health.json"),
+          JSON.stringify({
+            name: "health",
+            status: "attention",
+            startedAt: "2026-10-07T16:59:49-06:00",
+            exitCode: 2,
+            summary: "1 problem(s): disk /home is 87% full (57G free), getting tight",
+          }),
+        );
+        yield* addJob(file, {
+          name: "feeds-watch",
+          description: "Pull public data for launchkit and mediaforge",
           unit: "feeds-watch.timer",
           project: "scrapers",
         });
@@ -69,7 +94,9 @@ describe("ScheduleJobsService", () => {
           Effect.provide(
             ScheduleJobsService.layer.pipe(
               Layer.provide(Layer.succeed(ProcessRunner.ProcessRunner, fakeRunner)),
-              Layer.provide(Layer.succeed(HostProcessEnvironment, { CZ_JOBS_FILE: file })),
+              Layer.provide(
+                Layer.succeed(HostProcessEnvironment, { CZ_JOBS_FILE: file, HOME: dir }),
+              ),
               Layer.provide(Layer.succeed(HostProcessPlatform, "linux")),
               Layer.provide(
                 Layer.succeed(ScheduledTaskService.ScheduledTaskService, {
@@ -97,6 +124,15 @@ describe("ScheduleJobsService", () => {
           },
           nextRunAt: 1791460800000,
           registered: true,
+        });
+        expect(jobs.find((job) => job.id === "health")).toMatchObject({
+          schedule: "Daily 03:30",
+          lastRun: {
+            status: "attention",
+            at: Date.parse("2026-10-07T16:59:49-06:00"),
+            reason: "1 problem(s): disk /home is 87% full (57G free), getting tight",
+          },
+          output: { kind: "path", ref: path.join(state, "health.log") },
         });
         expect(jobs.filter((job) => !job.registered).map((job) => job.unit)).toEqual([
           "fwupd-refresh.timer",

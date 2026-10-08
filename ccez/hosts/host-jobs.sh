@@ -37,9 +37,9 @@ automerge=0
 
 mkdir -p "$units" "$config" "$units/cz-host.service.d"
 
-toml="# Scheduled jobs on this host, written by ccez/hosts/host-jobs.sh.
-# Each runs as the systemd user timer cz-job-<name>.timer; the last run is in
-# ~/.local/state/cz-host/jobs/<name>.json.
+toml="# Scheduled jobs on this host, for czcode's Schedules view. host-jobs.sh
+# writes the cz-job-* entries; agents add theirs with \`cz jobs add\`. The last
+# run of a job run through job-run.sh is in ~/.local/state/cz-host/jobs/<name>.json.
 "
 wanted=()
 for job in "${jobs[@]}"; do
@@ -81,6 +81,15 @@ command = \"$hosts/$script\"
 unit = \"cz-job-$name.timer\"
 "
 done
+# Keep the jobs agents registered (every [[job]] not on a cz-job-* timer).
+if [ -f "$config/jobs.toml" ]; then
+  toml+=$(awk '
+    /^\[\[job\]\]/ { if (block != "" && !mine) printf "\n%s", block; block = ""; mine = 0; inside = 1 }
+    inside { block = block $0 "\n"; if ($0 ~ /^unit = "cz-job-/) mine = 1 }
+    END { if (block != "" && !mine) printf "\n%s", block }
+  ' "$config/jobs.toml")
+  toml+=$'\n'
+fi
 printf '%s' "$toml" > "$config/jobs.toml"
 
 # Jobs that were dropped (pr-automerge turned off, say).

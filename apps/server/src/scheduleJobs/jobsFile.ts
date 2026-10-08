@@ -1,8 +1,9 @@
 /**
  * The host's register of recurring jobs, `~/.config/cz-host/jobs.toml`: one
- * `[[job]]` per timer an agent installs, so cz can say what it does and find
- * its live state (see ccez/hosts/README.md, "Recurring jobs"). Agents write it
- * with `cz jobs add`, not by hand.
+ * `[[job]]` per timer, so cz can say what it does and find its live state
+ * (see ccez/hosts/README.md, "Recurring jobs"). ccez/hosts/host-jobs.sh
+ * writes the host's own nightly jobs here; agents add theirs with
+ * `cz jobs add`, not by hand, and host-jobs.sh keeps them.
  *
  * @module jobsFile
  */
@@ -14,18 +15,21 @@ import { parse, stringify } from "smol-toml";
 
 export const JobEntry = Schema.Struct({
   /** Short and unique on the host, like "feeds-watch". */
-  id: Schema.String.check(Schema.isPattern(/^[\w.-]+$/)),
+  name: Schema.String.check(Schema.isPattern(/^[\w.-]+$/)),
   /** One plain sentence: what the job does. */
-  what: Schema.String.check(Schema.isNonEmpty()),
+  description: Schema.String.check(Schema.isNonEmpty()),
   /** A systemd timer, like "feeds-watch.timer". */
   unit: Schema.optionalKey(Schema.String),
-  /** Where the timer lives; system by default. */
+  /** Where the timer lives; omitted means a user unit if one is loaded, else system. */
   scope: Schema.optionalKey(Schema.Literals(["system", "user"])),
   /** A launchd label instead of a systemd timer (macOS hosts). */
   launchd: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(Schema.String),
   /** The latest output: a file or folder path, or a URL. */
   output: Schema.optionalKey(Schema.String),
+  /** Written by ccez/hosts/host-jobs.sh for its own jobs; informational here. */
+  schedule: Schema.optionalKey(Schema.String),
+  command: Schema.optionalKey(Schema.String),
 });
 export type JobEntry = typeof JobEntry.Type;
 
@@ -73,26 +77,26 @@ const writeJobs = Effect.fn("jobsFile.writeJobs")(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const header =
-    "# Recurring jobs on this host, read by cz's Schedules view.\n# Edit with `cz jobs add` / `cz jobs remove`.\n\n";
+    "# Recurring jobs on this host, read by cz's Schedules view.\n# host-jobs.sh writes the cz-job-* entries; `cz jobs add` / `cz jobs remove` the rest.\n\n";
   yield* fs.makeDirectory(path.dirname(file), { recursive: true }).pipe(Effect.ignore);
   yield* fs
     .writeFileString(file, header + stringify({ job: jobs.map((job) => ({ ...job })) }))
     .pipe(Effect.mapError(() => new JobsFileError({ message: `Can't write ${file}.` })));
 });
 
-/** Adds a job, or replaces the one with the same id. */
+/** Adds a job, or replaces the one with the same name. */
 export const addJob = Effect.fn("jobsFile.addJob")(function* (file: string, job: JobEntry) {
   if (!job.unit && !job.launchd) {
     return yield* new JobsFileError({ message: "A job needs --unit (systemd) or --launchd." });
   }
   const jobs = yield* readJobs(file);
-  yield* writeJobs(file, [...jobs.filter((existing) => existing.id !== job.id), job]);
+  yield* writeJobs(file, [...jobs.filter((existing) => existing.name !== job.name), job]);
 });
 
-/** Removes a job by id; false when there was none. */
-export const removeJob = Effect.fn("jobsFile.removeJob")(function* (file: string, id: string) {
+/** Removes a job by name; false when there was none. */
+export const removeJob = Effect.fn("jobsFile.removeJob")(function* (file: string, name: string) {
   const jobs = yield* readJobs(file);
-  const kept = jobs.filter((job) => job.id !== id);
+  const kept = jobs.filter((job) => job.name !== name);
   if (kept.length === jobs.length) return false;
   yield* writeJobs(file, kept);
   return true;
