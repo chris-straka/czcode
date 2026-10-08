@@ -223,7 +223,9 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   );
   return (
     <>
-      <SidebarContent className="overflow-x-hidden">
+      {/* Settings opens as a view whose Back sits at the top left; the list starts
+          under it, level with the page's breadcrumb, instead of beneath the arrow. */}
+      <SidebarContent className="overflow-x-hidden md:mt-(--workspace-topbar-height)">
         <SidebarGroup>
           <div className="flex flex-col gap-2">
             {/* Same inset, gap and icon as the section rows below, so the icons line up. */}
