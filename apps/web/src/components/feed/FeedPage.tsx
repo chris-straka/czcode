@@ -29,6 +29,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
 import { NoProjectsHero } from "../NoProjectsHero";
+import { SidebarUpdateArchitectureWarning } from "../sidebar/SidebarUpdatePill";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
@@ -284,6 +285,7 @@ export function FeedPage() {
       {/* The page never scrolls sideways; only the chip row does. */}
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4">
+          <SidebarUpdateArchitectureWarning />
           <div className="flex items-center gap-2">
             <ToggleGroup
               value={[tab]}
