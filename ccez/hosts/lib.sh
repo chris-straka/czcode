@@ -5,8 +5,9 @@
 hosts_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 
-# This machine's name in hosts.txt (Tailscale names are lower case).
-this_host() { hostname | tr '[:upper:]' '[:lower:]'; }
+# This machine's name in hosts.txt (Tailscale names are lower case). -s drops
+# the ".local" that macOS adds.
+this_host() { hostname -s | tr '[:upper:]' '[:lower:]'; }
 
 # host_field <host> <column>: 2 is the SSH login, 3 the backup host.
 host_field() {

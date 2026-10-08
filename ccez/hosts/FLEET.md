@@ -17,6 +17,10 @@ SSH as `<user>@<name>`. `hosts.txt` is the machine-readable list the jobs and
   Mac build CI publishes for every push to main (`ccez/release/`).
   One or two agent tasks at most, and none by day; no SSH server (Tailscale
   from the App Store), so nothing logs in to it.
+- **`y8`** (user `chris`): MacBook Pro M1 Pro, 8 cores, 16 GB. macOS 27; also
+  the owner's laptop for language learning, so personal apps stay. Set up by
+  `mac.sh` in the owner's own account; reached with Tailscale SSH. Keeps
+  running with the lid closed while on power (`lid-awake-mac.sh`).
 - **`f-ms-7917`** (user `f`): i7-4790K, 8 threads, 32 GB, GTX 970. Ubuntu
   26.04; `/home` on a 480 GB SSD. The most CPU threads: long compiles,
   Docker, Bevy builds. Runs `pr-automerge`. Often the most loaded host.
@@ -74,16 +78,15 @@ separate macOS account on a shared Mac and has no host jobs.
 
 ### A MacBook as a host
 
-`mac.sh` keeps a Mac awake on power with `caffeinate -s`, but closing a
-MacBook's lid still sleeps it unless an external display is attached. For a
-laptop that works with the lid closed, after `mac.sh`:
+A MacBook sleeps when its lid closes, whatever `caffeinate` says, unless an
+external display is attached. `mac.sh` installs `lid-awake-mac.sh` on Macs
+with a battery: on power the Mac keeps running with the lid closed; off power
+it's a normal laptop and, if it was unplugged while closed, sleeps at once so
+it doesn't stay awake in a bag. See [README](README.md#a-mac).
 
-- `sudo pmset -a disablesleep 1` (undo: `0`). It applies on battery too, so
-  keep the laptop on its charger at home and switch it back before carrying
-  it in a bag.
-- Turn on Remote Login (System Settings → General → Sharing) with key-only
-  SSH, so `pick-host.sh`, the host jobs and other agents can reach it; then
-  give it a real login column in `hosts.txt`.
+`mac.sh` runs open-source `tailscaled` with Tailscale SSH, so the other hosts
+reach the Mac without Remote Login; give it a real login column in
+`hosts.txt`.
 
 ## One-time root steps still open
 

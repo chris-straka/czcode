@@ -17,6 +17,9 @@
 # Exit status: 0 all current, 2 something needs the owner, 1 clones or
 # fetches failed.
 set -uo pipefail
+# macOS has no timeout(1); perl's alarm does the same (exit 142 when it fires).
+command -v timeout > /dev/null ||
+  timeout() { perl -e 'alarm shift; exec @ARGV or die "exec $ARGV[0]: $!\n"' "$@"; }
 manifest="$(cd "$(dirname "$0")" && pwd)/repos.txt"
 cd "$HOME" || exit 1
 
