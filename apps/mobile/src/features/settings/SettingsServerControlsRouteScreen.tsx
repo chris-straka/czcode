@@ -7,7 +7,6 @@ import {
   type ServerSettings,
   type ServerSettingsPatch,
   type ThreadEnvMode,
-  type WorktreeSubmodules,
   PROJECT_SCOPED_SERVER_SETTING_KEYS,
   type ProjectScopedServerSettingKey,
 } from "@cz/contracts";
@@ -23,7 +22,6 @@ import {
   AndroidSettingsEnvironmentFilter,
   SettingsEnvironmentFilterHeader,
 } from "./components/SettingsEnvironmentFilterHeader";
-import { BranchNamingSettings } from "./components/BranchNamingSettings";
 import { SettingsChoiceRow } from "./components/SettingsChoiceRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
@@ -60,26 +58,6 @@ const PAGE_PROJECT_KEYS: Record<SettingsPage, readonly ProjectScopedServerSettin
   maintenance: ["continueThreadsAfterServerUpdate"],
 };
 
-const SUBMODULE_CHOICES: ReadonlyArray<{
-  readonly mode: WorktreeSubmodules | null;
-  readonly label: string;
-  readonly description: string;
-}> = [
-  // Only offered at environment scope; a project falls back through "Use defaults".
-  {
-    mode: null,
-    label: "Inherit",
-    description: "Use the repository's cz.json, or initialize recursively.",
-  },
-  { mode: "recursive", label: "Recursive", description: "Initialize nested submodules too." },
-  {
-    mode: "top-level",
-    label: "Top level only",
-    description: "Skip submodules declared inside other submodules.",
-  },
-  { mode: "none", label: "Skip", description: "Leave submodules empty for a setup script." },
-];
-
 const WORKSPACE_CHOICES: ReadonlyArray<{
   readonly mode: ThreadEnvMode | null;
   readonly label: string;
@@ -89,17 +67,17 @@ const WORKSPACE_CHOICES: ReadonlyArray<{
   {
     mode: null,
     label: "Inherit",
-    description: "Use the repository's cz.json, or the current checkout.",
+    description: "Use the repository's cz.json, or a new worktree.",
   },
   {
     mode: "local",
     label: "Current checkout",
-    description: "Start new threads in the existing workspace.",
+    description: "Work in the project folder itself.",
   },
   {
     mode: "worktree",
     label: "New worktree",
-    description: "Give each new thread a separate checkout.",
+    description: "Give each thread its own copy, so agents running at the same time don't collide.",
   },
 ];
 
@@ -251,7 +229,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
               {props.page === "new-threads" ? (
                 <>
                   <SettingsSection
-                    title="Default workspace"
+                    title="Where new threads work"
                     trailing={
                       pendingWrites === 0 && isMixed("defaultThreadEnvMode") ? (
                         <MixedValuesLabel projectSelected={projectSelected} />
@@ -276,32 +254,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     ))}
                   </SettingsSection>
                   <SettingsSection
-                    title="Worktree submodules"
-                    trailing={
-                      pendingWrites === 0 && isMixed("worktreeSubmodules") ? (
-                        <MixedValuesLabel projectSelected={projectSelected} />
-                      ) : null
-                    }
-                  >
-                    {SUBMODULE_CHOICES.filter(
-                      (choice) => choice.mode !== null || !projectSelected,
-                    ).map((choice, index) => (
-                      <SettingsChoiceRow
-                        key={choice.mode ?? "inherit"}
-                        label={choice.label}
-                        description={choice.description}
-                        selected={
-                          !isMixed("worktreeSubmodules") &&
-                          uniform("worktreeSubmodules") === choice.mode
-                        }
-                        separated={index > 0}
-                        disabled={disabledFor("worktreeSubmodules")}
-                        onPress={() => write({ worktreeSubmodules: choice.mode })}
-                      />
-                    ))}
-                  </SettingsSection>
-                  <SettingsSection
-                    title="Default permissions"
+                    title="What agents may do"
                     trailing={
                       pendingWrites === 0 && uniform("defaultRuntimeMode") === null ? (
                         <MixedValuesLabel projectSelected={projectSelected} />
@@ -325,44 +278,14 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
 
               {props.page === "source-control" ? (
                 <>
-                  <BranchNamingSettings
-                    key={targets
-                      .map((target) => `${target.environment.environmentId}:${target.projectId}`)
-                      .join(",")}
-                    mode={uniform("branchNamingMode")}
-                    prefix={uniform("branchNamePrefix")}
-                    instructions={uniform("branchNameInstructions")}
-                    disabled={disabledFor("branchNamingMode")}
-                    onChange={write}
-                  />
-                  <SettingsSection title="Pull requests">
-                    <SettingsSwitchRow
-                      icon="arrow.triangle.merge"
-                      label="Remove agent credits when merging"
-                      subtitle="Remove recognized agent credits from GitHub merge and squash messages, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits."
-                      value={uniform("removeAgentCreditsOnMerge")}
-                      disabled={disabledFor("removeAgentCreditsOnMerge")}
-                      onValueChange={(value) => write({ removeAgentCreditsOnMerge: value })}
-                    />
-                  </SettingsSection>
                   <SettingsSection title="Default branch">
                     <SettingsSwitchRow
                       icon="arrow.down.circle"
-                      label="Automatically pull"
-                      subtitle="Keep the default branch current when there are no local changes."
+                      label="Keep projects up to date"
+                      subtitle="Pulls the latest main when nothing is changed locally."
                       value={uniform("defaultAutoPull")}
                       disabled={disabledFor("defaultAutoPull")}
                       onValueChange={(value) => write({ defaultAutoPull: value })}
-                    />
-                  </SettingsSection>
-                  <SettingsSection title="Worktrees">
-                    <SettingsSwitchRow
-                      icon="arrow.triangle.branch"
-                      label="Start from origin"
-                      subtitle="Base new worktrees on the remote branch."
-                      value={uniform("newWorktreesStartFromOrigin")}
-                      disabled={disabledFor("newWorktreesStartFromOrigin")}
-                      onValueChange={(value) => write({ newWorktreesStartFromOrigin: value })}
                     />
                   </SettingsSection>
                 </>
@@ -474,11 +397,11 @@ function MixedValuesLabel(props: { readonly projectSelected: boolean }) {
       accessibilityLabel={
         props.projectSelected
           ? "Selected project checkouts use different values"
-          : "Selected environments use different values"
+          : "Selected machines use different values"
       }
       className="px-2 text-sm text-foreground-muted android:px-4"
     >
-      Mixed
+      Differs by machine
     </Text>
   );
 }
