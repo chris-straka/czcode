@@ -51,6 +51,11 @@ export const ScheduleJob = Schema.Struct({
   output: Schema.NullOr(ScheduleJobOutput),
   /** False for a timer found on the host but missing from jobs.toml. */
   registered: Schema.Boolean,
+  /**
+   * An unregistered timer the OS or a package installed (apt, logrotate,
+   * snap...). Absent from older servers, which didn't tell them apart.
+   */
+  system: Schema.optionalKey(Schema.Boolean),
 });
 export type ScheduleJob = typeof ScheduleJob.Type;
 

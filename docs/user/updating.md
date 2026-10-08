@@ -36,21 +36,35 @@ refused rather than running half-upgraded:
 
 Update the side the notice names, then reconnect.
 
+## Mac app
+
+Every change to `main` becomes a new Mac build once CI finishes building it. The app checks
+for one when it starts, every few minutes after that, and when you click the
+update button: the round button next to **Back** at the bottom left of
+Settings, or the button on the version row in Settings. Hover the button to see
+where things stand: **Up to date**, **Updating**, or **Restart to update**.
+
+A new build downloads by itself. It installs when no agent is working and
+nothing queued is due within 10 minutes, or when you quit czcode, or right away
+if you click **Restart to update**. czcode then reopens on the new version. If
+an update fails, the button says why in one sentence and the current version
+keeps running; click it to try again.
+
 ## Update a connected server
 
-czcode has no release downloads, so every machine updates by rebuilding from
-this repo's `main`. The in-app **Update server** and `cz update` look for
-releases and find none.
-
-- **Mac:** quit czcode, pull `main`, and run `ccez/release/mac.sh --install`.
-- **Agent hosts:** run the host setup script again on the host. It pulls
-  `main`, rebuilds, and restarts the `cz-host` service.
+- **Mac:** the server is part of the app, so updating the app updates it
+  (**Update server** in the app does the same).
+- **Agent hosts:** they rebuild `main` every night and restart once idle. To
+  update now, run the host setup script again on the host. It pulls `main`,
+  rebuilds, and restarts the `cz-host` service.
 
 Updating restarts that machine's server, so let active turns finish first.
 
 ## Update providers
 
-**Settings → Providers** shows provider updates for the selected environment.
+**Settings → Providers** opens on **All machines**: one grid of every provider on every
+connected machine, showing whether it's signed in, its version, and whether an update is waiting.
+Select a cell, or pick a machine in the header, to change that machine's provider.
 **Update all** updates every outdated provider on every connected environment
 at once. Hover it to see which providers it will update. Providers that only
 offer a manual update command are not included.

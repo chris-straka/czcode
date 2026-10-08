@@ -229,6 +229,13 @@ if want android && [ "$arch" = amd64 ]; then
   fi
 fi
 
+step "Gradle daemons stop after 10 idle minutes"
+# Agents build once and move on; Gradle's default keeps each daemon (about
+# 1 GB) alive for 3 hours after the last build.
+mkdir -p "$HOME/.gradle"
+grep -q '^org.gradle.daemon.idletimeout=' "$HOME/.gradle/gradle.properties" 2> /dev/null ||
+  echo 'org.gradle.daemon.idletimeout=600000' >> "$HOME/.gradle/gradle.properties"
+
 step "Environment for shells and the cz service"
 java_home=$(dirname "$(dirname "$(readlink -f "$(command -v javac 2> /dev/null || echo /usr/bin/javac)")")")
 mkdir -p "$HOME/.config/cz-host"

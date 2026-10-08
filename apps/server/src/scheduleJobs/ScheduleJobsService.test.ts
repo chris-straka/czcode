@@ -31,6 +31,28 @@ const userShow = (args: ReadonlyArray<string>) =>
     ? "LoadState=loaded\nUnit=cz-job-health.service\nTimersCalendar={ OnCalendar=*-*-* 03:30:00 ; next_elapse=@1791459000 }\nNextElapseUSecRealtime=@1791459000\n"
     : "LoadState=not-found\n";
 
+/** `systemctl show` of the unregistered timers and their services, as on art on 2026-10-08. */
+const unitShow = (args: ReadonlyArray<string>) => {
+  const units: Record<string, string> = {
+    "mfr-daily.timer":
+      "Id=mfr-daily.timer\nFragmentPath=/home/f/.config/systemd/user/mfr-daily.timer\nUnit=mfr-daily.service\nTimersCalendar={ OnCalendar=*-*-* 07:00:00 ; next_elapse=@1791464400 }\nDescription=mfr-daily.timer",
+    "mfr-daily.service":
+      "Id=mfr-daily.service\nDescription=Morning politics roundup for mediaforge",
+    "fwupd-refresh.timer":
+      "Id=fwupd-refresh.timer\nFragmentPath=/usr/lib/systemd/system/fwupd-refresh.timer\nUnit=fwupd-refresh.service\nTimersCalendar=\nDescription=Refresh fwupd metadata regularly",
+    "fwupd-refresh.service":
+      "Id=fwupd-refresh.service\nDescription=Refresh fwupd metadata and update motd",
+    "cz-net-watchdog.timer":
+      "Id=cz-net-watchdog.timer\nFragmentPath=/etc/systemd/system/cz-net-watchdog.timer\nUnit=cz-net-watchdog.service\nTimersCalendar=\nDescription=Check the wired network every minute",
+    "cz-net-watchdog.service":
+      "Id=cz-net-watchdog.service\nDescription=Reconnect the wired network when the router stops answering",
+  };
+  return args
+    .filter((arg) => units[arg])
+    .map((arg) => units[arg])
+    .join("\n\n");
+};
+
 /** Answers like systemd on f did on 2026-10-07. */
 const fakeRunner = ProcessRunner.ProcessRunner.of({
   run: (input) =>
@@ -40,14 +62,17 @@ const fakeRunner = ProcessRunner.ProcessRunner.of({
           ? journal
           : input.args.includes("list-timers")
             ? input.args.includes("--user")
-              ? "[]"
+              ? JSON.stringify([{ unit: "mfr-daily.timer", next: 1791464400000000, last: null }])
               : JSON.stringify([
                   { unit: "feeds-watch.timer", next: 1791460800000000, last: 1791374400000000 },
                   { unit: "fwupd-refresh.timer", next: 1791419668457592, last: 1791415993531720 },
+                  { unit: "cz-net-watchdog.timer", next: 1791419668457592, last: null },
                 ])
-            : input.args.includes("--user")
-              ? userShow(input.args)
-              : "LoadState=loaded\nUnit=feeds-watch.service\nTimersCalendar={ OnCalendar=*-*-* 06:00:00 ; next_elapse=@1791460800 }\nNextElapseUSecRealtime=@1791460800\nLastTriggerUSec=@1791374400\n",
+            : input.args.includes("Id")
+              ? unitShow(input.args)
+              : input.args.includes("--user")
+                ? userShow(input.args)
+                : "LoadState=loaded\nUnit=feeds-watch.service\nTimersCalendar={ OnCalendar=*-*-* 06:00:00 ; next_elapse=@1791460800 }\nNextElapseUSecRealtime=@1791460800\nLastTriggerUSec=@1791374400\n",
       stderr: "",
       code: 0,
       timedOut: false,
@@ -134,8 +159,30 @@ describe("ScheduleJobsService", () => {
           },
           output: { kind: "path", ref: path.join(state, "health.log") },
         });
-        expect(jobs.filter((job) => !job.registered).map((job) => job.unit)).toEqual([
-          "fwupd-refresh.timer",
+        // Ours are described by their service; the OS's are marked system.
+        expect(
+          jobs
+            .filter((job) => !job.registered)
+            .map(({ unit, what, schedule, system }) => ({ unit, what, schedule, system })),
+        ).toEqual([
+          {
+            unit: "fwupd-refresh.timer",
+            what: "Refresh fwupd metadata and update motd",
+            schedule: "System timer",
+            system: true,
+          },
+          {
+            unit: "cz-net-watchdog.timer",
+            what: "Reconnect the wired network when the router stops answering",
+            schedule: "System timer",
+            system: false,
+          },
+          {
+            unit: "mfr-daily.timer",
+            what: "Morning politics roundup for mediaforge",
+            schedule: "Daily 07:00",
+            system: false,
+          },
         ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );

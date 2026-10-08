@@ -80,6 +80,7 @@ import * as ForkDatabase from "./forkDatabase/ForkDatabase.ts";
 import * as ResetQueueService from "./resetQueue/ResetQueueService.ts";
 import * as AgentScopesService from "./agentScopes/AgentScopesService.ts";
 import * as HostSleepService from "./hostSleep/HostSleepService.ts";
+import * as DesktopUpdateWhenIdle from "./desktopUpdate/DesktopUpdateWhenIdle.ts";
 import { queueHttpApiLayer } from "./resetQueue/http.ts";
 import { threadsHttpApiLayer } from "./threadControl/http.ts";
 import { jobsHttpApiLayer } from "./scheduleJobs/http.ts";
@@ -164,6 +165,7 @@ import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as DesktopAppUpdate from "./desktopUpdate/DesktopAppUpdate.ts";
 import * as ServiceLauncherClient from "./cloud/serviceLauncherClient.ts";
 import * as ProcessDiagnostics from "./diagnostics/ProcessDiagnostics.ts";
+import * as HostLoadHistory from "./resourceTelemetry/HostLoadHistory.ts";
 import * as HostResources from "./resourceTelemetry/HostResources.ts";
 import * as ProcessResourceMonitor from "./diagnostics/ProcessResourceMonitor.ts";
 import * as TraceDiagnostics from "./diagnostics/TraceDiagnostics.ts";
@@ -678,8 +680,17 @@ const layerRuntimeDependencies = Layer.mergeAll(
 ).pipe(
   // Sleeps a spare host when idle; reads the queue to wake for its next run.
   Layer.provideMerge(HostSleepService.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
+  // Installs a downloaded desktop app update once no agent is working.
+  Layer.provideMerge(
+    DesktopUpdateWhenIdle.layer.pipe(
+      Layer.provide(ProjectionStoreV2.layer),
+      Layer.provide(layerDesktopAppUpdate),
+      Layer.provide(layerDesktopTelemetryReceiver),
+    ),
+  ),
   Layer.provideMerge(AgentScopesService.layer),
   Layer.provideMerge(ResetQueueService.layer),
+  Layer.provideMerge(HostLoadHistory.layer),
   Layer.provideMerge(layerRuntimeServices),
 );
 

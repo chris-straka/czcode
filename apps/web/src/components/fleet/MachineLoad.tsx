@@ -17,6 +17,7 @@ export const fleetAtom = createFleetAtom({
   shellSnapshotAtom: environmentSnapshotAtom,
   hostResourcesAtom: (environmentId) =>
     serverEnvironment.hostResources({ environmentId, input: {} }),
+  onlinePeersAtom: (environmentId) => serverEnvironment.onlinePeers({ environmentId, input: {} }),
 });
 
 const levelClass = (ratio: number) =>

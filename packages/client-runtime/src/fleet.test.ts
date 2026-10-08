@@ -13,6 +13,7 @@ import {
   fleetTotals,
   fleetWarnings,
   formatSince,
+  isPeerOnline,
   formatUsedOfTotal,
 } from "./fleet.ts";
 
@@ -27,6 +28,7 @@ const resources = (overrides: Partial<HostResourcesSnapshot> = {}): HostResource
   ...overrides,
 });
 const started = DateTime.makeUnsafe("2026-10-06T12:00:00Z");
+const NOW = DateTime.toEpochMillis(started) + 5 * 60_000;
 const thread = (id: string, fields: Partial<Record<string, unknown>> = {}) =>
   ({
     id,
@@ -50,6 +52,7 @@ const machine = (label: string, fields: Partial<FleetMachineInput> = {}): FleetM
   label,
   phase: "connected",
   wakeable: false,
+  peerOnline: false,
   resources: resources(),
   shell: shell([]),
   ...fields,
@@ -89,18 +92,21 @@ describe("fleetWarnings", () => {
 
 describe("fleetMachines", () => {
   it("shows awake machines first with their running agents, needing-you first", () => {
-    const machines = fleetMachines([
-      machine("art-ms-7917", { phase: "backoff", wakeable: true }),
-      machine("z", {
-        shell: shell([
-          thread("idle"),
-          thread("tests", { activeRunId: "run-1", currentActivity: "$ vp test run" }),
-          thread("asks", { pendingRuntimeRequest: { kind: "approval" } }),
-          thread("old", { activeRunId: "run-2", archivedAt: started }),
-        ]),
-      }),
-      machine("f-ms-7917", { phase: "offline" }),
-    ]);
+    const machines = fleetMachines(
+      [
+        machine("art-ms-7917", { phase: "backoff", wakeable: true }),
+        machine("z", {
+          shell: shell([
+            thread("idle"),
+            thread("tests", { activeRunId: "run-1", currentActivity: "$ vp test run" }),
+            thread("asks", { pendingRuntimeRequest: { kind: "approval" } }),
+            thread("old", { activeRunId: "run-2", archivedAt: started }),
+          ]),
+        }),
+        machine("f-ms-7917", { phase: "offline" }),
+      ],
+      NOW,
+    );
     expect(machines.map((entry) => [entry.label, entry.state])).toEqual([
       ["z", "awake"],
       ["art-ms-7917", "asleep"],
@@ -113,13 +119,16 @@ describe("fleetMachines", () => {
   });
 
   it("doesn't list threads from a machine that stopped answering", () => {
-    const [asleep] = fleetMachines([
-      machine("art", {
-        phase: "backoff",
-        wakeable: true,
-        shell: shell([thread("t", { activeRunId: "r" })]),
-      }),
-    ]);
+    const [asleep] = fleetMachines(
+      [
+        machine("art", {
+          phase: "backoff",
+          wakeable: true,
+          shell: shell([thread("t", { activeRunId: "r" })]),
+        }),
+      ],
+      NOW,
+    );
     expect(asleep?.agents).toEqual([]);
   });
 });
@@ -127,11 +136,14 @@ describe("fleetMachines", () => {
 describe("fleetTotals", () => {
   it("adds up awake machines only", () => {
     const totals = fleetTotals(
-      fleetMachines([
-        machine("a", { shell: shell([thread("t", { activeRunId: "r" })]) }),
-        machine("b", { resources: resources({ cpuUtilization: 0.25, cpuCount: 4 }) }),
-        machine("c", { phase: "offline" }),
-      ]),
+      fleetMachines(
+        [
+          machine("a", { shell: shell([thread("t", { activeRunId: "r" })]) }),
+          machine("b", { resources: resources({ cpuUtilization: 0.25, cpuCount: 4 }) }),
+          machine("c", { phase: "offline" }),
+        ],
+        NOW,
+      ),
     );
     expect(totals).toMatchObject({
       machines: 3,
@@ -157,5 +169,57 @@ describe("formatSince", () => {
     expect(formatSince(Date.parse("2026-10-06T13:11:50Z"), now)).toBe("now");
     expect(formatSince(Date.parse("2026-10-06T13:00:00Z"), now)).toBe("12m");
     expect(formatSince(Date.parse("2026-10-06T12:00:00Z"), now)).toBe("1h 12m");
+  });
+});
+
+describe("busy machines", () => {
+  const peers = [
+    { hostName: "basement", dnsName: "basement.tail1234.ts.net", tailscaleIps: ["100.64.0.7"] },
+  ];
+
+  it("matches a tailnet peer by MagicDNS name, short name, or Tailscale IP", () => {
+    expect(isPeerOnline("basement.tail1234.ts.net", peers)).toBe(true);
+    expect(isPeerOnline("basement", peers)).toBe(true);
+    expect(isPeerOnline("100.64.0.7", peers)).toBe(true);
+    expect(isPeerOnline("art", peers)).toBe(false);
+    expect(isPeerOnline(null, peers)).toBe(false);
+  });
+
+  it("calls a machine that is online but not answering busy, not asleep, and keeps its last reading", () => {
+    const [busy] = fleetMachines(
+      [machine("basement", { phase: "backoff", wakeable: true, peerOnline: true })],
+      NOW,
+    );
+    expect(busy?.state).toBe("busy");
+    expect(busy?.resources).not.toBeNull();
+  });
+});
+
+describe("stuck starts", () => {
+  it("marks a run starting for hours as stuck and leaves it out of the working count", () => {
+    const hoursAgo = DateTime.makeUnsafe(NOW - 16 * 60 * 60_000);
+    const machines = fleetMachines(
+      [
+        machine("f", {
+          shell: shell([
+            thread("Resume: Courtroom", {
+              activeRunId: "r1",
+              activityRunStatus: "starting",
+              activityRunStartedAt: hoursAgo,
+            }),
+            thread("fresh start", { activeRunId: "r2", activityRunStatus: "starting" }),
+            thread("working", { activeRunId: "r3", currentActivity: "$ vp test run" }),
+          ]),
+        }),
+      ],
+      NOW,
+    );
+    const agents = machines[0]?.agents ?? [];
+    expect(agents.find((agent) => agent.title === "Resume: Courtroom")).toMatchObject({
+      stuck: true,
+      activity: "stuck starting",
+    });
+    expect(agents.find((agent) => agent.title === "fresh start")?.stuck).toBe(false);
+    expect(fleetTotals(machines).agents).toBe(2);
   });
 });

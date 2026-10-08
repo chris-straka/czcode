@@ -1,5 +1,6 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import {
+  isSystemTimer,
   scheduleJobNextRunLabel,
   scheduleJobRunLabel,
   sortScheduleJobs,
@@ -23,8 +24,9 @@ import { ScrollArea } from "../ui/scroll-area";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
 
 /**
- * Every recurring job on the machines the feed shows: cz's scheduled tasks
- * and the timers registered in each host's jobs.toml. Failures come first.
+ * Every recurring job on the machines the feed shows: cz's scheduled tasks,
+ * the timers registered in each host's jobs.toml, and timers someone set up
+ * by hand. The OS's own timers hide behind a toggle. Failures come first.
  */
 export function SchedulesPage() {
   useEscapeToGoBack();
@@ -70,12 +72,12 @@ function MachineJobs({
   const listAtom = jobsEnvironment.list({ environmentId, input: null });
   const result = useAtomValue(listAtom);
   const refresh = useAtomRefresh(listAtom);
-  const [showUnregistered, setShowUnregistered] = useState(false);
+  const [showSystem, setShowSystem] = useState(false);
   const jobs = sortScheduleJobs(
     Option.getOrElse(AsyncResult.value(result), (): ReadonlyArray<ScheduleJob> => []),
   );
-  const registered = jobs.filter((job) => job.registered);
-  const unregistered = jobs.filter((job) => !job.registered);
+  const ours = jobs.filter((job) => !isSystemTimer(job));
+  const system = jobs.filter(isSystemTimer);
   const [now] = useState(Date.now);
   return (
     <section className="flex flex-col gap-3">
@@ -89,29 +91,23 @@ function MachineJobs({
         <p className="text-sm text-muted-foreground">
           Couldn't read this machine's jobs. Its cz may be older than Schedules.
         </p>
-      ) : registered.length === 0 && AsyncResult.isSuccess(result) ? (
-        <p className="text-sm text-muted-foreground">No recurring jobs registered.</p>
+      ) : ours.length === 0 && AsyncResult.isSuccess(result) ? (
+        <p className="text-sm text-muted-foreground">No recurring jobs.</p>
       ) : (
-        <JobList jobs={registered} environmentId={environmentId} now={now} />
+        <JobList jobs={ours} environmentId={environmentId} now={now} />
       )}
-      {unregistered.length > 0 ? (
-        showUnregistered ? (
-          <>
-            <p className="text-xs text-muted-foreground">
-              Timers nobody registered with <code>cz jobs add</code>:
-            </p>
-            <JobList jobs={unregistered} environmentId={environmentId} now={now} />
-          </>
-        ) : (
+      {system.length > 0 ? (
+        <>
           <Button
             size="sm"
-            variant="ghost"
+            variant="ghost-muted"
             className="self-start"
-            onClick={() => setShowUnregistered(true)}
+            onClick={() => setShowSystem((shown) => !shown)}
           >
-            Show {unregistered.length} other timers
+            {showSystem ? "Hide" : "Show"} {system.length} system timers
           </Button>
-        )
+          {showSystem ? <JobList jobs={system} environmentId={environmentId} now={now} /> : null}
+        </>
       ) : null}
     </section>
   );

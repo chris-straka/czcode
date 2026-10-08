@@ -3,6 +3,13 @@
 Customize shortcuts in **Settings → Keybindings** on web and desktop. That page
 also lists the command IDs and defaults available in your version.
 
+## Moving around without the mouse
+
+Lists and open views use vim keys, the same as ccez-llm: `j`/`k` move one item or line,
+`d`/`u` three, `Ctrl+D`/`Ctrl+U` half a screen, `g g`/`G` the ends. `l` or Enter opens the
+focused item and `h` or Esc goes back. `/` opens search, and Space plays or pauses a Decision's
+clip or sound. The app shows no key hints; **Settings → Keybindings → Page keys** lists them all.
+
 ## Composer controls
 
 In **Settings → General → Send shortcut**, choose whether Enter sends, requires
