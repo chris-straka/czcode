@@ -90,13 +90,16 @@ export const ThreadBriefGroup = Schema.Struct({
    * (archive) stopped runs, or open the threads to look.
    */
   action: Schema.Literals(["retry", "dismiss", "open"]),
-  threads: Schema.Array(Schema.Struct({ threadId: Schema.String, title: Schema.String })),
+  /** The threads it's about, for its action and project link; the brief never lists them. */
+  threadIds: Schema.Array(Schema.String),
 });
 export type ThreadBriefGroup = typeof ThreadBriefGroup.Type;
 
 export const ThreadBrief = Schema.Struct({
-  /** Epoch ms the brief starts at: when the owner last looked. */
+  /** Epoch ms the brief starts at: when the owner last read one. */
   since: Schema.Number,
+  /** When the owner last read (dismissed) a brief here; clients hide it for the rest of that day. */
+  readAt: Schema.NullOr(Schema.Number),
   groups: Schema.Array(ThreadBriefGroup),
   /** "pending": the model is still writing and `text` is a count; "plain": it failed. */
   lines: Schema.Literals(["written", "pending", "plain"]),

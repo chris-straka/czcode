@@ -1,10 +1,11 @@
 /**
- * The Morning brief: one card at the top of Needs you saying what happened
- * since the owner last looked, for the machines the filter shows. What got
- * done (by project), what failed (by cause) or was stopped, what needs them,
- * and machine trouble. Each machine's server writes its own lines
- * (MorningBriefService); this merges them with the Decisions, waiting
- * threads, and fleet health the client already has. Shared by web and mobile.
+ * The Morning brief: a short written summary at the top of Home, once a day,
+ * of what happened since the owner last read one, on the machines the filter
+ * shows. What got done (by project), what failed (by cause) or was stopped,
+ * what needs them, and machine trouble. It never lists threads. Each
+ * machine's server writes its own lines (MorningBriefService); this merges
+ * them with the Decisions, waiting threads, and fleet health the client
+ * already has. Shared by web and mobile.
  *
  * Sorts with `.sort` on fresh arrays, not `.toSorted`: the phone's Hermes
  * engine has no `toSorted`.
@@ -37,7 +38,6 @@ export interface BriefDecision {
 export interface BriefWaitingThread {
   readonly environmentId: EnvironmentId;
   readonly id: string;
-  readonly title: string;
   readonly archivedAt: string | null;
   /** A run under way has no `completedAt`. */
   readonly latestRun: { readonly completedAt: string | null } | null;
@@ -53,7 +53,6 @@ export interface BriefJob {
 export interface BriefThreadRef {
   readonly environmentId: EnvironmentId;
   readonly threadId: string;
-  readonly title: string;
 }
 
 /** One line of the brief, with the threads it is about. */
@@ -64,14 +63,17 @@ export interface BriefLine {
   readonly label: string;
   readonly text: string;
   readonly action: ThreadBrief["groups"][number]["action"];
+  /** The threads it's about, for its action and project link. Never shown. */
   readonly threads: ReadonlyArray<BriefThreadRef>;
   /** Scheduled jobs that failed, for the "Scheduled job" line. */
   readonly jobs: ReadonlyArray<BriefJob & { readonly run: ScheduleJobRun }>;
 }
 
-export interface MorningBrief<T extends BriefWaitingThread> {
-  /** Epoch ms of the earliest "last looked" across the machines, or null before any answered. */
+export interface MorningBrief {
+  /** Epoch ms of the earliest start across the machines, or null before any answered. */
   readonly since: number | null;
+  /** The latest time the owner read a brief on any of the machines. */
+  readonly readAt: number | null;
   readonly done: ReadonlyArray<BriefLine>;
   /** Failed, then stopped. */
   readonly failed: ReadonlyArray<BriefLine>;
@@ -84,8 +86,8 @@ export interface MorningBrief<T extends BriefWaitingThread> {
     /** The one that matters most: an agent waiting, then money, then the oldest. */
     readonly top: BriefDecision | null;
   };
-  /** Threads waiting on an approval or an answer. */
-  readonly waiting: ReadonlyArray<T>;
+  /** How many threads wait on an approval or an answer. */
+  readonly waiting: number;
   readonly machines: ReadonlyArray<{
     readonly environmentId: EnvironmentId;
     readonly label: string;
@@ -136,13 +138,13 @@ export function machineProblem(machine: FleetMachine): string | null {
  * limited to the machines the feed shows; `decisions` are the open ones it shows.
  * A thread the owner archived or restarted since the server wrote its brief drops out.
  */
-export function buildMorningBrief<T extends BriefWaitingThread>(input: {
+export function buildMorningBrief(input: {
   readonly machines: ReadonlyArray<BriefMachine>;
   readonly decisions: ReadonlyArray<BriefDecision>;
-  readonly threads: ReadonlyArray<T>;
+  readonly threads: ReadonlyArray<BriefWaitingThread>;
   readonly jobs: ReadonlyArray<BriefJob>;
   readonly fleet: ReadonlyArray<FleetMachine>;
-}): MorningBrief<T> {
+}): MorningBrief {
   const answered = input.machines.flatMap((machine) =>
     machine.brief === null ? [] : [{ environmentId: machine.environmentId, brief: machine.brief }],
   );
@@ -162,14 +164,22 @@ export function buildMorningBrief<T extends BriefWaitingThread>(input: {
     for (const group of brief.groups) {
       const key = `${group.kind}:${group.label}`;
       const line = lines.get(key);
-      const threads = group.threads
-        .filter((thread) => ended.has(`${environmentId}:${thread.threadId}`))
-        .map((thread) => ({ environmentId, ...thread }));
+      const threads = group.threadIds
+        .filter((threadId) => ended.has(`${environmentId}:${threadId}`))
+        .map((threadId) => ({ environmentId, threadId }));
       if (threads.length === 0) continue;
       lines.set(
         key,
         line === undefined
-          ? { key, ...group, threads, jobs: [] }
+          ? {
+              key,
+              kind: group.kind,
+              label: group.label,
+              text: group.text,
+              action: group.action,
+              threads,
+              jobs: [],
+            }
           : {
               ...line,
               text: line.text.includes(group.text) ? line.text : `${line.text}; ${group.text}`,
@@ -208,8 +218,12 @@ export function buildMorningBrief<T extends BriefWaitingThread>(input: {
   }
 
   const all = [...lines.values()];
+  const reads = answered.flatMap((machine) =>
+    machine.brief.readAt === null ? [] : [machine.brief.readAt],
+  );
   return {
     since,
+    readAt: reads.length === 0 ? null : Math.max(...reads),
     done: all.filter((line) => line.kind === "done"),
     failed: [
       ...all.filter((line) => line.kind === "failed"),
@@ -226,7 +240,7 @@ export function buildMorningBrief<T extends BriefWaitingThread>(input: {
     waiting: input.threads.filter(
       (thread) =>
         thread.archivedAt === null && (thread.hasPendingApprovals || thread.hasPendingUserInput),
-    ),
+    ).length,
     machines: input.fleet.flatMap((machine) => {
       const problem = machineProblem(machine);
       return problem === null
@@ -237,41 +251,31 @@ export function buildMorningBrief<T extends BriefWaitingThread>(input: {
 }
 
 /** True when there is nothing to say. */
-export function morningBriefIsEmpty(brief: MorningBrief<BriefWaitingThread>): boolean {
+export function morningBriefIsEmpty(brief: MorningBrief): boolean {
   return (
     brief.done.length === 0 &&
     brief.failed.length === 0 &&
     brief.decisions.total === 0 &&
-    brief.waiting.length === 0 &&
+    brief.waiting === 0 &&
     brief.machines.length === 0
   );
 }
-
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 /** How many threads or jobs a line covers. */
 export function briefLineCount(line: BriefLine): number {
   return line.threads.length + line.jobs.length;
 }
 
-/** The folded line: "hll, czcode done · 2 failed · 3 Decisions · basement offline". */
-export function morningBriefSummary(brief: MorningBrief<BriefWaitingThread>): string {
-  const total = (kind: BriefLine["kind"]) =>
-    brief.failed
-      .filter((line) => line.kind === kind)
-      .reduce((sum, line) => sum + briefLineCount(line), 0);
-  const failed = total("failed");
-  const stopped = total("stopped");
-  return [
-    brief.done.length > 0 ? `${brief.done.map((line) => line.label).join(", ")} done` : null,
-    failed > 0 ? `${failed} failed` : null,
-    stopped > 0 ? `${stopped} stopped` : null,
-    brief.decisions.total > 0 ? plural(brief.decisions.total, "Decision") : null,
-    brief.waiting.length > 0 ? `${plural(brief.waiting.length, "thread")} waiting` : null,
-    ...brief.machines.map((machine) => `${machine.label} ${machine.problem}`),
-  ]
-    .filter((part) => part !== null)
-    .join(" · ");
+const startOfDay = (at: number, timeZone: DateTime.TimeZone) =>
+  DateTime.toEpochMillis(DateTime.startOf(DateTime.makeZonedUnsafe(at, { timeZone }), "day"));
+
+/** True once the owner read a brief today: it stays hidden until tomorrow. */
+export function morningBriefReadToday(
+  brief: MorningBrief,
+  now: number,
+  timeZone: DateTime.TimeZone = DateTime.zoneMakeLocal(),
+): boolean {
+  return brief.readAt !== null && brief.readAt >= startOfDay(now, timeZone);
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -286,9 +290,7 @@ export function formatBriefSince(
   const parts = DateTime.toParts(zoned);
   const pad = (value: number) => String(value).padStart(2, "0");
   const time = `${pad(parts.hour)}:${pad(parts.minute)}`;
-  const today = DateTime.toEpochMillis(
-    DateTime.startOf(DateTime.makeZonedUnsafe(now, { timeZone }), "day"),
-  );
+  const today = startOfDay(now, timeZone);
   if (since >= today) return time;
   if (since >= today - 24 * 60 * 60_000) return `yesterday ${time}`;
   return `${WEEKDAYS[parts.weekDay]} ${time}`;

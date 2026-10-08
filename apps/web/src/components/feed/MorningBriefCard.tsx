@@ -3,17 +3,16 @@ import { scopeThreadRef } from "@cz/client-runtime/environment";
 import {
   type BriefJob,
   type BriefLine,
-  briefLineCount,
   buildMorningBrief,
   formatBriefSince,
   morningBriefIsEmpty,
-  morningBriefSummary,
+  morningBriefReadToday,
 } from "@cz/client-runtime/decisions/morningBrief";
 import type { EnvironmentThreadShell } from "@cz/client-runtime/state/models";
 import { type EnvironmentId, ThreadId } from "@cz/contracts";
 import { Link } from "@tanstack/react-router";
-import { ChevronDownIcon, ChevronRightIcon, SunriseIcon } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { SunriseIcon } from "lucide-react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { undoLatestThreadAction } from "~/hooks/showThreadUndoNotice";
 import { useThreadActions } from "~/hooks/useThreadActions";
@@ -26,11 +25,14 @@ import { toastManager } from "../ui/toast";
 const UNDO_WINDOW_MS = 5_000;
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
+/** When Done was pressed in this session, so the brief stays gone before the servers say so. */
+let readHereAt: number | null = null;
+
 /**
- * The Morning brief, pinned above Needs you: what happened since the owner
- * last looked, on the machines the filter shows. Each machine's server writes
- * its lines; opening the feed marks it seen there, so the next brief starts
- * from this visit.
+ * The Morning brief, at the top of Home once a day: a few written lines on
+ * what happened since the owner last read one, on the machines the filter
+ * shows. It never lists threads; lines link to projects and Decisions.
+ * Done hides it on every device until tomorrow.
  */
 export function MorningBriefCard({
   environmentIds,
@@ -38,7 +40,7 @@ export function MorningBriefCard({
   threads,
   jobs,
   now,
-  machineLabel,
+  projectOf,
   onOpenDecision,
 }: {
   readonly environmentIds: ReadonlyArray<EnvironmentId>;
@@ -47,11 +49,14 @@ export function MorningBriefCard({
   readonly threads: ReadonlyArray<EnvironmentThreadShell>;
   readonly jobs: ReadonlyArray<BriefJob>;
   readonly now: number;
-  readonly machineLabel: (environmentId: string) => string;
+  /** The Threads page project a thread belongs to. */
+  readonly projectOf: (thread: EnvironmentThreadShell) => string;
   readonly onOpenDecision: (key: string) => void;
 }) {
   const machines = useMachineBriefs(environmentIds);
   const fleet = useAtomValue(fleetAtom);
+  const markRead = useAtomCommand(decisionEnvironment.briefRead, "mark the brief read");
+  const [readHere, setReadHere] = useState(readHereAt);
   const brief = useMemo(
     () =>
       buildMorningBrief({
@@ -63,36 +68,33 @@ export function MorningBriefCard({
       }),
     [machines, decisions, threads, jobs, fleet, environmentIds],
   );
-  const markSeen = useAtomCommand(decisionEnvironment.briefSeen, { reportFailure: false });
-  useEffect(() => {
-    const seen = () => {
-      if (document.visibilityState !== "visible") return;
-      for (const environmentId of environmentIds) {
-        void markSeen({ environmentId, input: undefined });
-      }
-    };
-    seen();
-    document.addEventListener("visibilitychange", seen);
-    return () => document.removeEventListener("visibilitychange", seen);
-  }, [environmentIds, markSeen]);
-  const [folded, setFolded] = useState(false);
+  const shellByKey = useMemo(
+    () => new Map(threads.map((thread) => [`${thread.environmentId}:${thread.id}`, thread])),
+    [threads],
+  );
 
-  if (morningBriefIsEmpty(brief)) return null;
-  const manyMachines = new Set(threads.map((thread) => thread.environmentId)).size > 1;
+  const readToday =
+    morningBriefReadToday(brief, now) ||
+    (readHere !== null && morningBriefReadToday({ ...brief, readAt: readHere }, now));
+  if (readToday || morningBriefIsEmpty(brief)) return null;
 
-  if (folded) {
-    return (
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent/40"
-        onClick={() => setFolded(false)}
-      >
-        <SunriseIcon className="size-4 shrink-0" />
-        <span className="shrink-0 font-medium text-foreground">Morning brief</span>
-        <span className="truncate">{morningBriefSummary(brief)}</span>
-      </button>
+  const done = () => {
+    readHereAt = Date.now();
+    setReadHere(readHereAt);
+    for (const environmentId of environmentIds) {
+      void markRead({ environmentId, input: undefined });
+    }
+  };
+  /** The project a line is about, when its threads share one. */
+  const projectFor = (line: BriefLine) => {
+    const projects = new Set(
+      line.threads.flatMap((ref) => {
+        const shell = shellByKey.get(`${ref.environmentId}:${ref.threadId}`);
+        return shell ? [projectOf(shell)] : [];
+      }),
     );
-  }
+    return projects.size === 1 ? [...projects][0]! : null;
+  };
 
   const top = brief.decisions.top;
   return (
@@ -104,24 +106,18 @@ export function MorningBriefCard({
         <SunriseIcon className="size-4 shrink-0 text-muted-foreground" />
         <h2 className="text-sm font-medium text-foreground">Morning brief</h2>
         <span className="flex-1 truncate text-xs text-muted-foreground">
-          {brief.since === null
-            ? null
-            : `since you last looked, ${formatBriefSince(brief.since, now)}`}
+          {brief.since === null ? null : `since ${formatBriefSince(brief.since, now)}`}
           {brief.writing ? " · writing…" : null}
         </span>
-        <Button size="xs" variant="ghost" onClick={() => setFolded(true)}>
-          Fold
+        <Button size="xs" variant="ghost" onClick={done}>
+          Done
         </Button>
       </header>
 
       {brief.done.length > 0 ? (
         <BriefSection title="Done">
           {brief.done.map((line) => (
-            <BriefLineRow
-              key={line.key}
-              line={line}
-              machineLabel={manyMachines ? machineLabel : null}
-            />
+            <BriefLineRow key={line.key} line={line} project={projectFor(line)} />
           ))}
         </BriefSection>
       ) : null}
@@ -129,16 +125,12 @@ export function MorningBriefCard({
       {brief.failed.length > 0 ? (
         <BriefSection title="Failed or stopped">
           {brief.failed.map((line) => (
-            <BriefLineRow
-              key={line.key}
-              line={line}
-              machineLabel={manyMachines ? machineLabel : null}
-            />
+            <BriefLineRow key={line.key} line={line} project={projectFor(line)} />
           ))}
         </BriefSection>
       ) : null}
 
-      {brief.decisions.total > 0 || brief.waiting.length > 0 ? (
+      {brief.decisions.total > 0 || brief.waiting > 0 ? (
         <BriefSection title="Needs you">
           {top ? (
             <li>
@@ -159,16 +151,13 @@ export function MorningBriefCard({
               </button>
             </li>
           ) : null}
-          {brief.waiting.map((thread) => (
-            <li key={`${thread.environmentId}:${thread.id}`}>
-              <ThreadLink environmentId={thread.environmentId} threadId={thread.id}>
-                <span className="text-foreground">{thread.title}</span>
-                <span className="text-muted-foreground">
-                  {thread.hasPendingApprovals ? " is waiting for approval" : " asked you something"}
-                </span>
-              </ThreadLink>
+          {brief.waiting > 0 ? (
+            <li className="px-1 py-0.5 text-sm text-muted-foreground">
+              {brief.waiting === 1
+                ? "1 agent is waiting on an answer, below"
+                : `${brief.waiting} agents are waiting on an answer, below`}
             </li>
-          ))}
+          ) : null}
         </BriefSection>
       ) : null}
 
@@ -205,42 +194,19 @@ function BriefSection({
   );
 }
 
-function ThreadLink({
-  environmentId,
-  threadId,
-  children,
-}: {
-  readonly environmentId: string;
-  readonly threadId: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <Link
-      to="/$environmentId/$threadId"
-      params={{ environmentId, threadId }}
-      className="block min-w-0 rounded-md px-1 py-0.5 text-sm hover:bg-accent/40"
-    >
-      {children}
-    </Link>
-  );
-}
-
 /**
- * "hll: Andras rigged in game; level editor merged". One thread opens it;
- * several expand in place to the threads, each a link. Failed and stopped
- * lines carry their one action.
+ * "hll: Andras rigged in game; level editor merged", linking to the project
+ * (or Schedules, for jobs). Failed and stopped lines carry their one action.
  */
 function BriefLineRow({
   line,
-  machineLabel,
+  project,
 }: {
   readonly line: BriefLine;
-  readonly machineLabel: ((environmentId: string) => string) | null;
+  readonly project: string | null;
 }) {
-  const [open, setOpen] = useState(false);
   const retry = useAtomCommand(decisionEnvironment.retryThreads, "retry threads");
   const { archiveThread } = useThreadActions();
-  const single = line.threads.length === 1 && line.jobs.length === 0 ? line.threads[0] : null;
 
   const onRetry = async () => {
     const byMachine = new Map<EnvironmentId, string[]>();
@@ -282,65 +248,30 @@ function BriefLineRow({
       <span className="text-foreground">{line.text}</span>
     </>
   );
+  const rowClass = "block min-w-0 flex-1 rounded-md px-1 py-0.5 text-sm";
   return (
-    <li>
-      <div className="flex items-start gap-1">
-        {single ? (
-          <div className="min-w-0 flex-1">
-            <ThreadLink environmentId={single.environmentId} threadId={single.threadId}>
-              {text}
-            </ThreadLink>
-          </div>
-        ) : line.threads.length === 0 ? (
-          <Link
-            to="/schedules"
-            className="block min-w-0 flex-1 rounded-md px-1 py-0.5 text-sm hover:bg-accent/40"
-          >
-            {text}
-          </Link>
-        ) : (
-          <button
-            type="button"
-            aria-expanded={open}
-            className="flex min-w-0 flex-1 items-start gap-1 rounded-md px-1 py-0.5 text-left text-sm hover:bg-accent/40"
-            onClick={() => setOpen((current) => !current)}
-          >
-            <span className="min-w-0 flex-1">
-              {text}
-              <span className="text-muted-foreground"> · {briefLineCount(line)}</span>
-            </span>
-            {open ? (
-              <ChevronDownIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            ) : (
-              <ChevronRightIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-            )}
-          </button>
-        )}
-        {line.action === "open" || line.threads.length === 0 ? null : (
-          <Button
-            size="xs"
-            variant="outline"
-            className="shrink-0"
-            onClick={() => void (line.action === "retry" ? onRetry() : onDismiss())}
-          >
-            {line.action === "retry" ? "Retry" : "Dismiss"}
-          </Button>
-        )}
-      </div>
-      {open && !single ? (
-        <ul className="mt-0.5 ml-2 space-y-0.5 border-l border-border pl-2">
-          {line.threads.map((thread) => (
-            <li key={`${thread.environmentId}:${thread.threadId}`}>
-              <ThreadLink environmentId={thread.environmentId} threadId={thread.threadId}>
-                <span className="block truncate text-muted-foreground">
-                  {thread.title}
-                  {machineLabel ? ` · ${machineLabel(thread.environmentId)}` : null}
-                </span>
-              </ThreadLink>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+    <li className="flex items-start gap-1">
+      {line.jobs.length > 0 ? (
+        <Link to="/schedules" className={`${rowClass} hover:bg-accent/40`}>
+          {text}
+        </Link>
+      ) : project !== null ? (
+        <Link to="/threads" search={{ project }} className={`${rowClass} hover:bg-accent/40`}>
+          {text}
+        </Link>
+      ) : (
+        <p className={rowClass}>{text}</p>
+      )}
+      {line.action === "open" || line.threads.length === 0 ? null : (
+        <Button
+          size="xs"
+          variant="outline"
+          className="shrink-0"
+          onClick={() => void (line.action === "retry" ? onRetry() : onDismiss())}
+        >
+          {line.action === "retry" ? "Retry" : "Dismiss"}
+        </Button>
+      )}
     </li>
   );
 }

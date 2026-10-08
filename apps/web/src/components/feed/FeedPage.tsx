@@ -527,7 +527,7 @@ export function FeedPage() {
               threads={shownThreads}
               jobs={jobs}
               now={now}
-              machineLabel={machineLabel}
+              projectOf={(thread) => feedProjectKey(folderOf(thread))}
               onOpenDecision={showDecision}
             />
           ) : null}

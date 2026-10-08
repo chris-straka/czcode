@@ -68,8 +68,8 @@ export class DecisionsHttpClient extends Context.Service<
     readonly brief: (
       prepared: PreparedConnection,
     ) => Effect.Effect<ThreadBrief, RemoteEnvironmentRequestError>;
-    /** The owner opened the feed. */
-    readonly briefSeen: (
+    /** The owner read (dismissed) the brief. */
+    readonly briefRead: (
       prepared: PreparedConnection,
     ) => Effect.Effect<void, RemoteEnvironmentRequestError>;
     /** Asks stopped or failed threads to pick up where they left off. */
@@ -184,14 +184,14 @@ export const layer: Layer.Layer<DecisionsHttpClient, never, HttpClient.HttpClien
             request: ({ client, headers }) => client.brief({ headers }),
           }),
         ),
-      briefSeen: (prepared) =>
+      briefRead: (prepared) =>
         run(
           executeAuthenticatedEnvironmentHttpRequest({
             ...threads(prepared),
             method: "POST",
-            url: (base) => makeEnvironmentHttpApiUrlBuilder(base).threads.briefSeen(),
+            url: (base) => makeEnvironmentHttpApiUrlBuilder(base).threads.briefRead(),
             timeoutMs: REQUEST_TIMEOUT_MS,
-            request: ({ client, headers }) => client.briefSeen({ headers }),
+            request: ({ client, headers }) => client.briefRead({ headers }),
           }),
         ),
       retryThreads: (prepared, threadIds) =>

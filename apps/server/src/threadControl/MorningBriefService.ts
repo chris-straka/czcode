@@ -6,9 +6,8 @@
  * generation model writes one line per group; until it answers, or when it
  * can't, each line is a plain count.
  *
- * "Since they last looked" is a visit: a client marks the brief seen when it
- * opens the feed, and the brief covers everything since the visit before this
- * one, so reloading or switching devices mid-visit doesn't empty it.
+ * The brief covers everything since the owner last read (dismissed) one, which
+ * is stored here so dismissing on one device hides it on the others.
  *
  * @module MorningBriefService
  */
@@ -43,16 +42,14 @@ export class MorningBriefService extends Context.Service<
   MorningBriefService,
   {
     readonly brief: Effect.Effect<ThreadBrief>;
-    /** The owner opened the feed: starts a new visit unless one is under way. */
-    readonly markSeen: Effect.Effect<void>;
+    /** The owner read (dismissed) the brief: the next one starts from now. */
+    readonly markRead: Effect.Effect<void>;
     /** Asks each stopped or failed thread to pick up where it left off; returns how many were sent. */
     readonly retry: (threadIds: ReadonlyArray<string>) => Effect.Effect<number>;
   }
 >()("cz/threadControl/MorningBriefService") {}
 
-/** Opens of the feed closer together than this are one visit. */
-export const VISIT_GAP_MS = 30 * 60_000;
-/** Before the first visit, the brief covers this much. */
+/** Before the first read, the brief covers this much. */
 const FIRST_WINDOW_MS = 14 * 60 * 60_000;
 /** However long the owner was away, the brief covers at most this much. */
 const MAX_WINDOW_MS = 3 * 24 * 60 * 60_000;
@@ -62,25 +59,9 @@ const MAX_THREADS = 100;
 const RETRY_MESSAGE =
   "Your last run ended before it finished. Pick up where you left off and finish the task.";
 
-export interface BriefVisits {
-  /** When the current (or latest) visit last opened the feed. */
-  readonly seenAt: number | null;
-  /** When the visit before it ended. */
-  readonly previousSeenAt: number | null;
-}
-
-/** Where the brief starts: the end of the last finished visit. */
-export function briefSince(visits: BriefVisits, now: number): number {
-  const visiting = visits.seenAt !== null && now - visits.seenAt < VISIT_GAP_MS;
-  const start = visiting ? visits.previousSeenAt : visits.seenAt;
-  return Math.max(start ?? now - FIRST_WINDOW_MS, now - MAX_WINDOW_MS);
-}
-
-/** The visits after the feed opens at `now`. */
-export function visitAfterOpen(visits: BriefVisits, now: number): BriefVisits {
-  return visits.seenAt !== null && now - visits.seenAt < VISIT_GAP_MS
-    ? { seenAt: now, previousSeenAt: visits.previousSeenAt }
-    : { seenAt: now, previousSeenAt: visits.seenAt };
+/** Where the brief starts: when the owner last read one. */
+export function briefSince(readAt: number | null, now: number): number {
+  return Math.max(readAt ?? now - FIRST_WINDOW_MS, now - MAX_WINDOW_MS);
 }
 
 export type BriefOutcome = ThreadBriefGroup["kind"];
@@ -229,34 +210,19 @@ const make = Effect.gen(function* () {
     readonly lines: Deferred.Deferred<ReadonlyMap<string, string> | null>;
   } | null = null;
 
-  const readVisits = sql<{ name: string; value: string }>`
-    SELECT name, value FROM brief_state WHERE name IN ('seen_at', 'previous_seen_at')
-  `.pipe(
-    Effect.map((rows) => {
-      const value = (name: string) => {
-        const row = rows.find((candidate) => candidate.name === name);
-        return row === undefined ? null : Number(row.value);
-      };
-      return { seenAt: value("seen_at"), previousSeenAt: value("previous_seen_at") };
-    }),
-  );
+  const readAt = sql<{ value: string }>`
+    SELECT value FROM brief_state WHERE name = 'read_at'
+  `.pipe(Effect.map((rows) => (rows[0] === undefined ? null : Number(rows[0].value))));
 
-  const markSeen: MorningBriefService["Service"]["markSeen"] = Effect.gen(function* () {
+  const markRead: MorningBriefService["Service"]["markRead"] = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis;
-    const next = visitAfterOpen(yield* readVisits, now);
-    for (const [name, value] of [
-      ["seen_at", next.seenAt],
-      ["previous_seen_at", next.previousSeenAt],
-    ] as const) {
-      if (value === null) continue;
-      yield* sql`
-        INSERT INTO brief_state ${sql.insert({ name, value: String(value), updated_at: now })}
-        ON CONFLICT(name) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-      `;
-    }
+    yield* sql`
+      INSERT INTO brief_state ${sql.insert({ name: "read_at", value: String(now), updated_at: now })}
+      ON CONFLICT(name) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `;
   }).pipe(
-    Effect.catchCause((cause) => Effect.logWarning("Marking the brief seen failed", { cause })),
-    Effect.withSpan("MorningBriefService.markSeen"),
+    Effect.catchCause((cause) => Effect.logWarning("Marking the brief read failed", { cause })),
+    Effect.withSpan("MorningBriefService.markRead"),
   );
 
   const endedThreads = Effect.fn("MorningBriefService.endedThreads")(function* (since: number) {
@@ -318,19 +284,21 @@ const make = Effect.gen(function* () {
 
   const brief: MorningBriefService["Service"]["brief"] = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis;
-    const since = briefSince(yield* readVisits, now);
+    const read = yield* readAt;
+    const since = briefSince(read, now);
     const threads = yield* endedThreads(since);
     const groups = briefGroups(threads);
     const present = (lines: ReadonlyMap<string, string> | null, state: ThreadBrief["lines"]) =>
       ({
         since,
+        readAt: read,
         lines: state,
         groups: groups.map((group) => ({
           kind: group.kind,
           label: group.label,
           action: group.action,
           text: lines?.get(group.key) ?? plainLine(group),
-          threads: group.threads.map(({ threadId, title }) => ({ threadId, title })),
+          threadIds: group.threads.map((thread) => thread.threadId),
         })),
       }) satisfies ThreadBrief;
     if (groups.length === 0) return present(null, "written");
@@ -355,7 +323,12 @@ const make = Effect.gen(function* () {
     Effect.catchCause((cause) =>
       Effect.logWarning("Building the brief failed", { cause }).pipe(
         Effect.flatMap(() => Clock.currentTimeMillis),
-        Effect.map((now): ThreadBrief => ({ since: now, groups: [], lines: "plain" })),
+        Effect.map((now): ThreadBrief => ({
+          since: now,
+          readAt: null,
+          groups: [],
+          lines: "plain",
+        })),
       ),
     ),
     Effect.withSpan("MorningBriefService.brief"),
@@ -399,7 +372,7 @@ const make = Effect.gen(function* () {
     ),
   );
 
-  return MorningBriefService.of({ brief, markSeen, retry });
+  return MorningBriefService.of({ brief, markRead, retry });
 });
 
 export const layer = Layer.effect(MorningBriefService, make);

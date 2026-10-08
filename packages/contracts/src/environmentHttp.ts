@@ -974,7 +974,7 @@ class EnvironmentThreadsHttpApi extends HttpApiGroup.make("threads")
     }).middleware(EnvironmentAuthenticatedAuth),
   )
   .add(
-    HttpApiEndpoint.post("briefSeen", "/api/threads/brief/seen", {
+    HttpApiEndpoint.post("briefRead", "/api/threads/brief/read", {
       headers: OptionalBearerHeaders,
       success: Schema.Void,
       error: [EnvironmentScopeRequiredError, EnvironmentInternalError],

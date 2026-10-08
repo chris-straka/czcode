@@ -87,9 +87,9 @@ export function createDecisionEnvironmentAtoms<R, E>(
       refreshIntervalMs: BRIEF_REFRESH_INTERVAL_MS,
       execute: (_: "brief") => withPrepared((client, prepared) => client.brief(prepared)),
     }),
-    briefSeen: createEnvironmentCommand(runtime, {
-      label: "environment-data:threads:brief-seen",
-      execute: (_: void) => withPrepared((client, prepared) => client.briefSeen(prepared)),
+    briefRead: createEnvironmentCommand(runtime, {
+      label: "environment-data:threads:brief-read",
+      execute: (_: void) => withPrepared((client, prepared) => client.briefRead(prepared)),
     }),
     retryThreads: createEnvironmentCommand(runtime, {
       label: "environment-data:threads:retry",

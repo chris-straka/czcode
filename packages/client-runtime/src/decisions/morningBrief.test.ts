@@ -8,7 +8,7 @@ import {
   formatBriefSince,
   machineProblem,
   morningBriefIsEmpty,
-  morningBriefSummary,
+  morningBriefReadToday,
 } from "./morningBrief.ts";
 
 const f = "env-f" as EnvironmentId;
@@ -38,7 +38,6 @@ const thread = (
 ) => ({
   environmentId: overrides.environmentId ?? f,
   id,
-  title: id,
   archivedAt: overrides.archivedAt ?? null,
   latestRun: { completedAt: overrides.running ? null : "2026-10-08T04:00:00.000Z" },
   hasPendingApprovals: false,
@@ -50,13 +49,14 @@ const machineBrief = (
   overrides: Partial<ThreadBrief> = {},
 ): ThreadBrief => ({
   since,
+  readAt: null,
   lines: "written",
   groups: groups.map(([kind, label, text, ids]) => ({
     kind,
     label,
     text,
     action: kind === "stopped" ? "dismiss" : "open",
-    threads: ids.map((threadId) => ({ threadId, title: threadId })),
+    threadIds: ids,
   })),
   ...overrides,
 });
@@ -165,11 +165,8 @@ describe("buildMorningBrief", () => {
       { project: "czcode", count: 2 },
       { project: "hll", count: 1 },
     ]);
-    expect(brief.waiting.map((t) => t.id)).toEqual(["asking"]);
+    expect(brief.waiting).toBe(1);
     expect(brief.machines.map((m) => `${m.label} ${m.problem}`)).toEqual(["basement offline"]);
-    expect(morningBriefSummary(brief)).toBe(
-      "hll done · 2 failed · 1 stopped · 3 Decisions · 1 thread waiting · basement offline",
-    );
   });
 
   it("is empty when nothing happened and nothing waits", () => {
@@ -184,6 +181,27 @@ describe("buildMorningBrief", () => {
         }),
       ),
     ).toBe(true);
+  });
+});
+
+describe("morningBriefReadToday", () => {
+  const denver = DateTime.zoneMakeNamedUnsafe("America/Denver");
+  const at = (iso: string) => DateTime.toEpochMillis(DateTime.makeUnsafe(iso));
+  const read = (readAt: string) =>
+    buildMorningBrief({
+      machines: [
+        { environmentId: f, brief: machineBrief([], { readAt: at(readAt) }) },
+        { environmentId: basement, brief: machineBrief([], { readAt: null }) },
+      ],
+      decisions: [],
+      threads: [],
+      jobs: [],
+      fleet: [],
+    });
+  const now = at("2026-10-08T09:30:00-06:00");
+  it("hides the brief for the rest of the day it was read on any machine", () => {
+    expect(morningBriefReadToday(read("2026-10-08T07:00:00-06:00"), now, denver)).toBe(true);
+    expect(morningBriefReadToday(read("2026-10-07T22:00:00-06:00"), now, denver)).toBe(false);
   });
 });
 

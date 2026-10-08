@@ -73,11 +73,11 @@ export const threadsHttpApiLayer = HttpApiBuilder.group(
           return yield* briefs.brief;
         }),
       )
-      .handle("briefSeen", (args) =>
+      .handle("briefRead", (args) =>
         Effect.gen(function* () {
           yield* annotateEnvironmentRequest(args.endpoint.name);
           yield* requireEnvironmentScope(AuthOrchestrationReadScope);
-          yield* briefs.markSeen;
+          yield* briefs.markRead;
         }),
       )
       .handle("retry", (args) =>

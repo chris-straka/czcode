@@ -23,8 +23,6 @@ import {
   briefProject,
   briefSince,
   plainLine,
-  VISIT_GAP_MS,
-  visitAfterOpen,
 } from "./MorningBriefService.ts";
 
 const HOUR = 60 * 60_000;
@@ -41,29 +39,11 @@ const thread = (overrides: Partial<BriefThread>): BriefThread => ({
 });
 
 describe("morning brief", () => {
-  it("covers everything since the visit before this one", () => {
-    const now = 100 * HOUR;
-    // Last visit ended last night; this morning's first open hasn't been marked yet.
-    expect(briefSince({ seenAt: now - 10 * HOUR, previousSeenAt: now - 30 * HOUR }, now)).toBe(
-      now - 10 * HOUR,
-    );
-    // Opening the feed starts a visit, and the brief keeps covering since last night.
-    const visiting = visitAfterOpen({ seenAt: now - 10 * HOUR, previousSeenAt: null }, now);
-    expect(visiting).toEqual({ seenAt: now, previousSeenAt: now - 10 * HOUR });
-    expect(briefSince(visiting, now + 5 * 60_000)).toBe(now - 10 * HOUR);
-    // Reloading or opening on the phone mid-visit doesn't empty it.
-    const reopened = visitAfterOpen(visiting, now + 10 * 60_000);
-    expect(reopened.previousSeenAt).toBe(now - 10 * HOUR);
-    // Once the visit is over, the next brief starts where it ended.
-    expect(briefSince(reopened, now + 10 * 60_000 + VISIT_GAP_MS)).toBe(now + 10 * 60_000);
-  });
-
-  it("starts from the last 14 hours, and never reaches back past 3 days", () => {
+  it("covers everything since the owner last read one, at most 3 days back", () => {
     const now = 1000 * HOUR;
-    expect(briefSince({ seenAt: null, previousSeenAt: null }, now)).toBe(now - 14 * HOUR);
-    expect(briefSince({ seenAt: now - 200 * HOUR, previousSeenAt: null }, now)).toBe(
-      now - 72 * HOUR,
-    );
+    expect(briefSince(now - 10 * HOUR, now)).toBe(now - 10 * HOUR);
+    expect(briefSince(null, now)).toBe(now - 14 * HOUR);
+    expect(briefSince(now - 200 * HOUR, now)).toBe(now - 72 * HOUR);
   });
 
   it("names done work after the folder it touched", () => {
@@ -180,6 +160,12 @@ describe("MorningBriefService", () => {
       ]);
       expect(second.groups).toEqual(first.groups);
       expect(calls).toBe(1);
+      // Reading it moves the start to now, so those threads leave the next brief.
+      yield* TestClock.adjust("1 hour");
+      yield* service.markRead;
+      const after = yield* service.brief;
+      expect(after.readAt).toBe(60 * 60_000);
+      expect(after.groups).toEqual([]);
     }).pipe(
       Effect.provide(
         briefLayer([shell("a", "completed"), shell("b", "interrupted")], () => {
