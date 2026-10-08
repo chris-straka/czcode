@@ -417,6 +417,46 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(cz-mobil
   }
 }
 
+/* A page header whose contents share the left and right edges of the content
+   column below it (WorkspacePageHeader alignWith), never closer to the window
+   edge than the usual gutters and titlebar controls allow. */
+@utility workspace-header-aligned {
+  --header-inset: calc(max(0px, (100% - var(--content-max)) / 2) + var(--content-pad));
+  padding-left: max(var(--workspace-gutter-start), var(--header-inset));
+  padding-right: max(var(--workspace-gutter-end), var(--header-inset));
+
+  &:is(.wco, .wco *) {
+    padding-right: max(var(--workspace-native-controls-inset), var(--header-inset));
+  }
+  [data-sidebar-state="collapsed"] & {
+    padding-left: max(var(--workspace-titlebar-content-left), var(--header-inset));
+  }
+  @media (width < 48rem) {
+    [data-sidebar-state="expanded"] & {
+      padding-left: max(var(--workspace-titlebar-content-left), var(--header-inset));
+    }
+  }
+}
+
+/* The content column under an aligned header: when titlebar controls push the
+   header's contents right, the column moves with them. */
+@utility workspace-content-clears-titlebar {
+  [data-sidebar-state="collapsed"] & {
+    padding-left: max(
+      var(--content-pad),
+      calc(var(--workspace-titlebar-content-left) - max(0px, (100% - var(--content-max)) / 2))
+    );
+  }
+  @media (width < 48rem) {
+    [data-sidebar-state="expanded"] & {
+      padding-left: max(
+        var(--content-pad),
+        calc(var(--workspace-titlebar-content-left) - max(0px, (100% - var(--content-max)) / 2))
+      );
+    }
+  }
+}
+
 @utility topbar-scroll-fade {
   -webkit-mask-image:
     linear-gradient(

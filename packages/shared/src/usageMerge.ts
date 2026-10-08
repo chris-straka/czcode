@@ -62,6 +62,34 @@ export function isModelCostUnknown(model: ModelTotals): boolean {
   return model.records > 0 && model.unpricedRecords >= model.records;
 }
 
+export interface FoldedModels {
+  /** Models worth their own row, in the order given. */
+  readonly major: readonly ModelTotals[];
+  /** The rest, in the order given, for one expandable "Other" row. Empty or at least two. */
+  readonly minor: readonly ModelTotals[];
+}
+
+/**
+ * Splits ranked models into the few that matter (a 1% share or more, five at
+ * most) and the long tail. Shares are of `metric`; an unpriced model has no
+ * cost share, so it folds under cost. The top model always stays, and a tail
+ * of one stays too, since an "Other" row for it would save nothing.
+ */
+export function foldMinorModels(
+  models: readonly ModelTotals[],
+  metric: "cost" | "tokens",
+): FoldedModels {
+  const share = (model: ModelTotals) =>
+    metric === "tokens" ? model.tokenShare : isModelCostUnknown(model) ? 0 : model.costShare;
+  const major: ModelTotals[] = [];
+  const minor: ModelTotals[] = [];
+  for (const model of models) {
+    if (major.length === 0 || (major.length < 5 && share(model) >= 0.01)) major.push(model);
+    else minor.push(model);
+  }
+  return minor.length === 1 ? { major: models, minor: [] } : { major, minor };
+}
+
 export interface DailyTotals {
   readonly day: string;
   readonly costUsd: number;
