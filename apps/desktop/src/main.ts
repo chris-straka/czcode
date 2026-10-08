@@ -125,6 +125,15 @@ const layerDesktopSshEnvironment = Layer.unwrap(
   }),
 );
 
+// electron-updater can't update the unsigned Mac build; it has its own updater.
+const layerUpdater = Layer.unwrap(
+  Effect.gen(function* () {
+    return (yield* HostProcessPlatform) === "darwin"
+      ? MacReleaseUpdater.layer
+      : ElectronUpdater.layer;
+  }),
+);
+
 const layerElectron = Layer.mergeAll(
   ElectronApp.layer,
   ElectronDialog.layer,
@@ -134,8 +143,7 @@ const layerElectron = Layer.mergeAll(
   ElectronSafeStorage.layer,
   ElectronShell.layer,
   ElectronTheme.layer,
-  // electron-updater can't update the unsigned Mac build; it has its own updater.
-  process.platform === "darwin" ? MacReleaseUpdater.layer : ElectronUpdater.layer,
+  layerUpdater,
   ElectronWindow.layer,
   DesktopIpc.layer(Electron.ipcMain),
 );

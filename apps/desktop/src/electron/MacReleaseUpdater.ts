@@ -7,14 +7,14 @@
  * from a detached script after the app quits, either to restart into the
  * update or on an ordinary quit.
  */
-import * as ChildProcess from "node:child_process";
-import * as Crypto from "node:crypto";
-import { EventEmitter } from "node:events";
-import * as FS from "node:fs";
-import * as FSP from "node:fs/promises";
-import * as OS from "node:os";
-import * as Path from "node:path";
-import { promisify } from "node:util";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeCrypto from "node:crypto";
+import * as NodeEvents from "node:events";
+import * as NodeFS from "node:fs";
+import * as NodeFSP from "node:fs/promises";
+import * as NodeOS from "node:os";
+import * as NodePath from "node:path";
+import * as NodeUtil from "node:util";
 
 import * as Electron from "electron";
 import * as Effect from "effect/Effect";
@@ -35,12 +35,12 @@ import {
   ElectronUpdaterQuitAndInstallError,
 } from "./ElectronUpdater.ts";
 
-const execFile = promisify(ChildProcess.execFile);
+const execFile = NodeUtil.promisify(NodeChildProcess.execFile);
 const FETCH_TIMEOUT_MS = 30_000;
 
 function readFeedRepository(): string | null {
   try {
-    const yml = FS.readFileSync(Path.join(process.resourcesPath, "app-update.yml"), "utf8");
+    const yml = NodeFS.readFileSync(NodePath.join(process.resourcesPath, "app-update.yml"), "utf8");
     const owner = /^owner:\s*(\S+)/m.exec(yml)?.[1];
     const repo = /^repo:\s*(\S+)/m.exec(yml)?.[1];
     return owner && repo ? `${owner}/${repo}` : null;
@@ -67,11 +67,11 @@ async function fetchOk(url: string, accept: string): Promise<Response> {
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = Effect.sync(() => {
-  const events = new EventEmitter();
+  const events = new NodeEvents.EventEmitter();
   // .../czcode.app/Contents/MacOS/czcode -> .../czcode.app
-  const bundlePath = Path.resolve(Electron.app.getPath("exe"), "../../..");
-  const stagingDir = Path.join(Path.dirname(bundlePath), ".czcode-update");
-  const failureFile = Path.join(Electron.app.getPath("userData"), "update-failed.txt");
+  const bundlePath = NodePath.resolve(Electron.app.getPath("exe"), "../../..");
+  const stagingDir = NodePath.join(NodePath.dirname(bundlePath), ".czcode-update");
+  const failureFile = NodePath.join(Electron.app.getPath("userData"), "update-failed.txt");
 
   let latest: MacRelease | null = null;
   let staged: { readonly version: string; readonly appPath: string } | null = null;
@@ -84,7 +84,7 @@ export const make = Effect.sync(() => {
   const startSwap = (relaunch: boolean) => {
     if (swapStarted || !staged) return;
     swapStarted = true;
-    ChildProcess.spawn(
+    NodeChildProcess.spawn(
       "/bin/sh",
       [
         "-c",
@@ -107,11 +107,11 @@ export const make = Effect.sync(() => {
     );
     if (!expected) throw new MacUpdateError("The update's checksum file is unreadable.");
 
-    const zipPath = Path.join(OS.tmpdir(), `czcode-${release.version}.zip`);
+    const zipPath = NodePath.join(NodeOS.tmpdir(), `czcode-${release.version}.zip`);
     const response = await fetchOk(release.zipUrl, "application/octet-stream");
     const total = Number(response.headers.get("content-length")) || release.zipSize;
-    const hash = Crypto.createHash("sha256");
-    const file = FS.createWriteStream(zipPath);
+    const hash = NodeCrypto.createHash("sha256");
+    const file = NodeFS.createWriteStream(zipPath);
     let received = 0;
     try {
       for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
@@ -131,20 +131,20 @@ export const make = Effect.sync(() => {
         throw new MacUpdateError("The downloaded update didn't match its checksum.");
       }
       try {
-        await FSP.rm(stagingDir, { recursive: true, force: true });
-        await FSP.mkdir(stagingDir);
+        await NodeFSP.rm(stagingDir, { recursive: true, force: true });
+        await NodeFSP.mkdir(stagingDir);
       } catch (cause) {
         throw new MacUpdateError(
-          `czcode can't write to ${Path.dirname(bundlePath)}, so it can't update itself.`,
+          `czcode can't write to ${NodePath.dirname(bundlePath)}, so it can't update itself.`,
           { cause },
         );
       }
       await execFile("ditto", ["-x", "-k", zipPath, stagingDir]).catch((cause: unknown) => {
         throw new MacUpdateError("The downloaded update couldn't be unpacked.", { cause });
       });
-      const appName = (await FSP.readdir(stagingDir)).find((name) => name.endsWith(".app"));
-      const appPath = appName ? Path.join(stagingDir, appName) : null;
-      if (!appPath || !FS.existsSync(Path.join(appPath, "Contents/MacOS"))) {
+      const appName = (await NodeFSP.readdir(stagingDir)).find((name) => name.endsWith(".app"));
+      const appPath = appName ? NodePath.join(stagingDir, appName) : null;
+      if (!appPath || !NodeFS.existsSync(NodePath.join(appPath, "Contents/MacOS"))) {
         throw new MacUpdateError("The downloaded update has no app in it.");
       }
       // curl-style downloads aren't quarantined, but be sure: a quarantined
@@ -153,10 +153,10 @@ export const make = Effect.sync(() => {
       staged = { version: release.version, appPath };
       events.emit("update-downloaded", { version: release.version });
     } catch (error) {
-      await FSP.rm(stagingDir, { recursive: true, force: true }).catch(() => undefined);
+      await NodeFSP.rm(stagingDir, { recursive: true, force: true }).catch(() => undefined);
       throw error;
     } finally {
-      await FSP.rm(zipPath, { force: true }).catch(() => undefined);
+      await NodeFSP.rm(zipPath, { force: true }).catch(() => undefined);
     }
   };
 
@@ -172,9 +172,9 @@ export const make = Effect.sync(() => {
   };
 
   const check = async () => {
-    const failure = await FSP.readFile(failureFile, "utf8").catch(() => null);
+    const failure = await NodeFSP.readFile(failureFile, "utf8").catch(() => null);
     if (failure !== null) {
-      await FSP.rm(failureFile, { force: true });
+      await NodeFSP.rm(failureFile, { force: true });
       autoDownload = false;
       throw new MacUpdateError(failure.trim() || "The last update couldn't be installed.");
     }
@@ -225,7 +225,7 @@ export const make = Effect.sync(() => {
     quitAndInstall: ({ isSilent, isForceRunAfter }) =>
       Effect.try({
         try: () => {
-          if (!staged || !FS.existsSync(staged.appPath)) {
+          if (!staged || !NodeFS.existsSync(staged.appPath)) {
             staged = null;
             throw new MacUpdateError("The downloaded update is gone; check for updates again.");
           }
