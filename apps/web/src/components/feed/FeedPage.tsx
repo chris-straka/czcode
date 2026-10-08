@@ -4,14 +4,19 @@ import {
   VERDICT_BUTTONS,
   optionMedia,
 } from "@cz/client-runtime/decisions/draft";
-import { filterChips } from "@cz/client-runtime/decisions/feed";
 import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
-import { buildOneFeed, feedFolderLabel } from "@cz/client-runtime/decisions/oneFeed";
+import {
+  buildOneFeed,
+  type FeedProjectGroup,
+  feedFolderLabel,
+  feedProjectGroup,
+  feedProjectKey,
+} from "@cz/client-runtime/decisions/oneFeed";
 import type { EnvironmentThreadShell } from "@cz/client-runtime/state/models";
-import type { DecisionAnswerInput, DecisionMediaRef, DecisionProjectBlurb } from "@cz/contracts";
+import type { DecisionAnswerInput, DecisionMediaRef } from "@cz/contracts";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { CheckIcon, InboxIcon, PencilIcon } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useFeedFilterStore } from "~/feedFilterStore";
 import { cn } from "~/lib/utils";
@@ -41,9 +46,10 @@ import { Input } from "../ui/input";
 import { Skeleton } from "../ui/skeleton";
 import { toastManager } from "../ui/toast";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { FeedModal } from "./FeedModal";
-import { FeedMeta, FeedThreadCard, FeedThreadRow, feedThreadStatus } from "./FeedThreadCard";
+import { FeedMeta, FeedThreadCard } from "./FeedThreadCard";
+import { FeedGroupToggle, type FeedProjectChoice, FeedProjectsMenu } from "./FeedFilters";
+import { FeedThreadGroups } from "./FeedThreadGroups";
 import { FeedTopBar } from "./FeedTopBar";
 import { MorningBriefCard } from "./MorningBriefCard";
 
@@ -66,10 +72,8 @@ function ageLabel(createdAt: number, now: number): string {
   return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`;
 }
 
-/** How many thread digests (result excerpt, folder) the feed reads at once. */
-const DIGEST_PAGE = 60;
-/** Thread rows shown at first and per "Show more"; the list can run to hundreds. */
-const ROW_PAGE = 40;
+/** How many threads' digests (summary line, folder) the feed reads: the most recent ones. */
+const DIGEST_LIMIT = 200;
 
 /**
  * The one feed (layout A): a slim top bar, then one column. Threads and
@@ -90,11 +94,9 @@ export function FeedPage() {
   const answerCommand = useAtomCommand(decisionEnvironment.answer, "answer decision");
   const uploadCommand = useAtomCommand(decisionEnvironment.upload, "upload decision media");
   const selectedProjects = useFeedFilterStore((state) => state.projects);
-  const kinds = useFeedFilterStore((state) => state.kinds);
-  const setProjects = useFeedFilterStore((state) => state.setProjects);
-  const setKinds = useFeedFilterStore((state) => state.setKinds);
-  const [tab, setTab] = useState<"open" | "answered">("open");
-  const [rowLimit, setRowLimit] = useState(ROW_PAGE);
+  const group = useFeedFilterStore((state) => state.group);
+  const [tabChoice, setTab] = useState<"needs" | "threads" | null>(null);
+  const [showAnswered, setShowAnswered] = useState(false);
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
   });
@@ -139,9 +141,8 @@ export function FeedPage() {
     [projects],
   );
 
-  // Chips come from what this machine filter and device could show, so a
-  // chip never leads to an empty feed.
-  // The Morning brief reads the same set: the whole night, not just the picked chips.
+  // What this machine filter and device could show, whatever projects are
+  // picked: the project menu offers these, and the Morning brief reads them.
   const reachable = useMemo(
     () =>
       buildOneFeed({
@@ -154,9 +155,65 @@ export function FeedPage() {
       }).flatMap((card) => (card.kind === "decision" ? [card.decision] : [])),
     [feed.entries, filtered.filter.machine, filtered.filter.device],
   );
-  const chips = useMemo(() => filterChips(reachable.map((entry) => entry.item)), [reachable]);
-
   const machine = filtered.filter.machine;
+  // Every listed thread, with the folder it works in: its project and group.
+  const listedThreads = useMemo(
+    () =>
+      threads.filter(
+        (thread) =>
+          thread.archivedAt === null &&
+          thread.deletedAt === null &&
+          thread.lineage.relationshipToParent !== "subagent" &&
+          (machine.type === "all" || thread.environmentId === machine.environmentId),
+      ),
+    [threads, machine],
+  );
+  const digests = useThreadDigests(
+    useMemo(
+      () =>
+        [...listedThreads]
+          .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+          .slice(0, DIGEST_LIMIT),
+      [listedThreads],
+    ),
+  );
+  const folderOf = useCallback(
+    (thread: EnvironmentThreadShell) =>
+      feedFolderLabel(
+        projectById.get(`${thread.environmentId}:${thread.projectId}`)?.title ?? "",
+        digests.get(`${thread.environmentId}:${thread.id}`)?.workingSubpath,
+      ),
+    [projectById, digests],
+  );
+  const threadGroupOf = useCallback(
+    (thread: EnvironmentThreadShell) =>
+      feedProjectGroup(
+        `${projectById.get(`${thread.environmentId}:${thread.projectId}`)?.workspaceRoot ?? ""}/${folderOf(thread)}`,
+      ),
+    [projectById, folderOf],
+  );
+  const groupOf = useMemo(() => {
+    const fromThreads = new Map(
+      listedThreads.map((thread) => [feedProjectKey(folderOf(thread)), threadGroupOf(thread)]),
+    );
+    return (project: string): FeedProjectGroup =>
+      blurbs.get(project)?.group ?? fromThreads.get(project) ?? "software";
+  }, [listedThreads, folderOf, threadGroupOf, blurbs]);
+  const projectChoices = useMemo((): FeedProjectChoice[] => {
+    const names = new Set([
+      ...reachable.map((entry) => entry.item.project),
+      ...listedThreads.map((thread) => feedProjectKey(folderOf(thread))),
+    ]);
+    return [...names]
+      .filter((name) => name !== "")
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({
+        name,
+        group: groupOf(name),
+        description: blurbs.get(name)?.description ?? null,
+      }));
+  }, [reachable, listedThreads, folderOf, groupOf, blurbs]);
+
   const shownMachineIds = useMemo(
     () => (machine.type === "all" ? [...presentationById.keys()] : [machine.environmentId]),
     [machine, presentationById],
@@ -192,17 +249,39 @@ export function FeedPage() {
         decisions: feed.entries.filter(
           (entry) => !pending.has(entryKey(entry)) && !sent.has(entryKey(entry)),
         ),
-        filter: filtered.filter,
+        filter: {
+          ...filtered.filter,
+          ...(group ? { groupOf } : {}),
+          threadProject: (thread) => feedProjectKey(folderOf(thread as EnvironmentThreadShell)),
+        },
       }),
-    [threads, feed.entries, filtered.filter, pending, sent],
+    [threads, feed.entries, filtered.filter, pending, sent, group, groupOf, folderOf],
   );
   const needsYou = cards.filter((card) => card.needsYou);
-  const rest = cards.filter((card) => !card.needsYou);
-  const rows = rest.slice(0, rowLimit);
-  const shownThreads = [...needsYou, ...rows]
-    .flatMap((card) => (card.kind === "thread" ? [card.thread] : []))
-    .slice(0, DIGEST_PAGE);
-  const digests = useThreadDigests(shownThreads);
+  const waitingThreads = useMemo(
+    () =>
+      new Set(
+        needsYou.flatMap((card) =>
+          card.kind === "thread" ? [`${card.thread.environmentId}:${card.thread.id}`] : [],
+        ),
+      ),
+    [needsYou],
+  );
+  // The Threads tab: every listed thread under the picked projects and group.
+  const groupedThreads = listedThreads.filter((thread) => {
+    const project = feedProjectKey(folderOf(thread));
+    return (
+      (selectedProjects.length === 0 || selectedProjects.includes(project)) &&
+      (group === null || threadGroupOf(thread) === group)
+    );
+  });
+  const tab = tabChoice ?? (needsYou.length > 0 ? "needs" : "threads");
+  const answeredShown = answered.entries.filter(
+    (entry) =>
+      (machine.type === "all" || entry.environmentId === machine.environmentId) &&
+      (selectedProjects.length === 0 || selectedProjects.includes(entry.item.project)) &&
+      (group === null || groupOf(entry.item.project) === group),
+  );
 
   // Decisions in feed order, for Review all and the modal's position.
   const visible = useMemo(
@@ -291,9 +370,11 @@ export function FeedPage() {
   const threadPlacement = (thread: EnvironmentThreadShell) => {
     const project = projectById.get(`${thread.environmentId}:${thread.projectId}`);
     const digest = digests.get(`${thread.environmentId}:${thread.id}`);
+    const folder = feedFolderLabel(project?.title ?? "", digest?.workingSubpath);
     return {
       machine: machineLabel(thread.environmentId),
-      folder: feedFolderLabel(project?.title ?? "", digest?.workingSubpath),
+      folder,
+      project: feedProjectKey(folder),
       excerpt: digest?.excerpt ?? null,
       age: ageLabel(Date.parse(thread.updatedAt), now),
     };
@@ -309,6 +390,13 @@ export function FeedPage() {
     />
   );
 
+  const filters = (
+    <>
+      <FeedGroupToggle />
+      <FeedProjectsMenu projects={projectChoices} />
+    </>
+  );
+
   return (
     <div className="flex h-dvh min-h-0 min-w-0 flex-1 flex-col bg-background" data-feed-page="">
       <FeedTopBar
@@ -317,12 +405,35 @@ export function FeedPage() {
         onReviewAll={() => {
           if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
         }}
+        filters={filters}
       />
       {/* The page never scrolls sideways; only the chip row does. */}
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4">
           <SidebarUpdateArchitectureWarning />
-          {briefDay && brief ? (
+          <ToggleGroup
+            aria-label="Feed"
+            value={[tab]}
+            onValueChange={(value) => {
+              const next = value[0];
+              if (next === "needs" || next === "threads") setTab(next);
+            }}
+          >
+            <Toggle size="sm" value="needs">
+              Needs you
+              <span className="tabular-nums text-warning-foreground">{needsYou.length}</span>
+            </Toggle>
+            <Toggle size="sm" value="threads">
+              Threads
+              <span className="tabular-nums text-muted-foreground">{groupedThreads.length}</span>
+            </Toggle>
+          </ToggleGroup>
+          {/* Beside the search bar on wider screens; here on a phone. */}
+          <div className="flex flex-wrap items-center gap-1.5 md:hidden">{filters}</div>
+          {selectedBlurbs.map(({ project, description }) => (
+            <ProjectBlurbLine key={project} project={project} description={description} />
+          ))}
+          {tab === "needs" && briefDay && brief ? (
             <MorningBriefCard
               day={briefDay.day}
               brief={brief}
@@ -336,63 +447,47 @@ export function FeedPage() {
               }}
             />
           ) : null}
-          <div className="flex items-center gap-2">
-            <ToggleGroup
-              value={[tab]}
-              onValueChange={(value) => setTab((value[0] as "open" | "answered") ?? "open")}
-            >
-              <Toggle size="sm" value="open">
-                Feed
-              </Toggle>
-              <Toggle size="sm" value="answered">
-                Answered
-              </Toggle>
-            </ToggleGroup>
-          </div>
-          {tab === "open" && chips.projects.length + chips.kinds.length > 1 ? (
-            <ChipRow
-              projects={chips.projects}
-              kinds={chips.kinds}
-              selectedProjects={selectedProjects}
-              selectedKinds={kinds}
-              blurbs={blurbs}
-              onProjects={setProjects}
-              onKinds={setKinds}
-            />
-          ) : null}
-          {tab === "open"
-            ? selectedBlurbs.map(({ project, description }) => (
-                <ProjectBlurbLine key={project} project={project} description={description} />
-              ))
-            : null}
 
-          {tab === "answered" ? (
-            <AnsweredList feed={answered} now={now} />
+          {tab === "threads" ? (
+            groupedThreads.length === 0 ? (
+              projects.length === 0 ? (
+                <NoProjectsHero />
+              ) : (
+                <p className="py-8 text-center text-sm text-muted-foreground">No threads here.</p>
+              )
+            ) : (
+              <FeedThreadGroups
+                threads={groupedThreads}
+                place={threadPlacement}
+                needsYou={(thread) =>
+                  waitingThreads.has(`${thread.environmentId}:${thread.id}`) ||
+                  thread.hasPendingApprovals ||
+                  thread.hasPendingUserInput
+                }
+                now={now}
+              />
+            )
           ) : feed.isPending && threads.length === 0 ? (
             <>
               <Skeleton className="h-28 w-full" />
               <Skeleton className="h-28 w-full" />
             </>
-          ) : cards.length === 0 && pending.size === 0 ? (
-            projects.length === 0 ? (
-              <NoProjectsHero />
-            ) : (
-              <Empty className="min-h-64">
-                <EmptyMedia variant="icon">
-                  <InboxIcon />
-                </EmptyMedia>
-                <EmptyHeader>
-                  <EmptyTitle>All clear</EmptyTitle>
-                  <EmptyDescription>Threads and agents' questions show up here.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )
           ) : (
             <>
-              {needsYou.length > 0 ? (
-                <h2 className="pt-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                  Needs you <span className="text-warning-foreground">{needsYou.length}</span>
-                </h2>
+              {needsYou.length === 0 && pending.size === 0 ? (
+                projects.length === 0 ? (
+                  <NoProjectsHero />
+                ) : (
+                  <Empty className="min-h-48">
+                    <EmptyMedia variant="icon">
+                      <InboxIcon />
+                    </EmptyMedia>
+                    <EmptyHeader>
+                      <EmptyTitle>Nothing needs you</EmptyTitle>
+                      <EmptyDescription>Agents' questions show up here.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                )
               ) : null}
               {needsYou.map((card) => {
                 if (card.kind === "decision") return decisionCard(card.decision);
@@ -410,36 +505,16 @@ export function FeedPage() {
                   </FeedThreadCard>
                 );
               })}
-              {rest.length > 0 ? (
-                <>
-                  <h2 className="pt-3 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    Threads
-                  </h2>
-                  <div className="overflow-hidden rounded-lg border border-border bg-card">
-                    {rows.flatMap((card) =>
-                      card.kind === "thread"
-                        ? [
-                            <FeedThreadRow
-                              key={card.key}
-                              thread={card.thread}
-                              {...threadPlacement(card.thread)}
-                              status={feedThreadStatus(card.thread, false)}
-                            />,
-                          ]
-                        : [],
-                    )}
-                  </div>
-                </>
-              ) : null}
-              {rest.length > rowLimit ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => setRowLimit((limit) => limit + ROW_PAGE)}
-                >
-                  Show {Math.min(ROW_PAGE, rest.length - rowLimit)} more
-                </Button>
+              <Button
+                size="xs"
+                variant="ghost-muted"
+                className="self-start"
+                onClick={() => setShowAnswered((shown) => !shown)}
+              >
+                {showAnswered ? "Hide answered" : `Answered (${answeredShown.length})`}
+              </Button>
+              {showAnswered ? (
+                <AnsweredList feed={{ ...answered, entries: answeredShown }} now={now} />
               ) : null}
             </>
           )}
@@ -482,127 +557,7 @@ export function FeedPage() {
   );
 }
 
-/** A row of chips that scrolls on its own with faded edges, inside the card column. */
-function ScrollingChips({
-  label,
-  children,
-}: {
-  readonly label: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <div
-      aria-label={label}
-      className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 [mask-image:linear-gradient(to_right,transparent,black_1rem,black_calc(100%-1rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      {children}
-    </div>
-  );
-}
-
-/**
- * Project chips in two sections, Games and Software (grouped by where each
- * project's folder lives), each led by a toggle that picks the whole group;
- * then decision kinds. A project chip's tooltip says what the project is.
- */
-function ChipRow(props: {
-  readonly projects: readonly string[];
-  readonly kinds: readonly string[];
-  readonly selectedProjects: readonly string[];
-  readonly selectedKinds: readonly string[];
-  readonly blurbs: ReadonlyMap<string, DecisionProjectBlurb>;
-  readonly onProjects: (projects: string[]) => void;
-  readonly onKinds: (kinds: string[]) => void;
-}) {
-  const groups = (["games", "software"] as const)
-    .map((group) => ({
-      group,
-      label: group === "games" ? "Games" : "Software",
-      projects: props.projects.filter(
-        (project) => (props.blurbs.get(project)?.group ?? "software") === group,
-      ),
-    }))
-    .filter((section) => section.projects.length > 0);
-  const selected = new Set(props.selectedProjects);
-  return (
-    <div className="space-y-2" aria-label="Filters">
-      {groups.map((section) => {
-        const all = section.projects.every((project) => selected.has(project));
-        return (
-          <ScrollingChips key={section.group} label={`${section.label} projects`}>
-            <Toggle
-              size="sm"
-              variant="outline"
-              className="shrink-0"
-              pressed={all}
-              aria-label={`All ${section.label.toLowerCase()} projects`}
-              onPressedChange={(pressed) =>
-                props.onProjects(
-                  pressed
-                    ? [...new Set([...props.selectedProjects, ...section.projects])]
-                    : props.selectedProjects.filter(
-                        (project) => !section.projects.includes(project),
-                      ),
-                )
-              }
-            >
-              {section.label}
-            </Toggle>
-            <ToggleGroup
-              multiple
-              className="shrink-0"
-              value={section.projects.filter((project) => selected.has(project))}
-              onValueChange={(value) =>
-                props.onProjects([
-                  ...props.selectedProjects.filter(
-                    (project) => !section.projects.includes(project),
-                  ),
-                  ...(value as string[]),
-                ])
-              }
-            >
-              {section.projects.map((project) => {
-                const description = props.blurbs.get(project)?.description;
-                return description ? (
-                  <Tooltip key={project}>
-                    <TooltipTrigger render={<Toggle size="sm" value={project} />}>
-                      {project}
-                    </TooltipTrigger>
-                    <TooltipPopup side="bottom" className="max-w-xs">
-                      {description}
-                    </TooltipPopup>
-                  </Tooltip>
-                ) : (
-                  <Toggle key={project} size="sm" value={project}>
-                    {project}
-                  </Toggle>
-                );
-              })}
-            </ToggleGroup>
-          </ScrollingChips>
-        );
-      })}
-      {props.kinds.length > 1 ? (
-        <ScrollingChips label="Kinds">
-          <ToggleGroup
-            multiple
-            className="shrink-0"
-            value={[...props.selectedKinds]}
-            onValueChange={(value) => props.onKinds(value as string[])}
-          >
-            {props.kinds.map((kind) => (
-              <Toggle key={kind} size="sm" value={kind}>
-                {kind}
-              </Toggle>
-            ))}
-          </ToggleGroup>
-        </ScrollingChips>
-      ) : null}
-    </div>
-  );
-}
-
-/** "courtroom: trial adventure…" under the chips, with the owner's own line editable. */
+/** "courtroom: trial adventure…" under the tabs for a picked project, with the owner's own line editable. */
 function ProjectBlurbLine({
   project,
   description,

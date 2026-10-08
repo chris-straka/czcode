@@ -1,10 +1,10 @@
 /**
- * What the feed shows: which machines, and which decision projects and
- * kinds. The inbox badge reads the same filter, so every count agrees with
- * the cards on screen. The machine choice and "show phone items" persist;
- * chips reset per session.
+ * What the feed shows: which machines, games or software, and which
+ * projects. The inbox badge reads the same filter, so every count agrees
+ * with the cards on screen. The machine, group, and "show phone items"
+ * persist; picked projects reset per session.
  */
-import type { MachineFilter } from "@cz/client-runtime/decisions/oneFeed";
+import type { FeedProjectGroup, MachineFilter } from "@cz/client-runtime/decisions/oneFeed";
 import type { EnvironmentId } from "@cz/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -16,6 +16,9 @@ interface FeedFilterState {
   readonly machine: MachineFilter | null;
   readonly projects: ReadonlyArray<string>;
   readonly kinds: ReadonlyArray<string>;
+  /** Games or software only; null shows both. */
+  readonly group: FeedProjectGroup | null;
+  readonly setGroup: (group: FeedProjectGroup | null) => void;
   /** Desktop only: phone playtests and other phone items stay hidden unless this is on. */
   readonly showPhoneItems: boolean;
   readonly setShowPhoneItems: (show: boolean) => void;
@@ -30,6 +33,8 @@ export const useFeedFilterStore = create<FeedFilterState>()(
       machine: null,
       projects: [],
       kinds: [],
+      group: null,
+      setGroup: (group) => set({ group }),
       showPhoneItems: false,
       setShowPhoneItems: (showPhoneItems) => set({ showPhoneItems }),
       setMachine: (machine) => set({ machine }),
@@ -41,7 +46,11 @@ export const useFeedFilterStore = create<FeedFilterState>()(
       storage: createJSONStorage(() =>
         resolveStorage(typeof window !== "undefined" ? window.localStorage : undefined),
       ),
-      partialize: (state) => ({ machine: state.machine, showPhoneItems: state.showPhoneItems }),
+      partialize: (state) => ({
+        machine: state.machine,
+        group: state.group,
+        showPhoneItems: state.showPhoneItems,
+      }),
     },
   ),
 );

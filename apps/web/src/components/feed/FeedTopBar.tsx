@@ -199,10 +199,13 @@ export function FeedTopBar({
   badge,
   reviewing,
   onReviewAll,
+  filters,
 }: {
   readonly badge: number;
   readonly reviewing: boolean;
   readonly onReviewAll: () => void;
+  /** Games/software and project filters, beside the search bar. */
+  readonly filters?: ReactNode;
 }) {
   const navigate = useNavigate();
   const pullRequestsSupported = usePullRequestsSupported();
@@ -218,6 +221,7 @@ export function FeedTopBar({
         <SearchIcon />
         <span className="truncate">Search</span>
       </Button>
+      {filters ? <div className="flex items-center gap-1.5 max-md:hidden">{filters}</div> : null}
       <span className="flex-1 max-sm:hidden" />
       <TopBarButton
         label="New thread"

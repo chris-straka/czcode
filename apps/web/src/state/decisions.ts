@@ -150,14 +150,17 @@ export function useProjectBlurbs(): ReadonlyMap<string, DecisionProjectBlurb> {
 }
 
 /**
- * The feed filter in effect: machine (this one by default), chips, and this
- * device's kind. Pages and badges read it so their counts agree.
+ * The feed filter in effect: machine (this one by default), games or
+ * software, picked projects, and this device's kind. Pages and badges read
+ * it so their counts agree.
  */
 function useFeedFilter(): OneFeedFilter {
   const machine = useFeedFilterStore((state) => state.machine);
   const projects = useFeedFilterStore((state) => state.projects);
   const kinds = useFeedFilterStore((state) => state.kinds);
   const showPhoneItems = useFeedFilterStore((state) => state.showPhoneItems);
+  const group = useFeedFilterStore((state) => state.group);
+  const blurbs = useProjectBlurbs();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const phone = useMediaQuery("(pointer: coarse) and (max-width: 640px)");
   return useMemo(
@@ -165,6 +168,12 @@ function useFeedFilter(): OneFeedFilter {
       machine: resolveMachineFilter(machine, primaryEnvironmentId),
       projects: new Set(projects),
       kinds: new Set(kinds),
+      ...(group
+        ? {
+            group,
+            groupOf: (project: string) => blurbs.get(project)?.group ?? "software",
+          }
+        : {}),
       // On the desktop, phone items (Android playtests) stay out unless asked for.
       ...(phone
         ? { device: "phone" as const }
@@ -172,7 +181,7 @@ function useFeedFilter(): OneFeedFilter {
           ? {}
           : { device: "desktop" as const }),
     }),
-    [machine, projects, kinds, primaryEnvironmentId, phone, showPhoneItems],
+    [machine, projects, kinds, group, blurbs, primaryEnvironmentId, phone, showPhoneItems],
   );
 }
 
