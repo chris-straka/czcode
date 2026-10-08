@@ -261,11 +261,6 @@ export function morningBriefIsEmpty(brief: MorningBrief): boolean {
   );
 }
 
-/** How many threads or jobs a line covers. */
-export function briefLineCount(line: BriefLine): number {
-  return line.threads.length + line.jobs.length;
-}
-
 const startOfDay = (at: number, timeZone: DateTime.TimeZone) =>
   DateTime.toEpochMillis(DateTime.startOf(DateTime.makeZonedUnsafe(at, { timeZone }), "day"));
 
