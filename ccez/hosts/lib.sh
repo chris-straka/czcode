@@ -48,3 +48,26 @@ PY
   done
   return 1
 }
+
+# in_use <folder> [<repo> <tools regex>]: why the folder is in use, or nothing.
+# In use means a process works inside it or has a file in it open or mapped
+# (under its real path too, when it's a symlink), or a build tool matching
+# the regex runs in the repo.
+in_use() {
+  local dir=$1 repo=${2:-} tools=${3:-} real proc cwd
+  real=$(readlink -f "$dir")
+  for proc in /proc/[0-9]*; do
+    [ -O "$proc" ] || continue
+    cwd="$(readlink "$proc/cwd" 2> /dev/null)/"
+    if [[ "$cwd" == "$dir/"* || "$cwd" == "$real/"* ]] ||
+      find "$proc/fd" \( -lname "$dir/*" -o -lname "$real/*" \) 2> /dev/null | grep -q . ||
+      grep -qF -e " $dir/" -e " $real/" "$proc/maps" 2> /dev/null; then
+      echo "$(cat "$proc/comm" 2> /dev/null) (pid ${proc#/proc/})"
+      return
+    fi
+    if [ -n "$repo" ] && [[ "$cwd" == "$repo/"* ]] && grep -qxE "$tools" "$proc/comm" 2> /dev/null; then
+      echo "$(cat "$proc/comm") (pid ${proc#/proc/}) running in its repo"
+      return
+    fi
+  done
+}
