@@ -5,7 +5,8 @@ asleep, or unreachable, its CPU, memory, swap (with what zram costs in RAM), and
 each disk, and the agents working there right now with what each is doing and for how long.
 Totals for the whole fleet sit at the top.
 
-Open it from the sidebar or the command palette (**Open fleet**) on web and desktop, the
+Open it from the machine menu at the left of the feed's top bar (**Machines**) or the command
+palette (**Open fleet**) on web and desktop, the
 server-rack button on the phone's thread list, or tab 5 in the terminal app (`cz tui`).
 
 - A machine that is low on disk (under 10% free, or under 10 GB on a large disk), memory, or swap
@@ -17,3 +18,7 @@ server-rack button on the phone's thread list, or tab 5 in the terminal app (`cz
 - Open an agent's thread from its row, or stop it there.
 
 Readings refresh every few seconds while Fleet is open and the app is in front.
+
+The machine menu shows a small load meter beside each machine: bars for CPU, memory, swap, and
+the fullest disk, then how many agents are running. Hover it for the numbers. The machine the feed
+shows carries the same meter in the top bar.

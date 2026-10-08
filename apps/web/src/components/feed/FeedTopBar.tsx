@@ -12,7 +12,8 @@ import {
   SettingsIcon,
   SquarePenIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useAtomValue } from "@effect/atom-react";
+import { type ReactNode, useState } from "react";
 
 import { openCommandPalette } from "~/commandPaletteBus";
 import { isElectron } from "~/env";
@@ -22,6 +23,7 @@ import {
   usePrimaryEnvironmentId,
   usePullRequestsSupported,
 } from "~/state/environments";
+import { fleetAtom, MachineLoadMeter, useLiveHostResources } from "../fleet/MachineLoad";
 import { SchedulesFailureDot } from "../schedules/SchedulesPage";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
@@ -30,6 +32,7 @@ import { Button } from "../ui/button";
 import {
   Menu,
   MenuCheckboxItem,
+  MenuItem,
   MenuPopup,
   MenuRadioGroup,
   MenuRadioItem,
@@ -61,8 +64,19 @@ function TopBarButton({
   );
 }
 
-/** Which machines the feed shows: this one (the default), another, or all. */
+/** How often the machine filter's load meters refresh: open menu, and the shown machine. */
+const LOAD_REFRESH_OPEN_MS = 3_000;
+const LOAD_REFRESH_CLOSED_MS = 30_000;
+
+/**
+ * Which machines the feed shows: this one (the default), another, or all.
+ * Each machine carries a small load meter (CPU, RAM, swap, disk, agents),
+ * live while the menu is open; Machines opens the full Fleet view.
+ */
 function MachineFilterMenu() {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const machines = useAtomValue(fleetAtom);
   const machine = useFeedFilterStore((state) => state.machine);
   const setMachine = useFeedFilterStore((state) => state.setMachine);
   const showPhoneItems = useFeedFilterStore((state) => state.showPhoneItems);
@@ -73,8 +87,20 @@ function MachineFilterMenu() {
   const label = (environmentId: EnvironmentId) =>
     environments.find((environment) => environment.environmentId === environmentId)?.label ?? "";
   const value = resolved.type === "all" ? "all" : resolved.environmentId;
+  const machineOf = (environmentId: EnvironmentId) =>
+    machines.find((machine) => machine.environmentId === environmentId);
+  const shownMachine = resolved.type === "one" ? machineOf(resolved.environmentId) : undefined;
+  const awakeIds = machines
+    .filter((machine) => machine.state === "awake")
+    .map((machine) => machine.environmentId);
+  useLiveHostResources(awakeIds, LOAD_REFRESH_OPEN_MS, open);
+  useLiveHostResources(
+    shownMachine?.state === "awake" ? [shownMachine.environmentId] : [],
+    LOAD_REFRESH_CLOSED_MS,
+    !open,
+  );
   return (
-    <Menu>
+    <Menu open={open} onOpenChange={setOpen}>
       <MenuTrigger
         render={<Button size="sm" variant="outline" aria-label="Machines shown in the feed" />}
       >
@@ -84,6 +110,11 @@ function MachineFilterMenu() {
             ? "All machines"
             : shortMachineLabel(label(resolved.environmentId))}
         </span>
+        {shownMachine ? (
+          <span className="max-sm:hidden">
+            <MachineLoadMeter machine={shownMachine} />
+          </span>
+        ) : null}
         <ChevronDownIcon />
       </MenuTrigger>
       <MenuPopup align="start">
@@ -101,8 +132,15 @@ function MachineFilterMenu() {
         >
           {environments.map((environment) => (
             <MenuRadioItem key={environment.environmentId} value={environment.environmentId}>
-              {environment.label}
-              {environment.environmentId === primaryEnvironmentId ? " (this machine)" : ""}
+              <span className="flex items-center gap-4">
+                <span className="min-w-0 flex-1 truncate">
+                  {environment.label}
+                  {environment.environmentId === primaryEnvironmentId ? " (this machine)" : ""}
+                </span>
+                {machineOf(environment.environmentId) ? (
+                  <MachineLoadMeter machine={machineOf(environment.environmentId)!} />
+                ) : null}
+              </span>
             </MenuRadioItem>
           ))}
           <MenuSeparator />
@@ -112,6 +150,11 @@ function MachineFilterMenu() {
         <MenuCheckboxItem checked={showPhoneItems} onCheckedChange={setShowPhoneItems}>
           Show phone items
         </MenuCheckboxItem>
+        <MenuSeparator />
+        <MenuItem onClick={() => void navigate({ to: "/fleet" })}>
+          <MonitorIcon />
+          Machines
+        </MenuItem>
       </MenuPopup>
     </Menu>
   );
