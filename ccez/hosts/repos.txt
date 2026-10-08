@@ -106,6 +106,15 @@ SWE/ccez-keeps                        chris-straka/ccez-keeps
 SWE/ccez-llm                          chris-straka/ccez-llm
 SWE/czcode                            chris-straka/czcode
 SWE/forgeshop                         chris-straka/forgeshop
+SWE/games/back-then                    chris-straka/back-then
+SWE/games/bell-town                    chris-straka/bell-town
+SWE/games/false-stars                  chris-straka/false-stars
+SWE/games/grammarye                    chris-straka/grammarye
+SWE/games/kite-isles                   chris-straka/kite-isles
+SWE/games/last-road                    chris-straka/last-road
+SWE/games/low-tide                     chris-straka/low-tide
+SWE/games/undertow                     chris-straka/undertow
+SWE/games/whirling-sand-sanctum        chris-straka/whirling-sand-sanctum
 SWE/games/blackout                    chris-straka/blackout
 SWE/games/courtroom                   chris-straka/courtroom
 SWE/games/dead-letters                chris-straka/dead-letters
