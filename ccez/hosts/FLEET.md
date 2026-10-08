@@ -13,7 +13,8 @@ SSH as `<user>@<name>`. `hosts.txt` is the machine-readable list the jobs and
 `pick-host.sh` read.
 
 - **`z`**: Mac mini M4, 16 GB. The owner's desk: Blender, iOS builds, playing
-  Mac builds. Runs the czcode desktop app, which its own session rebuilds.
+  Mac builds. Runs the czcode desktop app, which updates itself from the
+  Mac build CI publishes for every push to main (`ccez/release/`).
   One or two agent tasks at most, and none by day; no SSH server (Tailscale
   from the App Store), so nothing logs in to it.
 - **`f-ms-7917`** (user `f`): i7-4790K, 8 threads, 32 GB, GTX 970. Ubuntu
