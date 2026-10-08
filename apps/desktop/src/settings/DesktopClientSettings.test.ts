@@ -1,5 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 import { ClientSettingsSchema, DEFAULT_CLIENT_SETTINGS, type ClientSettings } from "@cz/contracts";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -145,32 +146,35 @@ describe("DesktopClientSettings", () => {
     ),
   );
 
-  it.effect("saves through a symlinked client settings file without replacing the link", () =>
-    withClientSettings(
-      Effect.gen(function* () {
-        const environment = yield* DesktopEnvironment.DesktopEnvironment;
-        const fileSystem = yield* FileSystem.FileSystem;
-        const settings = yield* DesktopClientSettings.DesktopClientSettings;
-        const dotfiles = yield* fileSystem.makeTempDirectoryScoped({
-          prefix: "cz-desktop-client-settings-dotfiles-",
-        });
-        const linkedSettingsPath = `${dotfiles}/client-settings.json`;
-        yield* fileSystem.writeFileString(linkedSettingsPath, "{}\n");
-        yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
-        yield* fileSystem.symlink(linkedSettingsPath, environment.clientSettingsPath);
+  // Creating symlinks needs elevation on Windows.
+  it.effect.skipIf(HostProcessPlatform.defaultValue() === "win32")(
+    "saves through a symlinked client settings file without replacing the link",
+    () =>
+      withClientSettings(
+        Effect.gen(function* () {
+          const environment = yield* DesktopEnvironment.DesktopEnvironment;
+          const fileSystem = yield* FileSystem.FileSystem;
+          const settings = yield* DesktopClientSettings.DesktopClientSettings;
+          const dotfiles = yield* fileSystem.makeTempDirectoryScoped({
+            prefix: "cz-desktop-client-settings-dotfiles-",
+          });
+          const linkedSettingsPath = `${dotfiles}/client-settings.json`;
+          yield* fileSystem.writeFileString(linkedSettingsPath, "{}\n");
+          yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
+          yield* fileSystem.symlink(linkedSettingsPath, environment.clientSettingsPath);
 
-        yield* settings.set(clientSettings);
+          yield* settings.set(clientSettings);
 
-        assert.equal(
-          yield* fileSystem.readLink(environment.clientSettingsPath),
-          linkedSettingsPath,
-        );
-        assert.deepEqual(
-          yield* decodeClientSettingsJson(yield* fileSystem.readFileString(linkedSettingsPath)),
-          clientSettings,
-        );
-      }),
-    ),
+          assert.equal(
+            yield* fileSystem.readLink(environment.clientSettingsPath),
+            linkedSettingsPath,
+          );
+          assert.deepEqual(
+            yield* decodeClientSettingsJson(yield* fileSystem.readFileString(linkedSettingsPath)),
+            clientSettings,
+          );
+        }),
+      ),
   );
 
   it.effect.each([

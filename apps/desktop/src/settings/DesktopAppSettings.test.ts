@@ -1,5 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -357,32 +358,35 @@ describe("DesktopSettings", () => {
     ),
   );
 
-  it.effect("saves through a symlinked settings file without replacing the link", () =>
-    withSettings(
-      Effect.gen(function* () {
-        const environment = yield* DesktopEnvironment.DesktopEnvironment;
-        const fileSystem = yield* FileSystem.FileSystem;
-        const settings = yield* DesktopAppSettings.DesktopAppSettings;
-        const dotfiles = yield* fileSystem.makeTempDirectoryScoped({
-          prefix: "cz-desktop-settings-dotfiles-",
-        });
-        const linkedSettingsPath = `${dotfiles}/desktop-settings.json`;
-        yield* fileSystem.writeFileString(linkedSettingsPath, "{}\n");
-        yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
-        yield* fileSystem.symlink(linkedSettingsPath, environment.desktopSettingsPath);
+  // Creating symlinks needs elevation on Windows.
+  it.effect.skipIf(HostProcessPlatform.defaultValue() === "win32")(
+    "saves through a symlinked settings file without replacing the link",
+    () =>
+      withSettings(
+        Effect.gen(function* () {
+          const environment = yield* DesktopEnvironment.DesktopEnvironment;
+          const fileSystem = yield* FileSystem.FileSystem;
+          const settings = yield* DesktopAppSettings.DesktopAppSettings;
+          const dotfiles = yield* fileSystem.makeTempDirectoryScoped({
+            prefix: "cz-desktop-settings-dotfiles-",
+          });
+          const linkedSettingsPath = `${dotfiles}/desktop-settings.json`;
+          yield* fileSystem.writeFileString(linkedSettingsPath, "{}\n");
+          yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
+          yield* fileSystem.symlink(linkedSettingsPath, environment.desktopSettingsPath);
 
-        yield* settings.setServerExposureMode("network-accessible");
+          yield* settings.setServerExposureMode("network-accessible");
 
-        assert.equal(
-          yield* fileSystem.readLink(environment.desktopSettingsPath),
-          linkedSettingsPath,
-        );
-        const persisted = yield* decodeDesktopSettingsPatch(
-          yield* fileSystem.readFileString(linkedSettingsPath),
-        );
-        assert.equal(persisted.serverExposureMode, "network-accessible");
-      }),
-    ),
+          assert.equal(
+            yield* fileSystem.readLink(environment.desktopSettingsPath),
+            linkedSettingsPath,
+          );
+          const persisted = yield* decodeDesktopSettingsPatch(
+            yield* fileSystem.readFileString(linkedSettingsPath),
+          );
+          assert.equal(persisted.serverExposureMode, "network-accessible");
+        }),
+      ),
   );
 
   it.effect("migrates legacy implicit update channels to the runtime default", () =>

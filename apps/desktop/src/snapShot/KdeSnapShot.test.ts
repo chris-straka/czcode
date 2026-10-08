@@ -3,6 +3,7 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 
 const execute = vi.hoisted(() => vi.fn());
 const startEffects = vi.hoisted(() => vi.fn());
@@ -86,34 +87,38 @@ it("does not install or request screenshots during initial discovery", async () 
   await expect(NodeFSP.stat(paths.dataHome)).rejects.toMatchObject({ code: "ENOENT" });
 });
 
-it("installs offline at a stable path and verifies permissions using the installed identity", async () => {
-  await setup.perform("install-kde-helper");
-  const { executable, desktop } = kdeCapturePaths(paths);
-  expect(await NodeFSP.readFile(executable, "utf8")).toBe("bundled executable");
-  expect((await NodeFSP.stat(executable)).mode & 0o777).toBe(0o755);
-  expect(await NodeFSP.readFile(desktop, "utf8")).toBe(kdeCaptureDesktopEntry(executable));
-  expect(kdeCaptureDesktopEntry(executable)).toContain(`Exec="${executable}" check`);
-  expect((await setup.state()).status).toBe("ready");
-  expect((await setup.state()).feedbackAvailable).toBe(true);
-  expect(execute.mock.calls.map(([file, args]) => [file, args])).toEqual([
-    ["kbuildsycoca6", ["--noincremental"]],
-    [
-      "systemd-run",
+// Linux compositor helper; checks POSIX execute bits.
+it.skipIf(HostProcessPlatform.defaultValue() === "win32")(
+  "installs offline at a stable path and verifies permissions using the installed identity",
+  async () => {
+    await setup.perform("install-kde-helper");
+    const { executable, desktop } = kdeCapturePaths(paths);
+    expect(await NodeFSP.readFile(executable, "utf8")).toBe("bundled executable");
+    expect((await NodeFSP.stat(executable)).mode & 0o777).toBe(0o755);
+    expect(await NodeFSP.readFile(desktop, "utf8")).toBe(kdeCaptureDesktopEntry(executable));
+    expect(kdeCaptureDesktopEntry(executable)).toContain(`Exec="${executable}" check`);
+    expect((await setup.state()).status).toBe("ready");
+    expect((await setup.state()).feedbackAvailable).toBe(true);
+    expect(execute.mock.calls.map(([file, args]) => [file, args])).toEqual([
+      ["kbuildsycoca6", ["--noincremental"]],
       [
-        "--user",
-        "--quiet",
-        "--wait",
-        "--collect",
-        "--pipe",
-        "--service-type=exec",
-        "kbuildsycoca6",
-        "--noincremental",
+        "systemd-run",
+        [
+          "--user",
+          "--quiet",
+          "--wait",
+          "--collect",
+          "--pipe",
+          "--service-type=exec",
+          "kbuildsycoca6",
+          "--noincremental",
+        ],
       ],
-    ],
-    [executable, ["check"]],
-    [executable, ["check"]],
-  ]);
-});
+      [executable, ["check"]],
+      [executable, ["check"]],
+    ]);
+  },
+);
 
 it("does not mistake installed files for KDE authorization, or fall back to a picker on denial", async () => {
   await setup.perform("install-kde-helper");
