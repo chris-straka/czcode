@@ -5,7 +5,8 @@
  * @module clipboard
  */
 import * as NodeChildProcess from "node:child_process";
-import * as NodeOS from "node:os";
+
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 
 const run = (command: string, args: ReadonlyArray<string>, encoding: "buffer" | "utf8") =>
   new Promise<Buffer | string | null>((resolve) => {
@@ -25,7 +26,7 @@ export function parseAppleScriptData(output: string): Uint8Array | null {
 
 /** PNG bytes of the clipboard's image, or null when it holds none. */
 export async function readClipboardImage(): Promise<Uint8Array | null> {
-  if (NodeOS.platform() === "darwin") {
+  if (HostProcessPlatform.defaultValue() === "darwin") {
     const output = await run("osascript", ["-e", "the clipboard as «class PNGf»"], "utf8");
     return typeof output === "string" ? parseAppleScriptData(output) : null;
   }

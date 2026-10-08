@@ -8,7 +8,7 @@
  */
 import type { OrchestrationV2TurnItem } from "@cz/contracts";
 
-export const TURN_ACTIVITY_MAX_CHARS = 100;
+const TURN_ACTIVITY_MAX_CHARS = 100;
 
 const firstLine = (text: string) =>
   text
@@ -23,10 +23,10 @@ const baseName = (path: string) => path.split(/[\\/]/).pop() || path;
 
 /** The fields a step's activity reads, so a store can pass them without decoding the item. */
 export type TurnActivityInput = Pick<OrchestrationV2TurnItem, "type"> & {
-  readonly input?: string | null;
-  readonly fileName?: string | null;
-  readonly pattern?: string | null;
-  readonly title?: string | null;
+  readonly input?: string | null | undefined;
+  readonly fileName?: string | null | undefined;
+  readonly pattern?: string | null | undefined;
+  readonly title?: string | null | undefined;
 };
 
 /** One step's activity, or null for steps that say nothing about the moment (a user message). */

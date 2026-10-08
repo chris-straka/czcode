@@ -1,10 +1,13 @@
 import type { OrchestrationV2TurnItem } from "@cz/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { runActivity, turnItemActivity } from "./turnActivity.ts";
+import { runActivity, turnItemActivity, type TurnActivityInput } from "./turnActivity.ts";
+
+// Both shapes: runActivity reads whole items, turnItemActivity only the activity fields.
+type Item = OrchestrationV2TurnItem & TurnActivityInput;
 
 const item = (fields: Record<string, unknown>) =>
-  ({ runId: "run-1", ordinal: 0, title: null, ...fields }) as unknown as OrchestrationV2TurnItem;
+  ({ runId: "run-1", ordinal: 0, title: null, ...fields }) as unknown as Item;
 
 describe("turnItemActivity", () => {
   it("names a command by its first line, clipped", () => {
