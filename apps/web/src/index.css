@@ -1800,6 +1800,16 @@ code {
   -webkit-app-region: no-drag;
 }
 
+/* Desktop hit-tests app-region before z-index, so anything floating over a
+   header bar would lose its clicks to window dragging. Toasts and the
+   backdrops of dialogs and sheets are mounted after the headers and opt out,
+   so their buttons work and a click on the bar closes the dialog. */
+[data-slot="toast-viewport"] > *,
+[data-slot$="-backdrop"],
+[data-slot$="-viewport"]:not([data-slot="scroll-area-viewport"]) {
+  -webkit-app-region: no-drag;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: var(--app-scrollbar-width);

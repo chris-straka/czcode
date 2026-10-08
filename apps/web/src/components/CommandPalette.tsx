@@ -42,6 +42,7 @@ import {
   resolveEnvironmentMachineKind,
 } from "@cz/contracts";
 import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
+import { useDeveloperControls } from "./settings/DeveloperOnly";
 import * as Option from "effect/Option";
 import {
   ArrowLeftIcon,
@@ -698,6 +699,7 @@ function OpenCommandPaletteDialog(props: {
   const navigate = useNavigate();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { clearOpenIntent, openIntent, openOverlayMode, setOpen } = props;
+  const developerControls = useDeveloperControls();
   const [query, setQuery] = useState(openIntent?.kind === "search" ? openIntent.query : "");
   const [linkedThreadSearch, setLinkedThreadSearch] = useState(
     openIntent?.kind === "search" ? openIntent : null,
@@ -2202,6 +2204,7 @@ function OpenCommandPaletteDialog(props: {
   });
 
   if (
+    developerControls &&
     environments.some(
       (environment) => environment.serverConfig?.environment.capabilities.pullRequests === true,
     )
