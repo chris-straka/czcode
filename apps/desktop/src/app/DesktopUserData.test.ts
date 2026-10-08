@@ -1,14 +1,16 @@
+// @effect-diagnostics nodeBuiltinImport:off - Fixture paths follow the host separator, as the code under test does.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
+import * as NodePath from "node:path";
 
 import { resolveUserDataPath } from "./DesktopUserData.ts";
 
 it.effect("identifies a failed source read and preserves its cause", () => {
-  const sourceState = "/profiles/czcode/Local State";
+  const sourceState = NodePath.join("/profiles", "czcode", "Local State");
   const cause = PlatformError.systemError({
     _tag: "PermissionDenied",
     module: "FileSystem",
