@@ -25,6 +25,12 @@ interface FeedFilterState {
   readonly setMachine: (machine: MachineFilter | null) => void;
   readonly setProjects: (projects: ReadonlyArray<string>) => void;
   readonly setKinds: (kinds: ReadonlyArray<string>) => void;
+  /** The Threads page: a grid of project cards, or a list of collapsible projects. */
+  readonly threadsView: "grid" | "list";
+  readonly setThreadsView: (view: "grid" | "list") => void;
+  /** Projects open in the list view; every project starts collapsed. */
+  readonly expandedProjects: ReadonlyArray<string>;
+  readonly setExpandedProjects: (projects: ReadonlyArray<string>) => void;
 }
 
 export const useFeedFilterStore = create<FeedFilterState>()(
@@ -40,6 +46,10 @@ export const useFeedFilterStore = create<FeedFilterState>()(
       setMachine: (machine) => set({ machine }),
       setProjects: (projects) => set({ projects }),
       setKinds: (kinds) => set({ kinds }),
+      threadsView: "grid",
+      setThreadsView: (threadsView) => set({ threadsView }),
+      expandedProjects: [],
+      setExpandedProjects: (expandedProjects) => set({ expandedProjects }),
     }),
     {
       name: "czcode:feed-filter:v1",
@@ -50,6 +60,8 @@ export const useFeedFilterStore = create<FeedFilterState>()(
         machine: state.machine,
         group: state.group,
         showPhoneItems: state.showPhoneItems,
+        threadsView: state.threadsView,
+        expandedProjects: state.expandedProjects,
       }),
     },
   ),
