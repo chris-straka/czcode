@@ -65,7 +65,8 @@ const DISK_FILESYSTEMS = new Set([
 
 /**
  * The mount points of real disks in /proc/self/mounts, one per device (btrfs
- * subvolumes share one), skipping snap and loop images.
+ * subvolumes share one), skipping snap and loop images and the boot and EFI
+ * partitions, which hold no work.
  */
 export function parseLinuxDiskMounts(mounts: string): Array<string> {
   const byDevice = new Map<string, string>();
@@ -75,11 +76,28 @@ export function parseLinuxDiskMounts(mounts: string): Array<string> {
     if (device.startsWith("/dev/loop")) continue;
     // Spaces in mount points are octal-escaped.
     const mount = rawMount.replace(/\\040/g, " ");
-    if (mount.startsWith("/snap/")) continue;
+    if (mount.startsWith("/snap/") || mount === "/boot" || mount.startsWith("/boot/")) continue;
     const existing = byDevice.get(device);
     if (existing === undefined || mount.length < existing.length) byDevice.set(device, mount);
   }
   return [...byDevice.values()].toSorted();
+}
+
+/**
+ * One entry per disk: volumes that report the same size and free space share
+ * one store, such as every APFS volume in a Mac's container ("Macintosh HD"
+ * under /Volumes is the system disk again). The first mount listed is kept.
+ */
+export function sameDiskOnce<
+  Disk extends { readonly totalBytes: number; readonly freeBytes: number },
+>(disks: ReadonlyArray<Disk>): Array<Disk> {
+  const seen = new Set<string>();
+  return disks.filter((disk) => {
+    const key = `${disk.totalBytes}:${disk.freeBytes}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** Totals over the devices, as the snapshot carries them. */

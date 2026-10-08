@@ -95,11 +95,11 @@ type Row =
     };
 
 /**
- * Every paired machine at once, live: state, CPU, memory, swap and zram,
- * disks, load, and the agents working there now. j/k move between machines;
- * l or Enter steps into one, where j/k move between its agents, Enter opens
- * an agent's thread, s stops it, and h or Esc steps back out. w wakes a
- * sleeping machine (not a busy one, which is on but too loaded to answer).
+ * Every paired machine at once, live: state, CPU, memory, disks, load, and
+ * the agents working there now. j/k move between machines; l or Enter steps
+ * into one, where j/k move between its agents, Enter opens an agent's thread,
+ * s stops it, and h or Esc steps back out. w wakes a sleeping machine (not a
+ * busy one, which is on but too loaded to answer).
  */
 export function FleetScreen(props: {
   readonly atoms: TuiAtoms;
@@ -303,9 +303,6 @@ export function FleetScreen(props: {
         // Readings from a machine that stopped answering are its last known state, greyed.
         const tone = awake ? {} : { color: "gray" };
         const memUsed = resources.totalMemoryBytes - resources.availableMemoryBytes;
-        const zramRam = (resources.swap?.devices ?? [])
-          .filter((device) => device.kind === "zram")
-          .reduce((sum, device) => sum + (device.memoryBytes ?? 0), 0);
         const cpu = resources.cpuUtilization ?? 0;
         const vitals = [
           h(Gauge, {
@@ -326,18 +323,7 @@ export function FleetScreen(props: {
             detail: formatUsedOfTotal(memUsed, resources.totalMemoryBytes),
             ...tone,
           }),
-          resources.swap && resources.swap.totalBytes > 0
-            ? h(Gauge, {
-                key: "swap",
-                label: "Swap",
-                ratio: resources.swap.usedBytes / resources.swap.totalBytes,
-                width: meterWidth,
-                detailWidth: 22,
-                detail: `${formatUsedOfTotal(resources.swap.usedBytes, resources.swap.totalBytes)}${zramRam > 0 ? ` zram ${formatBytes(zramRam)}` : ""}`,
-                ...tone,
-              })
-            : null,
-        ].filter(Boolean);
+        ];
         const disks = (resources.disks ?? []).map((disk) =>
           h(Gauge, {
             key: `disk:${disk.mount}`,

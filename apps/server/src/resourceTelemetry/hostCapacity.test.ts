@@ -6,6 +6,7 @@ import {
   parseLinuxDiskMounts,
   parseProcSwaps,
   parseZramMemoryBytes,
+  sameDiskOnce,
   swapFromDevices,
 } from "./hostCapacity.ts";
 
@@ -58,9 +59,23 @@ describe("host capacity", () => {
       "/dev/nvme0n1p2 /mnt/My\\040Games btrfs rw 0 0",
       "/dev/nvme0n1p2 /mnt/My\\040Games/@snapshots btrfs rw 0 0",
       "/dev/loop3 /snap/core22/1380 squashfs ro 0 0",
+      "/dev/sda1 /boot/efi vfat rw 0 0",
+      "/dev/sda3 /boot ext4 rw 0 0",
       "tmpfs /run tmpfs rw 0 0",
       "/dev/loop9 /mnt/image ext4 rw 0 0",
     ].join("\n");
     expect(parseLinuxDiskMounts(mounts)).toEqual(["/", "/home", "/mnt/My Games"]);
+  });
+
+  it("shows a Mac's APFS volumes as one disk", () => {
+    const disks = [
+      { mount: "/System/Volumes/Data", totalBytes: 994, freeBytes: 426 },
+      { mount: "/Volumes/Macintosh HD", totalBytes: 994, freeBytes: 426 },
+      { mount: "/Volumes/Backup", totalBytes: 2000, freeBytes: 1500 },
+    ];
+    expect(sameDiskOnce(disks).map((disk) => disk.mount)).toEqual([
+      "/System/Volumes/Data",
+      "/Volumes/Backup",
+    ]);
   });
 });
