@@ -160,8 +160,8 @@ export function ThemePreviewCircle({
 
 /**
  * A theme card's light and dark balls. Clicking a ball assigns that theme to
- * that half of the appearance mix; assigned balls carry a ring and a sun or
- * moon badge.
+ * that half of the appearance mix; assigned balls carry a ring and, under
+ * the ball rather than on the ring, a sun or moon badge.
  */
 export function ThemePreviewCircles({
   label,
@@ -175,7 +175,7 @@ export function ThemePreviewCircles({
   previews: ThemeCardDefinition["previews"];
 }) {
   return (
-    <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3">
+    <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3 pb-6">
       {previews.map((preview) => {
         const mode = preview.mode;
         const isPicked = activeModes.includes(mode);
@@ -206,7 +206,7 @@ export function ThemePreviewCircles({
                       />
                       <span
                         aria-hidden
-                        className="pointer-events-none absolute bottom-0.5 right-0.5 flex size-5 items-center justify-center rounded-full border border-border/70 bg-background text-foreground shadow-sm"
+                        className="pointer-events-none absolute top-full left-1/2 mt-1 flex size-5 -translate-x-1/2 items-center justify-center rounded-full border border-border/70 bg-background text-foreground shadow-sm"
                       >
                         {mode === "light" ? (
                           <SunIcon className="size-3" />

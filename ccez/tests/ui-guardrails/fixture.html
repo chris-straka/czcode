@@ -1,0 +1,175 @@
+<!doctype html>
+<!-- Every mistake the guardrails exist for, on one page. ui-guardrails.ts runs
+     the checks here first and fails if any of them stops catching its bug. -->
+<html>
+  <head>
+    <style>
+      body {
+        margin: 0;
+        font:
+          14px/20px system-ui,
+          sans-serif;
+      }
+      button {
+        cursor: pointer;
+        user-select: none;
+        font: inherit;
+        padding: 4px 8px;
+      }
+      .drag-region {
+        -webkit-app-region: drag;
+      }
+      .drag-region button {
+        -webkit-app-region: no-drag;
+      }
+      header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        z-index: 10;
+        background: #eee;
+      }
+      .icon {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      svg {
+        width: 16px;
+        height: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 89.png: first control right against the window buttons. Spacing: 4px then 12px. -->
+    <header class="drag-region">
+      <button id="machines" style="position: absolute; left: 78px">All machines</button>
+      <!-- Clickable but not a button, so the title bar's drag region swallows it. -->
+      <span
+        role="button"
+        tabindex="0"
+        style="position: absolute; left: 320px; cursor: pointer; user-select: none"
+        >Games</span
+      >
+      <span style="position: absolute; right: 16px; display: flex">
+        <button class="icon" aria-label="New">
+          <svg viewBox="0 0 16 16"><rect width="16" height="16" /></svg>
+        </button>
+        <button class="icon" aria-label="Inbox" style="margin-left: 4px">
+          <svg viewBox="0 0 16 16"><rect width="16" height="16" /></svg>
+        </button>
+        <button class="icon" aria-label="Settings" style="margin-left: 12px">
+          <svg viewBox="0 0 16 16"><rect width="16" height="16" /></svg>
+        </button>
+      </span>
+    </header>
+
+    <!-- 51.png: a toast under the title bar; its close button can't be clicked. -->
+    <div data-slot="toast-viewport" style="position: fixed; top: 20px; right: 140px; z-index: 5">
+      <div
+        style="
+          width: 220px;
+          padding: 8px;
+          background: #fff;
+          border: 1px solid #ccc;
+          -webkit-app-region: no-drag;
+        "
+      >
+        <button aria-label="Dismiss notification" style="position: absolute; top: 4px; right: 4px">
+          x
+        </button>
+        <p style="margin: 40px 0 0">Saved</p>
+      </div>
+    </div>
+
+    <main style="padding: 120px 24px 24px">
+      <!-- 45.png: the same choice twice in one bar. -->
+      <footer>
+        <button>None of these</button>
+        <button>None of these, try again</button>
+      </footer>
+
+      <!-- 49.png: button text selects. -->
+      <p><button style="user-select: text">Ask for changes</button></p>
+
+      <!-- Clickable without a pointer. -->
+      <p><span role="button" tabindex="0" style="cursor: default">Open thread</span></p>
+
+      <!-- Two controls on top of each other. -->
+      <p style="position: relative; height: 40px">
+        <button style="position: absolute; left: 0">Approve</button>
+        <button style="position: absolute; left: 30px">Reject</button>
+      </p>
+
+      <!-- 53.png: a badge on a selected swatch's ring. -->
+      <p>
+        <button
+          aria-label="Use light mode"
+          style="
+            position: relative;
+            width: 68px;
+            height: 68px;
+            border-radius: 50%;
+            border: 0;
+            background: #ddd;
+          "
+        >
+          <span
+            style="
+              position: absolute;
+              inset: 0;
+              border-radius: 50%;
+              box-shadow: inset 0 0 0 2px blue;
+            "
+          ></span>
+          <span
+            style="
+              position: absolute;
+              bottom: 2px;
+              right: 2px;
+              width: 20px;
+              height: 20px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border-radius: 50%;
+              background: #fff;
+            "
+          >
+            <svg viewBox="0 0 16 16" style="width: 12px; height: 12px">
+              <circle cx="8" cy="8" r="6" />
+            </svg>
+          </span>
+        </button>
+      </p>
+
+      <!-- Text running out of its box, and text cut off by its parent. -->
+      <div style="width: 120px; white-space: nowrap">Supercalifragilisticexpialidocious</div>
+      <div style="width: 120px; overflow: hidden">
+        <span style="display: inline-block; white-space: nowrap">Antidisestablishmentarianism</span>
+      </div>
+
+      <!-- A menu off the screen. -->
+      <div
+        role="menu"
+        style="
+          position: fixed;
+          left: -60px;
+          top: 400px;
+          width: 160px;
+          height: 40px;
+          background: #fff;
+        "
+      >
+        <div role="menuitem" style="cursor: pointer">Archive</div>
+      </div>
+    </main>
+  </body>
+</html>

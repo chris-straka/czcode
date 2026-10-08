@@ -478,6 +478,49 @@ jobs:
       - name: Exercise release-only workflow steps
         run: node scripts/release-smoke.ts
 
+  # Visits every main view with seeded data at 390, 1024 and 1600px and in an
+  # emulated macOS desktop shell, and fails on basic layout mistakes (controls
+  # under the window buttons, overlaps, clipped text, duplicate buttons...).
+  # See ccez/tests/ui-guardrails.ts; failures upload outlined screenshots.
+  ui_guardrails:
+    name: UI Guardrails
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Install Chromium
+        run: node apps/server/node_modules/playwright-core/cli.js install --with-deps --only-shell chromium
+
+      - name: Build web and server
+        run: vp run --filter @cz/web --filter cz build
+
+      - name: Check every view
+        env:
+          UI_GUARDRAILS_OUT: ${{ runner.temp }}/ui-guardrails
+        run: node ccez/tests/ui-guardrails.ts
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-guardrails
+          path: ${{ runner.temp }}/ui-guardrails
+          retention-days: 14
+
   # Branch protection requires this job by its name, `Check`. It fails when any
   # other job fails, is cancelled, or is skipped without a reason, so splitting
   # or resharding jobs needs no ruleset change. Add every new job to `needs`.
@@ -499,6 +542,7 @@ jobs:
         mobile_native_changes,
         mobile_native_static_analysis,
         release_smoke,
+        ui_guardrails,
       ]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

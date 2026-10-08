@@ -30,7 +30,7 @@ import { typingTarget } from "../hooks/useVimKeys";
 import { FeedPage } from "./feed/FeedPage";
 
 // Ends just past the third traffic light (see the desktop preload).
-const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 78px)";
+const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 86px)";
 
 // Moves through the app's route history like a browser's back/forward buttons.
 function NavigationHistoryShortcuts() {
