@@ -87,12 +87,14 @@ import {
   ThreadControlListResult,
   ThreadControlNotFoundError,
   ThreadStopInput,
+  ThreadArchiveInput,
   ThreadDigestInput,
   ThreadDigestResult,
   ThreadBrief,
   ThreadRetryInput,
   ThreadRetryResult,
   ThreadStopResult,
+  ThreadArchiveResult,
 } from "./threadControl.ts";
 import { Project, ProjectMutation, ProjectSnapshot } from "./project.ts";
 import { ScheduleJobList } from "./scheduleJobs.ts";
@@ -940,7 +942,7 @@ const webhookEndpoint = {
 } as const;
 const WEBHOOK_PATH = "/api/hooks/:hookId/:token";
 
-/** Lists threads and stops their runs, for `cz thread` (fork). */
+/** Lists threads, stops their runs, and archives them, for `cz thread` (fork). */
 /** Every recurring job on this machine: cz scheduled tasks and registered timers (fork). */
 class EnvironmentJobsHttpApi extends HttpApiGroup.make("jobs").add(
   HttpApiEndpoint.get("list", "/api/jobs", {
@@ -993,6 +995,14 @@ class EnvironmentThreadsHttpApi extends HttpApiGroup.make("threads")
       headers: OptionalBearerHeaders,
       payload: ThreadStopInput,
       success: ThreadStopResult,
+      error: [ThreadControlNotFoundError, EnvironmentScopeRequiredError, EnvironmentInternalError],
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("archive", "/api/threads/archive", {
+      headers: OptionalBearerHeaders,
+      payload: ThreadArchiveInput,
+      success: ThreadArchiveResult,
       error: [ThreadControlNotFoundError, EnvironmentScopeRequiredError, EnvironmentInternalError],
     }).middleware(EnvironmentAuthenticatedAuth),
   ) {}

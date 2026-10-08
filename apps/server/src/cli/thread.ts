@@ -1,5 +1,5 @@
 /**
- * `cz thread`: list threads and stop runs, on this machine or (`--host`) a
+ * `cz thread`: list threads, stop runs, and archive threads, on this machine or (`--host`) a
  * paired one, without opening an app.
  *
  * @module ThreadCli
@@ -93,7 +93,57 @@ const stopCommand = Command.make("stop", {
   ),
 );
 
+/** Threads whose title starts with the prefix, archived ones left out. */
+export const threadsTitled = (threads: ReadonlyArray<ThreadControlSummary>, prefix: string) =>
+  threads.filter((thread) => !thread.archived && thread.title.startsWith(prefix));
+
+const archiveCommand = Command.make("archive", {
+  baseDir: baseDirFlag,
+  host: hostFlag,
+  titled: Flag.String("titled").pipe(
+    Flag.withDescription('Archive every thread whose title starts with this, e.g. "Lead: ".'),
+    Flag.optional,
+  ),
+  ids: Argument.String("thread").pipe(
+    Argument.withDescription("Thread id or the short id cz thread list shows."),
+    Argument.atLeast(0),
+  ),
+}).pipe(
+  Command.withDescription(
+    "Archive threads: a running turn stops, and nothing wakes or resumes them after.",
+  ),
+  Command.withHandler((flags) =>
+    withServer({ baseDir: flags.baseDir, host: flags.host, sessionLabel }, ({ client, headers }) =>
+      Effect.gen(function* () {
+        const { threads } = yield* client.threads.list({ headers });
+        const targets: Array<ThreadControlSummary> = [];
+        for (const wanted of flags.ids) {
+          const thread = matchThread(threads, wanted);
+          if (typeof thread === "string") return yield* new ThreadCliError({ message: thread });
+          targets.push(thread);
+        }
+        if (flags.titled._tag === "Some")
+          targets.push(...threadsTitled(threads, flags.titled.value));
+        if (targets.length === 0) {
+          return yield* new ThreadCliError({
+            message: "Name threads to archive, or pass --titled.",
+          });
+        }
+        for (const thread of targets) {
+          const result = yield* client.threads.archive({
+            headers,
+            payload: { threadId: thread.threadId },
+          });
+          yield* Console.log(
+            `${shortThreadId(thread.threadId)}  ${result.status === "archived" ? "archived" : "was archived"}  ${thread.title}`,
+          );
+        }
+      }),
+    ),
+  ),
+);
+
 export const threadCommand = Command.make("thread").pipe(
-  Command.withDescription("List threads and stop runs, here or on a paired machine."),
-  Command.withSubcommands([listCommand, stopCommand]),
+  Command.withDescription("List, stop, and archive threads, here or on a paired machine."),
+  Command.withSubcommands([listCommand, stopCommand, archiveCommand]),
 );

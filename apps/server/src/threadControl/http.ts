@@ -1,5 +1,6 @@
 /**
- * HTTP transport for listing threads and stopping their runs (`/api/threads`),
+ * HTTP transport for listing threads, stopping their runs, and archiving them
+ * (`/api/threads`),
  * used by `cz thread` on this machine and, with `--host`, on a paired one.
  *
  * @module ThreadControlHttp
@@ -109,6 +110,38 @@ export const threadsHttpApiLayer = HttpApiBuilder.group(
             });
           }).pipe(Effect.catch((cause) => failEnvironmentInternal("internal_error", cause)));
           return { status: result.type === "interrupt_requested" ? "stopping" : "idle" } as const;
+        }),
+      )
+      .handle("archive", (args) =>
+        Effect.gen(function* () {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthOrchestrationOperateScope);
+          const threadId = ThreadId.make(args.payload.threadId);
+          const thread = yield* projections
+            .getThreadShell(threadId)
+            .pipe(Effect.catch((cause) => failEnvironmentInternal("internal_error", cause)));
+          if (thread === null || thread.deletedAt !== null) {
+            return yield* new ThreadControlNotFoundError({
+              message: `No thread ${args.payload.threadId}.`,
+            });
+          }
+          if (thread.archivedAt !== null) return { status: "already" } as const;
+          // An archived thread takes no wakes or usage-limit resumes; a run
+          // still going is stopped first so nothing keeps working unseen.
+          yield* Effect.gen(function* () {
+            yield* threadManagement.interruptThread({
+              projectId: thread.projectId,
+              commandId: CommandId.make(`thread-archive-stop:${yield* crypto.randomUUIDv4}`),
+              threadId,
+              reason: "Archived with cz thread archive.",
+            });
+            yield* threadManagement.dispatch({
+              type: "thread.archive",
+              commandId: CommandId.make(`thread-archive:${yield* crypto.randomUUIDv4}`),
+              threadId,
+            });
+          }).pipe(Effect.catch((cause) => failEnvironmentInternal("internal_error", cause)));
+          return { status: "archived" } as const;
         }),
       );
   }),

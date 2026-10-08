@@ -40,6 +40,17 @@ export const ThreadStopResult = Schema.Struct({
 });
 export type ThreadStopResult = typeof ThreadStopResult.Type;
 
+export const ThreadArchiveInput = Schema.Struct({
+  threadId: Schema.String,
+});
+export type ThreadArchiveInput = typeof ThreadArchiveInput.Type;
+
+export const ThreadArchiveResult = Schema.Struct({
+  /** "archived" when this call archived it, "already" when it was archived before. */
+  status: Schema.Literals(["archived", "already"]),
+});
+export type ThreadArchiveResult = typeof ThreadArchiveResult.Type;
+
 export class ThreadControlNotFoundError extends Schema.TaggedError<ThreadControlNotFoundError>()(
   "ThreadControlNotFoundError",
   { message: Schema.String },
