@@ -7,19 +7,16 @@ import {
   formatSince,
   formatUsedOfTotal,
 } from "@cz/client-runtime/fleet";
-import { createFleetAtom } from "@cz/client-runtime/state/fleet";
 import type { EnvironmentId } from "@cz/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertTriangleIcon, PowerIcon, SquareIcon } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
 
-import { environmentCatalog } from "../../connection/catalog";
 import { isElectron } from "~/env";
 import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
 import { useWakeEnvironment } from "../../state/hostWake";
 import { serverEnvironment } from "../../state/server";
-import { environmentSnapshotAtom } from "../../state/shell";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Badge } from "../ui/badge";
@@ -27,35 +24,10 @@ import { Button } from "../ui/button";
 import { SidebarInset } from "../ui/sidebar";
 import { toastManager } from "../ui/toast";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { fleetAtom, Meter } from "./MachineLoad";
 
 /** How often host readings refresh while the page is open (the server caches 5 s). */
 const REFRESH_MS = 3000;
-
-const fleetAtom = createFleetAtom({
-  catalogValueAtom: environmentCatalog.catalogValueAtom,
-  connectionStateAtom: environmentCatalog.stateAtom,
-  shellSnapshotAtom: environmentSnapshotAtom,
-  hostResourcesAtom: (environmentId) =>
-    serverEnvironment.hostResources({ environmentId, input: {} }),
-});
-
-const levelClass = (ratio: number) =>
-  ratio >= 0.9 ? "bg-destructive" : ratio >= 0.7 ? "bg-warning" : "bg-success";
-
-function Meter({ ratio, muted }: { readonly ratio: number; readonly muted?: boolean }) {
-  const clamped = Math.min(1, Math.max(0, ratio));
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-      <div
-        className={cn(
-          "h-full rounded-full",
-          muted ? "bg-muted-foreground/40" : levelClass(clamped),
-        )}
-        style={{ width: `${Math.max(clamped > 0 ? 2 : 0, clamped * 100)}%` }}
-      />
-    </div>
-  );
-}
 
 function Gauge(props: {
   readonly label: string;
