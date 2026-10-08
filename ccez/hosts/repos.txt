@@ -109,7 +109,6 @@ SWE/forgeshop                         chris-straka/forgeshop
 SWE/games/blackout                    chris-straka/blackout
 SWE/games/courtroom                   chris-straka/courtroom
 SWE/games/dead-letters                chris-straka/dead-letters
-SWE/games/engine-bakeoff              chris-straka/engine-bakeoff
 SWE/games/hll                         chris-straka/hll
 SWE/games/horde-tactics               chris-straka/horde-tactics
 SWE/games/interpreter                 chris-straka/interpreter
