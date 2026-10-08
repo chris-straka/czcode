@@ -19,15 +19,22 @@ set -uo pipefail
 problems=()
 problem() { problems+=("$1") && echo "problem: $1"; }
 
-# Disk space on every real filesystem.
+# Disk space on every real filesystem, flagged at 80% so there's time to act
+# before 85%.
 while read -r use avail mount; do
   use=${use%\%}
-  if [ "$use" -ge 95 ]; then
+  if [ "$use" -ge 90 ]; then
     problem "disk $mount is $use% full ($avail free)"
-  elif [ "$use" -ge 85 ]; then
-    problem "disk $mount is $use% full ($avail free), getting tight"
+  elif [ "$use" -ge 80 ]; then
+    problem "disk $mount is $use% full ($avail free); free space before it passes 85% (agent-drive.sh moves build output and caches to a second drive)"
   fi
 done < <(df -h --output=pcent,avail,target -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs -x vfat 2> /dev/null | tail -n +2)
+# Folders agent-drive.sh moved are symlinks into the agent drive; they break
+# if it isn't mounted.
+drive=${CZ_AGENT_DRIVE:-/data}
+if [ -d "$drive/$USER" ] || find "$HOME" "$HOME/.cache" -maxdepth 1 -type l -lname "$drive/*" 2> /dev/null | grep -q .; then
+  mountpoint -q "$drive" || problem "the agent drive $drive isn't mounted; folders moved there are unreachable"
+fi
 
 # SMART, from udisks2 (it reads every drive's SMART data every 10 minutes and
 # shares it without root).
