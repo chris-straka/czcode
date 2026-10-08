@@ -138,3 +138,14 @@ describe("option pictures", () => {
     expect(contextMedia(decision).map((media) => media.key)).toEqual(["plan"]);
   });
 });
+
+describe("none of these", () => {
+  it("turns a pick down with or without asking for another round, note optional", () => {
+    const pick = item({});
+    const draft = emptyDraft(pick);
+    expect(draftToAnswer(pick, draft, "none")).toMatchObject({ declined: true, option_ids: null });
+    expect(draftToAnswer(pick, draft, "retry")).toMatchObject({ retry: true });
+    expect(draftToAnswer(pick, draft, true)).toMatchObject({ retry: true });
+    expect(answerSummary(pick, draftToAnswer(pick, draft, "none"))).toBe("None of these");
+  });
+});

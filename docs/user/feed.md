@@ -16,9 +16,7 @@ Beside the search bar, **All · Games · Software** and **Projects** narrow
 both tabs, for one machine or all.
 
 Opening a thread or a Decision shows it on its own page; **Back** (or Esc)
-returns to the feed where you left it. In the feed, `j`/`k` move between
-items, `gg`/`G` jump to the first and last, and Enter opens one; on a thread
-or Decision page the same keys scroll.
+returns to the feed where you left it.
 
 ## Decisions
 
@@ -27,6 +25,9 @@ click to jump, and on a review drag across it to mark a part you like or
 want changed, with a note; the agent gets the marks with your answer. A
 Decision with a video shows the video first, with the write-up under
 **Details**.
+
+On a pick, **None of these** turns all the options down, and **None of
+these, try again** asks the agent for new ones; a note is optional.
 
 **No longer relevant** on any Decision dismisses it (you can undo for a few
 seconds). Decisions also close themselves when the agent asks the same

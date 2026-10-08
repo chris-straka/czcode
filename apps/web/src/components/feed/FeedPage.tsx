@@ -911,6 +911,16 @@ function DecisionCard({
             Open
           </Button>
         )}
+        {item.kind === "pick" ? (
+          <>
+            <Button size="sm" variant="outline" onClick={() => onQuickAnswer({ declined: true })}>
+              None of these
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onQuickAnswer({ retry: true })}>
+              None of these, try again
+            </Button>
+          </>
+        ) : null}
         <Button size="xs" variant="ghost-muted" className="ms-auto" onClick={onDismiss}>
           No longer relevant
         </Button>

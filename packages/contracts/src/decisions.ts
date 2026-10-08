@@ -251,6 +251,8 @@ export const DecisionAnswer = Schema.Struct({
   redo_from: Schema.optionalKey(Schema.NullOr(Schema.String)),
   /** "None of these, try again". */
   retry: Schema.optionalKey(Schema.Boolean),
+  /** "None of these": none of the options, and no new round. */
+  declined: Schema.optionalKey(Schema.Boolean),
   comment: Schema.NullOr(Schema.String),
   /** Media key of a recorded voice note. */
   voice_key: Schema.NullOr(Schema.String),

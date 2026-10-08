@@ -40,7 +40,9 @@ back to its thread.
 ## What agents can ask (decision types)
 
 Each type has its own full-screen view. Every type has a free-text note and a
-voice note, plus **"none of these, try again"** with a note.
+voice note. Every type with options also offers **"none of these"**
+(`declined: true`: none of them, and no new round) and **"none of these, try
+again"** (`retry: true`: make new options; the note, if any, says how).
 
 1. **Pick:** choose one (or several, if the agent allows) from options that
    can be images, 3D models, sounds, or clips. Example: 4 Andras concepts.

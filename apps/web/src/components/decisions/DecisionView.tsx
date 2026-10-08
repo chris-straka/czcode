@@ -124,8 +124,10 @@ export function DecisionView({
   const unseen = unseenMediaProblem(item, engaged);
   const problem = unseen ?? draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
-  const submit = (patch: Partial<DecisionDraft> = {}, retry = false) =>
-    onSubmit(draftToAnswer(item, { ...draft, ...patch }, retry));
+  const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: "retry" | "none") =>
+    onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
+  // Any pick can be turned down, with or without asking for another round.
+  const declinable = item.options.length > 0 && item.kind !== "rank";
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fullScreen, setFullScreen] = useState<{
     readonly images: ReadonlyArray<ExpandedImageItem>;
@@ -151,8 +153,9 @@ export function DecisionView({
     });
   };
 
-  // Keys: j/k scroll, 1-9 pick, Enter sends, n/p (J/K) step through Review
-  // all, Esc closes. A text field keeps its keys; Esc there leaves it first.
+  // Keys: j/k scroll, 1-9 pick, 0 none of these, r none of these and try
+  // again, Enter sends, n/p (J/K) step through Review all, Esc closes. A text field keeps its keys; Esc there leaves it first.
+  // They are never shown on screen (owner's call, 2026-10-07).
   const keyHandler = useRef<(event: KeyboardEvent) => void>(() => {});
   const onKey = (event: KeyboardEvent) => {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -183,6 +186,14 @@ export function DecisionView({
           return onPrevious !== undefined;
         case "Escape":
           onClose();
+          return true;
+        case "0":
+          if (!declinable) return false;
+          submit({}, "none");
+          return true;
+        case "r":
+          if (!declinable) return false;
+          submit({}, "retry");
           return true;
         case "Enter":
           if (verdicts || item.kind === "timeline" || problem !== null) return false;
@@ -218,15 +229,6 @@ export function DecisionView({
   const mediaFirst =
     item.media.some((media) => media.type === "video") ||
     (item.body_md.length > 800 && item.media.some((media) => media.type === "image"));
-  const keyHints = [
-    "j/k scroll · gg/G ends",
-    item.kind === "pick" || verdicts
-      ? `1-${Math.min(9, item.kind === "pick" ? item.options.length : (verdicts?.length ?? 1))} choose`
-      : null,
-    !verdicts && item.kind !== "timeline" ? "Enter send" : null,
-    onSkip ? "n/p next/previous" : null,
-    "Esc close",
-  ].filter((hint) => hint !== null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-decision-kind={item.kind}>
@@ -413,16 +415,16 @@ export function DecisionView({
                 Send
               </Button>
             )}
-            {item.options.length > 0 && item.kind !== "rank" ? (
-              <Button
-                variant="ghost"
-                disabled={!draft.comment.trim() && draft.voiceKey === null}
-                title="Needs a note saying what to try instead"
-                onClick={() => submit({}, true)}
-              >
-                <RepeatIcon />
-                None of these, try again
-              </Button>
+            {declinable ? (
+              <>
+                <Button variant="outline" onClick={() => submit({}, "none")}>
+                  None of these
+                </Button>
+                <Button variant="ghost" onClick={() => submit({}, "retry")}>
+                  <RepeatIcon />
+                  None of these, try again
+                </Button>
+              </>
             ) : null}
             {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (
               <span className="text-xs text-muted-foreground">{problem}</span>
@@ -430,9 +432,6 @@ export function DecisionView({
             <Button variant="ghost-muted" size="sm" onClick={onDismiss}>
               No longer relevant
             </Button>
-            <span className="ms-auto hidden text-2xs text-muted-foreground sm:inline">
-              {keyHints.join(" · ")}
-            </span>
           </div>
         </div>
       </footer>
@@ -550,7 +549,7 @@ function PickBody({ entry, draft, update }: BodyProps) {
         role="listbox"
         aria-multiselectable={item.max_choices > 1}
       >
-        {item.options.map((option, index) => {
+        {item.options.map((option) => {
           const media = mediaOf(option);
           const selected = draft.optionIds.includes(option.id);
           return (
@@ -614,9 +613,6 @@ function PickBody({ entry, draft, update }: BodyProps) {
                 )
               ) : null}
               <span className="flex items-start gap-1.5 text-sm font-medium">
-                <kbd className="mt-px rounded border border-border px-1 text-2xs text-muted-foreground">
-                  {index + 1}
-                </kbd>
                 <span className="min-w-0 flex-1">{framed && !media ? null : option.label}</span>
                 {option.recommended ? (
                   <Badge variant="info" size="sm">
