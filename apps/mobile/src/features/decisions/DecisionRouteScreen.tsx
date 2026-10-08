@@ -6,6 +6,8 @@ import {
   emptyDraft,
   unseenMediaProblem,
   VERDICT_BUTTONS,
+  contextMedia,
+  optionMedia,
 } from "@cz/client-runtime/decisions/draft";
 import { shortMachineLabel } from "@cz/client-runtime/decisions/oneFeed";
 import type {
@@ -340,8 +342,7 @@ function PickOptions({ entry, draft, update }: BodyProps) {
   const { item } = entry;
   const resolve = useDecisionMediaResolver(entry.environmentId);
   const [viewing, setViewing] = useState<number | null>(null);
-  const mediaOf = (option: (typeof item.options)[number]) =>
-    option.media_idx === null ? null : (item.media[option.media_idx] ?? null);
+  const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   const framed = item.options.some((option) => mediaOf(option) !== null);
   const pictures = item.options.flatMap((option) => {
     const uri = mediaOf(option)?.type === "image" ? resolve(mediaOf(option)) : null;
@@ -357,67 +358,76 @@ function PickOptions({ entry, draft, update }: BodyProps) {
             : [...draft.optionIds, id],
     });
   return (
-    <View className={framed ? "flex-row flex-wrap justify-between gap-y-3" : "gap-3"}>
-      {item.options.map((option) => {
-        const media = mediaOf(option);
-        const selected = draft.optionIds.includes(option.id);
-        const pictureIndex = pictures.findIndex((picture) => picture.optionId === option.id);
-        return (
-          <Pressable
-            key={option.id}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            onPress={() => pick(option.id)}
-            onLongPress={pictureIndex >= 0 ? () => setViewing(pictureIndex) : undefined}
-            style={framed ? { width: "48.5%" } : undefined}
-            className={
-              selected
-                ? "gap-2 rounded-xl border-2 border-primary p-2"
-                : "gap-2 rounded-xl border border-subtle-strong p-2"
-            }
-          >
-            {framed ? (
-              pictureIndex >= 0 ? (
-                <Pressable
-                  accessibilityRole="imagebutton"
-                  accessibilityLabel={`Open ${option.label} full screen`}
-                  onPress={() => setViewing(pictureIndex)}
-                >
-                  <DecisionMedia environmentId={entry.environmentId} media={media!} framed />
-                </Pressable>
-              ) : media ? (
-                <DecisionMedia environmentId={entry.environmentId} media={media} />
-              ) : (
-                <View
-                  className="items-center justify-center bg-subtle p-3"
-                  style={OPTION_FRAME_STYLE}
-                >
-                  <Text className="text-center font-cz-medium text-foreground">{option.label}</Text>
-                </View>
-              )
-            ) : null}
-            {framed && !media ? null : (
-              <Text className="font-cz-medium text-foreground">{option.label}</Text>
-            )}
-            {option.recommended ? <Text className="text-xs text-primary">Recommended</Text> : null}
-            {option.reason ? (
-              <Text className="text-xs text-foreground-muted">{option.reason}</Text>
-            ) : null}
-          </Pressable>
-        );
-      })}
-      {viewing !== null ? (
-        <DecisionImageViewer
-          images={pictures}
-          index={viewing}
-          pickedIds={draft.optionIds}
-          onPick={(id) => {
-            pick(id);
-            if (item.max_choices === 1) setViewing(null);
-          }}
-          onClose={() => setViewing(null)}
-        />
-      ) : null}
+    <View className="gap-3">
+      {contextMedia(item).map((media) => (
+        <DecisionMedia key={media.key} environmentId={entry.environmentId} media={media} />
+      ))}
+      <View className={framed ? "flex-row flex-wrap justify-between gap-y-3" : "gap-3"}>
+        {item.options.map((option) => {
+          const media = mediaOf(option);
+          const selected = draft.optionIds.includes(option.id);
+          const pictureIndex = pictures.findIndex((picture) => picture.optionId === option.id);
+          return (
+            <Pressable
+              key={option.id}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => pick(option.id)}
+              onLongPress={pictureIndex >= 0 ? () => setViewing(pictureIndex) : undefined}
+              style={framed ? { width: "48.5%" } : undefined}
+              className={
+                selected
+                  ? "gap-2 rounded-xl border-2 border-primary p-2"
+                  : "gap-2 rounded-xl border border-subtle-strong p-2"
+              }
+            >
+              {framed ? (
+                pictureIndex >= 0 ? (
+                  <Pressable
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel={`Open ${option.label} full screen`}
+                    onPress={() => setViewing(pictureIndex)}
+                  >
+                    <DecisionMedia environmentId={entry.environmentId} media={media!} framed />
+                  </Pressable>
+                ) : media ? (
+                  <DecisionMedia environmentId={entry.environmentId} media={media} />
+                ) : (
+                  <View
+                    className="items-center justify-center bg-subtle p-3"
+                    style={OPTION_FRAME_STYLE}
+                  >
+                    <Text className="text-center font-cz-medium text-foreground">
+                      {option.label}
+                    </Text>
+                  </View>
+                )
+              ) : null}
+              {framed && !media ? null : (
+                <Text className="font-cz-medium text-foreground">{option.label}</Text>
+              )}
+              {option.recommended ? (
+                <Text className="text-xs text-primary">Recommended</Text>
+              ) : null}
+              {option.reason ? (
+                <Text className="text-xs text-foreground-muted">{option.reason}</Text>
+              ) : null}
+            </Pressable>
+          );
+        })}
+        {viewing !== null ? (
+          <DecisionImageViewer
+            images={pictures}
+            index={viewing}
+            pickedIds={draft.optionIds}
+            onPick={(id) => {
+              pick(id);
+              if (item.max_choices === 1) setViewing(null);
+            }}
+            onClose={() => setViewing(null)}
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -534,7 +544,7 @@ function ListenBody({ entry, draft, update }: BodyProps) {
         />
       ) : null}
       {item.options.map((option) => {
-        const media = option.media_idx === null ? null : item.media[option.media_idx];
+        const media = optionMedia(item, option);
         const reaction = draft.reactions[option.id];
         return (
           <View key={option.id} className="gap-2 rounded-xl bg-subtle p-3">

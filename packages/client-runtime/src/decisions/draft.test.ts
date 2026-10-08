@@ -4,9 +4,11 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   answerSummary,
   canAnswerFromCard,
+  contextMedia,
   draftProblem,
   draftToAnswer,
   emptyDraft,
+  optionMedia,
   unseenMediaProblem,
 } from "./draft.ts";
 
@@ -104,5 +106,35 @@ describe("seeing before approving", () => {
     expect(canAnswerFromCard({ kind: "review", media: [media("video", "v")] })).toBe(false);
     expect(canAnswerFromCard({ kind: "review", media: [media("image", "i")] })).toBe(false);
     expect(canAnswerFromCard({ kind: "pick", media: [media("image", "i")] })).toBe(true);
+  });
+});
+
+describe("option pictures", () => {
+  const image = (key: string, url = `/m/${key}`) => ({
+    type: "image" as const,
+    key,
+    name: key,
+    mime: "image/png",
+    size: 1,
+    ...(url ? { url } : {}),
+  });
+
+  it("shows an option's own picture, none for a shared or missing one, and the shared one once above", () => {
+    const decision = item({
+      media: [image("plan"), image("ember"), image("gone", "")],
+      options: [
+        { id: "a", label: "Ember", media_idx: 1 },
+        { id: "b", label: "Frost", media_idx: 0 },
+        { id: "c", label: "Ash", media_idx: 0 },
+        { id: "d", label: "Smoke", media_idx: 2 },
+      ],
+    });
+    expect(decision.options.map((option) => optionMedia(decision, option)?.key ?? null)).toEqual([
+      "ember",
+      null,
+      null,
+      null,
+    ]);
+    expect(contextMedia(decision).map((media) => media.key)).toEqual(["plan"]);
   });
 });
