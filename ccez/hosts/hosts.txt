@@ -2,10 +2,13 @@
 # Columns: Tailscale name; SSH login (Tailscale SSH); the host that keeps this
 # one's nightly userdata backup; hardware beyond CPUs: `gpu` for the GPU jobs
 # (Blender GPU renders, Whisper, local models, shader work) and `emulator`
-# for the fast Android emulator ("-" for none). The Mac has no SSH server
+# for the fast Android emulator ("-" for none). z has no SSH server
 # (Tailscale from the App Store can't run one), so the jobs only check that
-# it's online.
+# it's online. y8 is reached with Tailscale SSH (mac.sh's tailscaled); Macs
+# run no host jobs and back up nowhere, and pick-host.sh skips them (it reads
+# Linux load and memory).
 f-ms-7917    f@f-ms-7917      basement   -
 art-ms-7917  art@art-ms-7917  basement   gpu,emulator
 basement     b@basement       f-ms-7917  -
 z            -                -          -
+y8           chris@y8         -          -

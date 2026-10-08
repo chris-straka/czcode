@@ -7485,10 +7485,12 @@ export default function ChatView(props: ChatViewProps) {
       icon: <InboxIcon />,
       title: count === 1 ? "A decision is waiting on you" : `${count} decisions are waiting on you`,
       description: firstThreadDecision.item.question,
+      // One row on a phone: the question folds into the details popover there.
+      compact: true,
       actions: (
         <Button
           size="xs"
-          variant="ghost"
+          variant="outline"
           onClick={() =>
             void navigate({
               to: "/decisions",
@@ -11351,7 +11353,9 @@ export default function ChatView(props: ChatViewProps) {
               className={
                 isDraftHeroState
                   ? "pointer-events-none absolute inset-0 z-20 flex items-center"
-                  : "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 sm:pt-2"
+                  : // With a notice attached (a Decision waiting, a snooze), the composer's band is
+                    // solid, so the timeline never shows beside or behind the notice.
+                    "pointer-events-none absolute inset-x-0 bottom-0 z-20 pt-1.5 has-[[data-composer-banner-surface=attached]]:bg-background sm:pt-2"
               }
             >
               <div

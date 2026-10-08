@@ -285,6 +285,20 @@ else
 fi
 run launchctl enable "$domain/$LABEL"
 
+# A MacBook sleeps when its lid closes, whatever caffeinate says.
+# lid-awake-mac.sh keeps it running with the lid closed while it's on power;
+# off power it's a normal laptop. Skipped when the installed copy is current,
+# so a Standard account can re-run this script. CZ_HOST_LID_AWAKE=0 skips it.
+if [ "${CZ_HOST_LID_AWAKE:-1}" = 1 ] && { $dry || pmset -g batt | grep -q InternalBattery; }; then
+  step "Lid closed on power (MacBook)"
+  if already cmp -s "$CHECKOUT/ccez/hosts/lid-awake-mac.sh" /usr/local/sbin/cz-lid-awake; then
+    echo "Already installed."
+  else
+    need_admin "Keeping a closed MacBook running on power"
+    run sudo bash "$CHECKOUT/ccez/hosts/lid-awake-mac.sh" install
+  fi
+fi
+
 step "Coding agents"
 npm_global() { already have "$1" || run npm install -g "$2"; }
 npm_global claude @anthropic-ai/claude-code
