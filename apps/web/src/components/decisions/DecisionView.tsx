@@ -39,7 +39,7 @@ import { cn } from "~/lib/utils";
 import type { DecisionEntry } from "~/state/decisions";
 import ChatMarkdown from "../ChatMarkdown";
 import { Badge } from "../ui/badge";
-import { Button, buttonVariants } from "../ui/button";
+import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { ExpandedImageDialog } from "../chat/ExpandedImageDialog";
@@ -375,7 +375,8 @@ export function DecisionView({
               className="flex-1"
             />
             {item.kind === "request" ? null : (
-              <label className="inline-flex">
+              <Button variant="outline" size="icon" render={<label />} aria-label="Attach pictures">
+                <ImagePlusIcon />
                 <input
                   type="file"
                   accept="image/*"
@@ -387,14 +388,7 @@ export function DecisionView({
                     void attachImages(images);
                   }}
                 />
-                <span
-                  aria-label="Attach pictures"
-                  title="Attach pictures"
-                  className={buttonVariants({ variant: "outline", size: "icon" })}
-                >
-                  <ImagePlusIcon />
-                </span>
-              </label>
+              </Button>
             )}
             <VoiceNoteButton
               recorded={draft.voiceKey !== null}
@@ -440,11 +434,7 @@ export function DecisionView({
               </Button>
             )}
             {declinable ? (
-              <Button
-                variant="outline"
-                title="Sends your note and asks for new options"
-                onClick={() => submit({}, true)}
-              >
+              <Button variant="outline" onClick={() => submit({}, true)}>
                 None of these
               </Button>
             ) : null}
