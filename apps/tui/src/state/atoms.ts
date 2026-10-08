@@ -11,6 +11,7 @@ import { createOrchestrationEnvironmentAtoms } from "@cz/client-runtime/state/or
 import { createQueueEnvironmentAtoms } from "@cz/client-runtime/state/queue";
 import { createHostWakeEnvironmentAtoms } from "@cz/client-runtime/state/hostWake";
 import { createVcsEnvironmentAtoms } from "@cz/client-runtime/state/vcs";
+import { createAssetEnvironmentAtoms } from "@cz/client-runtime/state/assets";
 import { createAtomCommandScheduler, createRuntimeCommand } from "@cz/client-runtime/state/runtime";
 import { createServerEnvironmentAtoms } from "@cz/client-runtime/state/server";
 import { createEnvironmentSessionAtoms } from "@cz/client-runtime/state/session";
@@ -52,6 +53,7 @@ export function makeTuiAtoms({ runtime }: TuiRuntime) {
   const hostWake = createHostWakeEnvironmentAtoms(runtime);
   const orchestration = createOrchestrationEnvironmentAtoms(runtime);
   const vcs = createVcsEnvironmentAtoms(runtime);
+  const assets = createAssetEnvironmentAtoms(runtime);
   const pairing = createRuntimeCommand(runtime, {
     label: "tui:connection:pair",
     scheduler: createAtomCommandScheduler(),
@@ -80,6 +82,7 @@ export function makeTuiAtoms({ runtime }: TuiRuntime) {
     hostWake,
     orchestration,
     vcs,
+    assets,
     pairing,
   };
 }

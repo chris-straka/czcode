@@ -14,7 +14,7 @@ import {
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
 import { Box, Text } from "ink";
-import { createElement as h, useContext, useEffect, useMemo, useState } from "react";
+import { createElement as h, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import * as NodeCrypto from "node:crypto";
 import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
@@ -40,6 +40,14 @@ import { Picker } from "./Picker.ts";
 import { QuestionPanel } from "./QuestionPanel.ts";
 import { TextInput } from "./TextInput.ts";
 import { useWakeHost } from "./useWakeHost.ts";
+import {
+  THREAD_IMAGE_COLUMNS,
+  THREAD_IMAGE_ROWS,
+  type ThreadImage,
+  ThreadImageLoader,
+  ThreadImageRow,
+} from "./ThreadImages.ts";
+import { inlineImagesSupported } from "../model/kitty.ts";
 
 const TONE: Record<
   LineTone,
@@ -166,16 +174,34 @@ export function ThreadScreen(props: {
     [projection?.messages],
   );
   const width = Math.max(20, columns - 2);
+  // Where the terminal draws images, an attached image takes a block of rows.
+  const imagesInline = inlineImagesSupported();
   const rows = useMemo(() => {
-    const out: Array<{ key: string; tone: LineTone; text: string }> = [];
+    const out: Array<{
+      key: string;
+      tone: LineTone;
+      text: string;
+      image?: { readonly attachmentId: string; readonly name: string; readonly row: number };
+    }> = [];
     for (const line of transcriptLines(projection?.visibleTurnItems ?? [], { verbose })) {
+      if (line.image && imagesInline) {
+        for (let row = 0; row < THREAD_IMAGE_ROWS; row++) {
+          out.push({
+            key: `${line.key}:img${row}`,
+            tone: "dim",
+            text: "",
+            image: { ...line.image, row },
+          });
+        }
+        continue;
+      }
       const prose = line.tone === "user" || line.tone === "assistant";
       wrapText(line.text, prose ? Math.min(width, READING_WIDTH) : width).forEach((text, index) =>
         out.push({ key: `${line.key}:${index}`, tone: line.tone, text }),
       );
     }
     return out;
-  }, [projection?.visibleTurnItems, width, verbose]);
+  }, [projection?.visibleTurnItems, width, verbose, imagesInline]);
 
   const questionLines = question
     ? 3 + (question.questions[0]?.options.length ?? 0) + (answering ? 1 : 0)
@@ -190,7 +216,21 @@ export function ThreadScreen(props: {
   const visible = Math.max(3, height - footer - 3);
   const maxScroll = Math.max(0, rows.length - visible);
   const offset = Math.min(scroll, maxScroll);
-  const shown = rows.slice(rows.length - visible - offset, rows.length - offset);
+  // Clamped: a transcript shorter than the screen starts at its first line.
+  const shownStart = Math.max(0, rows.length - visible - offset);
+  const shown = rows.slice(shownStart, rows.length - offset);
+  const [threadImages, setThreadImages] = useState<ReadonlyMap<string, ThreadImage | null>>(
+    new Map(),
+  );
+  const onImageReady = useCallback(
+    (attachmentId: string, image: ThreadImage | null) =>
+      setThreadImages((current) => new Map(current).set(attachmentId, image)),
+    [],
+  );
+  // Only images with a row on screen are fetched and held by the terminal.
+  const visibleImages = [
+    ...new Set(shown.flatMap((row) => (row.image ? [row.image.attachmentId] : []))),
+  ];
   const needle = searchQuery.trim().toLowerCase();
   const matches = useMemo(
     () =>
@@ -445,9 +485,20 @@ export function ThreadScreen(props: {
     "q back",
   ].filter(Boolean);
 
+  const imageLoaders = visibleImages.map((attachmentId) =>
+    h(ThreadImageLoader, {
+      key: attachmentId,
+      atoms,
+      environmentId,
+      attachmentId,
+      maxColumns: Math.min(width, THREAD_IMAGE_COLUMNS),
+      onReady: onImageReady,
+    }),
+  );
   return h(
     Box,
     { flexDirection: "column" },
+    ...imageLoaders,
     h(
       Box,
       null,
@@ -462,17 +513,22 @@ export function ThreadScreen(props: {
       Box,
       { flexDirection: "column", height: visible },
       shown.map((row, index) =>
-        h(
-          Text,
-          {
-            key: row.key,
-            ...TONE[row.tone],
-            ...(rows.length - visible - offset + index === currentMatchRow
-              ? { inverse: true }
-              : {}),
-          },
-          row.text || " ",
-        ),
+        row.image
+          ? h(ThreadImageRow, {
+              key: row.key,
+              image: threadImages.get(row.image.attachmentId),
+              row: row.image.row,
+              name: row.image.name,
+            })
+          : h(
+              Text,
+              {
+                key: row.key,
+                ...TONE[row.tone],
+                ...(shownStart + index === currentMatchRow ? { inverse: true } : {}),
+              },
+              row.text || " ",
+            ),
       ),
     ),
     approval
