@@ -131,8 +131,9 @@ is in `~/.local/state/cz-host/jobs/<name>.log`, every run is in
   (or `host-jobs.sh`); `CZ_HOST_PR_AUTOMERGE=0` turns it off. It runs on
   `f-ms-7917`.
 
-The Mac isn't part of the host jobs: it has no SSH server for the others to
-reach, so `health` and `fleet-status.sh` only check that it's online.
+The Macs aren't part of the host jobs (they're systemd timers). `z` has no
+SSH server for the others to reach, so `health` and `fleet-status.sh` only
+check that it's online; `y8` answers over Tailscale SSH and shows no jobs.
 
 ### Recurring jobs agents add
 
