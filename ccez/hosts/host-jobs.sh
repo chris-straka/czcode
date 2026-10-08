@@ -30,18 +30,12 @@ jobs=(
   "update|*-*-* 04:00|cz-update.sh|Build origin/main and restart cz into it when no agent is working"
 )
 automerge=0
-[ -e "$units/cz-job-pr-automerge.timer" ] || [ -e "$units/pr-automerge.timer" ] && automerge=1
+[ -e "$units/cz-job-pr-automerge.timer" ] && automerge=1
 [ "${CZ_HOST_PR_AUTOMERGE:-$automerge}" = 1 ] && jobs+=(
   "pr-automerge|*:0/10|pr-automerge.sh|Merge the owner's green PRs; ask Dependabot to rebase conflicting ones"
 )
 
 mkdir -p "$units" "$config" "$units/cz-host.service.d"
-
-# The pr-automerge timer from before host jobs (install-pr-automerge.sh).
-if [ -e "$units/pr-automerge.timer" ]; then
-  systemctl --user disable --now pr-automerge.timer > /dev/null 2>&1 || true
-  rm -f "$units/pr-automerge.timer" "$units/pr-automerge.service"
-fi
 
 toml="# Scheduled jobs on this host, written by ccez/hosts/host-jobs.sh.
 # Each runs as the systemd user timer cz-job-<name>.timer; the last run is in

@@ -15,8 +15,8 @@
 # - A cap on journald and Docker logs, and no rsyslog copies in /var/log
 #   (a dying drive's kernel errors once filled 106 GB there), so logs can't
 #   fill the disk.
-# - A network watchdog that reconnects the wired chip when the router stops
-#   answering (net-watchdog.sh).
+# - On Killer (alx) wired chips, a network watchdog that reconnects the chip
+#   when the router stops answering (net-watchdog.sh).
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 in_wsl=false
@@ -111,9 +111,15 @@ if command -v docker > /dev/null 2>&1 && [ ! -e /etc/docker/daemon.json ]; then
     echo "Docker log caps apply after Docker's next restart (containers are running)."
   fi
 fi
-if ! $in_wsl && command -v nmcli > /dev/null 2>&1; then
+# The wired chips that hang after a router restart; other hosts recover alone.
+alx_wired=false
+for dev in /sys/class/net/*; do
+  [ -e "$dev/device" ] && [ ! -d "$dev/wireless" ] &&
+    [ "$(basename "$(readlink -f "$dev/device/driver")")" = alx ] && alx_wired=true
+done
+if ! $in_wsl && $alx_wired && command -v nmcli > /dev/null 2>&1; then
   step "Network watchdog"
-  # Reconnects a wired chip that stops passing traffic after the router
+  # Reconnects the chip when it stops passing traffic after the router
   # restarts (net-watchdog.sh says why). Log: journalctl -t cz-net-watchdog
   install -m 755 "$(dirname "${BASH_SOURCE[0]}")/net-watchdog.sh" /usr/local/sbin/cz-net-watchdog
   cat > /etc/systemd/system/cz-net-watchdog.service << 'UNIT'
@@ -137,5 +143,10 @@ WantedBy=timers.target
 UNIT
   systemctl daemon-reload
   systemctl enable --now cz-net-watchdog.timer > /dev/null 2>&1
+elif [ -e /etc/systemd/system/cz-net-watchdog.timer ]; then
+  systemctl disable --now cz-net-watchdog.timer > /dev/null 2>&1 || true
+  rm -f /etc/systemd/system/cz-net-watchdog.{timer,service} /usr/local/sbin/cz-net-watchdog
+  systemctl daemon-reload
+  echo "Network watchdog removed: this host's wired chip isn't a Killer (alx) one."
 fi
 echo "Tuning done."

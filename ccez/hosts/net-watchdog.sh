@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Brings a host's wired network back when it silently stops passing traffic.
 # tune-host-linux.sh installs it as /usr/local/sbin/cz-net-watchdog, run by
-# cz-net-watchdog.timer every minute as root.
+# cz-net-watchdog.timer every minute as root, on hosts with an alx chip only.
 #
 # Why: on 2026-10-07 the router restarted, and f and art (MSI boards with the
 # Killer E2200 chip, alx driver) stayed off the network for an hour. The chip
