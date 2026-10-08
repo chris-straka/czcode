@@ -1,3 +1,4 @@
+import { DIFFERS_BY_MACHINE } from "./scopedSettings";
 import { useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import type {
@@ -169,7 +170,7 @@ export function SourceControlWritingSettingsSection() {
             >
               <SelectValue>
                 {(value: SourceControlWritingStyleMode | null) =>
-                  value === null ? "Mixed" : MODE_OPTIONS[value].label
+                  value === null ? DIFFERS_BY_MACHINE : MODE_OPTIONS[value].label
                 }
               </SelectValue>
             </SelectTrigger>
@@ -308,7 +309,7 @@ export function SourceControlWritingSettingsSection() {
                   modelOptionsByInstance={modelOptionsByInstance}
                   triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
                   triggerAriaLabel="Source control writer model"
-                  {...(mixedWriterModel ? { triggerLabel: "Mixed" } : {})}
+                  {...(mixedWriterModel ? { triggerLabel: DIFFERS_BY_MACHINE } : {})}
                   {...(environmentId
                     ? {
                         onOpenProviderSetup: (instanceId: ProviderInstanceId) => {

@@ -8,10 +8,11 @@ them). It has two pages, switched at the top:
   [Morning brief](./morning-brief.md) on top. **Answered** at the bottom
   shows what you already answered. The inbox icon in the top bar, with the
   open count, brings you here from anywhere.
-- **Threads:** every thread, grouped by project, running ones first. Each
-  row shows the thread's last summary line, so you rarely need to open one.
-  Groups with nothing new fold; finished threads older than three days fold
-  under **older**.
+- **Threads:** a card per project, the ones that need you or have something
+  running first, with counts and the latest threads. Click a card for that
+  project's threads. The list button beside the tabs shows projects as
+  folded groups instead, with **Expand all** / **Collapse all**; cz remembers
+  which you use. Retries of the same task show as one row with a count.
 
 Beside the search bar, **All · Games · Software** and **Projects** narrow
 both pages, for one machine or all.
@@ -48,3 +49,10 @@ question again or its thread is archived.
 Nothing needs settling. A thread nobody has touched for a week, with
 nothing running or waiting on you, archives itself. **Settings → Archived**
 brings any thread back.
+
+On the Threads page, **Archive finished** in a project clears its done and
+failed threads at once. Keys work on whatever row or card the pointer is
+over: **e** archives, **Shift+D** deletes (with a few seconds to undo),
+**s** stops a running thread, **o** opens. On a project card they act on the
+whole project (Shift+D deletes only its failed threads). The full list is
+in **Settings → Keybindings**.

@@ -57,6 +57,7 @@ const STATE_BADGE: Record<
 > = {
   awake: { label: "Awake", variant: "success" },
   connecting: { label: "Connecting", variant: "warning" },
+  busy: { label: "Busy, not responding", variant: "warning" },
   asleep: { label: "Asleep", variant: "info" },
   unreachable: { label: "Unreachable", variant: "error" },
 };
@@ -97,7 +98,7 @@ function MachineCard({ machine, now }: { readonly machine: FleetMachine; readonl
         <Badge variant={badge.variant} size="sm">
           {badge.label}
         </Badge>
-        {awake && resources?.loadAverage?.[0] !== undefined ? (
+        {(awake || machine.state === "busy") && resources?.loadAverage?.[0] !== undefined ? (
           <span className="text-xs tabular-nums text-muted-foreground">
             load {resources.loadAverage[0].toFixed(1)} · {resources.cpuCount} cores
           </span>
@@ -206,7 +207,11 @@ function MachineCard({ machine, now }: { readonly machine: FleetMachine; readonl
                   <span
                     className={cn(
                       "w-full truncate font-mono text-xs",
-                      agent.needsYou ? "text-warning-foreground" : "text-info-foreground",
+                      agent.needsYou
+                        ? "text-warning-foreground"
+                        : agent.stuck
+                          ? "text-destructive-foreground"
+                          : "text-info-foreground",
                     )}
                   >
                     {agent.activity}

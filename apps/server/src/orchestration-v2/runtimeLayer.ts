@@ -1,3 +1,4 @@
+import * as StuckRunStarts from "./StuckRunStarts.ts";
 import * as UsageLimitRecoveryWorker from "./UsageLimitRecoveryWorker.ts";
 import * as Scheduler from "../scheduling/Scheduler.ts";
 import * as Layer from "effect/Layer";
@@ -335,6 +336,10 @@ export const layerProduction = Layer.mergeAll(
   layerSecretRequestsProvided,
   UsageLimitRecoveryWorker.layer.pipe(
     Layer.provide(Layer.mergeAll(ProjectionStore.layer, layerThreadManagementProvided)),
+  ),
+  // Fork: fails runs left `starting` with no start effect to finish them.
+  StuckRunStarts.layer.pipe(
+    Layer.provide(Layer.mergeAll(ProjectionStore.layer, layerEventSinkProvided, IdAllocator.layer)),
   ),
   layerProviderContinuationWorkerProvided,
   layerAgentSessionImporterProvided,

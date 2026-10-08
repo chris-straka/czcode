@@ -37,6 +37,7 @@ import { isElectron } from "../../env";
 import { useOpenInPreferredEditor } from "../../editorPreferences";
 import { formatShortcutLabel } from "../../keybindings";
 import { cn } from "../../lib/utils";
+import { PAGE_KEY_GROUPS } from "../../pageKeys";
 import { serverEnvironment } from "../../state/server";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { Badge } from "../ui/badge";
@@ -1276,6 +1277,32 @@ function BrowserKeybindingNotice() {
   );
 }
 
+/** Keys one page handles itself, such as hover keys; listed, not editable. */
+function PageKeysSection() {
+  return (
+    <SettingsSection id="keybindings-page-keys" title="Page keys">
+      {PAGE_KEY_GROUPS.map((group) => (
+        <div key={group.page}>
+          <div className="px-4 pt-3 text-xs font-medium text-muted-foreground">{group.page}</div>
+          {group.keys.map((entry) => (
+            <SettingsRow
+              key={entry.action}
+              title={entry.action}
+              control={
+                <KbdGroup>
+                  {entry.keys.map((key) => (
+                    <Kbd key={key}>{key}</Kbd>
+                  ))}
+                </KbdGroup>
+              }
+            />
+          ))}
+        </div>
+      ))}
+    </SettingsSection>
+  );
+}
+
 export function KeybindingsSettingsPanel() {
   // The representative environment supplies the displayed bindings; edits
   // fan out to every connected environment in the selection, so one
@@ -1521,6 +1548,8 @@ export function KeybindingsSettingsPanel() {
           </div>
         </SettingsGroup>
       )}
+
+      <PageKeysSection />
     </SettingsPageContainer>
   );
 }

@@ -28,8 +28,11 @@ vi.mock("../../state/environments", () => ({
 vi.mock("../../hooks/useSettings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../hooks/useSettings")>()),
   PRIMARY_SETTINGS_UNAVAILABLE_MESSAGE: "Connect to an environment",
-  useClientSettings: (selector?: (settings: typeof DEFAULT_CLIENT_SETTINGS) => unknown) =>
-    selector ? selector(DEFAULT_CLIENT_SETTINGS) : DEFAULT_CLIENT_SETTINGS,
+  // Developer controls on: the device and browser-default rows sit behind it.
+  useClientSettings: (selector?: (settings: typeof DEFAULT_CLIENT_SETTINGS) => unknown) => {
+    const settings = { ...DEFAULT_CLIENT_SETTINGS, developerControlsEnabled: true };
+    return selector ? selector(settings) : settings;
+  },
   useClientSettingsHydrated: () => true,
   usePrimarySettingsAvailable: () => true,
   usePrimarySettings: () => DEFAULT_UNIFIED_SETTINGS,

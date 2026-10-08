@@ -256,10 +256,9 @@ export function DecisionView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-decision-kind={item.kind}>
-
       {/* A stable gutter: opening Details or a long write-up doesn't shift the column. */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
-        <div className={cn(DECISION_COLUMN_CLASS, "space-y-4 pb-5")}>
+        <div className={cn(DECISION_COLUMN_CLASS, "space-y-4 pb-5 wrap-anywhere")}>
           {/* The view's one bar, in the page: back, what and where, position, thread, arrows. */}
           <div className="flex min-h-[var(--workspace-topbar-height)] items-center gap-1.5 text-xs text-muted-foreground">
             <Button size="icon-sm" variant="ghost" aria-label="Back" onClick={onClose}>
@@ -431,8 +430,7 @@ export function DecisionView({
               ))
             ) : item.kind === "timeline" ? (
               <>
-                <Button onClick={() => submit({ choice: "approve", redoFrom: null })}
-                >
+                <Button onClick={() => submit({ choice: "approve", redoFrom: null })}>
                   Approve run
                 </Button>
                 <Button

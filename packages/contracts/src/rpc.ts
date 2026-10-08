@@ -288,12 +288,15 @@ import {
   ServerUpsertKeybindingResult,
 } from "./server.ts";
 import {
+  HostLoadHistory,
+  HostLoadHistoryInput,
   HostResourcesSnapshot,
   ResourceTelemetryHistory,
   ResourceTelemetryHistoryInput,
   ResourceTelemetryRetryResult,
   ResourceTelemetrySnapshot,
 } from "./resourceTelemetry.ts";
+import { OnlinePeers } from "./hostWake.ts";
 import {
   UsageLimitSourceError,
   ProviderConsumeResetCreditInput,
@@ -460,6 +463,8 @@ export const WS_METHODS = {
   serverGetTraceDiagnostics: "server.getTraceDiagnostics",
   serverGetProcessDiagnostics: "server.getProcessDiagnostics",
   serverGetHostResources: "server.getHostResources",
+  serverGetHostLoadHistory: "server.getHostLoadHistory",
+  serverGetOnlinePeers: "server.getOnlinePeers",
   serverGetProcessResourceHistory: "server.getProcessResourceHistory",
   serverGetResourceTelemetryHistory: "server.getResourceTelemetryHistory",
   serverRetryResourceTelemetry: "server.retryResourceTelemetry",
@@ -813,6 +818,18 @@ const WsServerGetProcessDiagnosticsRpc = Rpc.make(WS_METHODS.serverGetProcessDia
 const WsServerGetHostResourcesRpc = Rpc.make(WS_METHODS.serverGetHostResources, {
   payload: Schema.Struct({}),
   success: HostResourcesSnapshot,
+  error: EnvironmentAuthorizationError,
+});
+
+const WsServerGetHostLoadHistoryRpc = Rpc.make(WS_METHODS.serverGetHostLoadHistory, {
+  payload: HostLoadHistoryInput,
+  success: HostLoadHistory,
+  error: EnvironmentAuthorizationError,
+});
+
+const WsServerGetOnlinePeersRpc = Rpc.make(WS_METHODS.serverGetOnlinePeers, {
+  payload: Schema.Struct({}),
+  success: OnlinePeers,
   error: EnvironmentAuthorizationError,
 });
 
@@ -1774,6 +1791,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerGetTraceDiagnosticsRpc,
   WsServerGetProcessDiagnosticsRpc,
   WsServerGetHostResourcesRpc,
+  WsServerGetHostLoadHistoryRpc,
+  WsServerGetOnlinePeersRpc,
   WsServerGetProcessResourceHistoryRpc,
   WsServerGetResourceTelemetryHistoryRpc,
   WsServerRetryResourceTelemetryRpc,

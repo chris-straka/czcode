@@ -163,6 +163,7 @@ export default defineConfig({
         "error",
         { paths: [...RESTRICTED_IMPORT_PATHS, RESTRICTED_PULL_REQUEST_GLYPH_IMPORTS] },
       ],
+      "czcode/clickable-cursor": "error",
       "czcode/no-global-process-runtime": "error",
       "czcode/no-inline-schema-compile": "warn",
       "czcode/no-manual-effect-runtime-in-tests": "error",

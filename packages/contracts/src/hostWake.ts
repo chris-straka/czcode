@@ -28,3 +28,16 @@ export const WakeHostResult = Schema.Struct({
   hostName: Schema.NullOr(Schema.String),
 });
 export type WakeHostResult = typeof WakeHostResult.Type;
+
+/** Tailnet peers a server sees online, so clients can tell a busy machine from a sleeping one. */
+export const OnlinePeers = Schema.Struct({
+  peers: Schema.Array(
+    Schema.Struct({
+      hostName: Schema.String,
+      /** MagicDNS name without the trailing dot. */
+      dnsName: Schema.String,
+      tailscaleIps: Schema.Array(Schema.String),
+    }),
+  ),
+});
+export type OnlinePeers = typeof OnlinePeers.Type;

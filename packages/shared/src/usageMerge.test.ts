@@ -10,7 +10,13 @@ import {
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 
-import { isModelCostUnknown, mergeUsage, type EnvironmentUsage } from "./usageMerge.ts";
+import {
+  foldMinorModels,
+  isModelCostUnknown,
+  mergeUsage,
+  type EnvironmentUsage,
+  type ModelTotals,
+} from "./usageMerge.ts";
 
 const decodeSummary = Schema.decodeUnknownSync(UsageSummary);
 const encodeSummary = Schema.encodeSync(UsageSummary);
@@ -784,5 +790,58 @@ describe("mergeUsage", () => {
     ]);
     expect(merged.daily).toHaveLength(1);
     expect(merged.daily[0]?.costUsd).toBe(10);
+  });
+});
+
+describe("foldMinorModels", () => {
+  const model = (name: string, costShare: number, overrides: Partial<ModelTotals> = {}) =>
+    ({
+      model: name,
+      provider: "claude",
+      costUsd: costShare * 100,
+      totalTokens: costShare * 1000,
+      tokens: bucket().totals,
+      records: 1,
+      unpricedRecords: 0,
+      unpricedTokens: 0,
+      costShare,
+      tokenShare: costShare,
+      ...overrides,
+    }) satisfies ModelTotals;
+  const names = (models: readonly ModelTotals[]) => models.map((entry) => entry.model);
+
+  it("keeps models with at least a 1% share and folds the tail", () => {
+    const folded = foldMinorModels(
+      [model("a", 0.9), model("b", 0.05), model("c", 0.01), model("d", 0.004), model("e", 0.001)],
+      "cost",
+    );
+    expect(names(folded.major)).toEqual(["a", "b", "c"]);
+    expect(names(folded.minor)).toEqual(["d", "e"]);
+  });
+
+  it("keeps at most five", () => {
+    const folded = foldMinorModels(
+      ["a", "b", "c", "d", "e", "f", "g"].map((name) => model(name, 0.14)),
+      "tokens",
+    );
+    expect(names(folded.major)).toEqual(["a", "b", "c", "d", "e"]);
+    expect(names(folded.minor)).toEqual(["f", "g"]);
+  });
+
+  it("does not fold a single model into Other", () => {
+    const folded = foldMinorModels([model("a", 0.99), model("b", 0.005)], "cost");
+    expect(names(folded.major)).toEqual(["a", "b"]);
+    expect(folded.minor).toEqual([]);
+  });
+
+  it("folds unpriced models under cost but not under tokens", () => {
+    const models = [
+      model("a", 0.6),
+      model("free", 0, { unpricedRecords: 1, tokenShare: 0.3 }),
+      model("b", 0.002),
+      model("c", 0.001),
+    ];
+    expect(names(foldMinorModels(models, "cost").minor)).toEqual(["free", "b", "c"]);
+    expect(names(foldMinorModels(models, "tokens").major)).toEqual(["a", "free"]);
   });
 });

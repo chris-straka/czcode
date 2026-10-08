@@ -4,7 +4,6 @@ import {
   type ProjectFileBackedSettingKey,
   resolveEnvironmentMachineKind,
   type ServerSettings,
-  type WorktreeSubmodules,
 } from "@cz/contracts";
 import { CheckIcon, LayersIcon } from "lucide-react";
 import * as Equal from "effect/Equal";
@@ -12,13 +11,12 @@ import * as Equal from "effect/Equal";
 import { cn } from "../../lib/utils";
 import type { EnvironmentPresentation } from "../../state/environments";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
-import { resolveEnvModeLabel, WORKTREE_SUBMODULES_LABELS } from "../BranchToolbar.logic";
-import { PULL_REQUEST_MERGE_METHOD_LABELS } from "../pullRequest/pullRequestDetail.logic";
 import { Button, InlineButton } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import type { ProjectOverrideEntry, ScopedSettingsTarget } from "./scopedSettings";
 import { isProjectScopedSettingKey } from "./scopedSettings";
+import { formatValue } from "./settingValueLabels";
 
 interface InheritanceLayer {
   readonly key: "project" | "environment" | "cz.json" | "built-in";
@@ -26,57 +24,6 @@ interface InheritanceLayer {
   readonly value: string;
   readonly effective: boolean;
   readonly set: boolean;
-}
-
-const WRITING_STYLE_LABELS: Record<string, string> = {
-  repo_conventions: "Repository conventions",
-  conventional_commits: "Conventional Commits",
-  custom: "Custom instructions",
-};
-
-/** Human labels for the values the chain can show; falls back to a type summary. */
-function formatValue(key: keyof ServerSettings, value: unknown): string {
-  if (value === null || value === undefined) {
-    return key === "pullRequestMergeMethod"
-      ? "Last selected"
-      : key === "sidebarAutoSettleAfterDays"
-        ? "Never"
-        : key === "defaultModelSelection"
-          ? "Automatic"
-          : key === "sourceControlWriterModelSelection"
-            ? "Text generation model"
-            : key === "defaultThreadEnvMode" || key === "worktreeSubmodules"
-              ? "Inherit"
-              : "Not set";
-  }
-  if (typeof value === "boolean") return value ? "On" : "Off";
-  if (typeof value === "number") {
-    return key === "sidebarAutoSettleAfterDays"
-      ? `${value} ${value === 1 ? "day" : "days"}`
-      : String(value);
-  }
-  if (typeof value === "string") {
-    if (key === "defaultThreadEnvMode" && (value === "local" || value === "worktree")) {
-      return resolveEnvModeLabel(value);
-    }
-    if (key === "worktreeSubmodules" && value in WORKTREE_SUBMODULES_LABELS) {
-      return WORKTREE_SUBMODULES_LABELS[value as WorktreeSubmodules];
-    }
-    if (key === "pullRequestMergeMethod" && value in PULL_REQUEST_MERGE_METHOD_LABELS) {
-      return PULL_REQUEST_MERGE_METHOD_LABELS[
-        value as keyof typeof PULL_REQUEST_MERGE_METHOD_LABELS
-      ];
-    }
-    return value === "" ? "Empty" : value;
-  }
-  if (Array.isArray(value)) return `${value.length} ${value.length === 1 ? "item" : "items"}`;
-  if (typeof value === "object") {
-    if ("model" in value && typeof value.model === "string") return value.model;
-    if ("mode" in value && typeof value.mode === "string") {
-      return WRITING_STYLE_LABELS[value.mode] ?? value.mode;
-    }
-  }
-  return "Custom";
 }
 
 /**

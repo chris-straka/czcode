@@ -34,6 +34,7 @@ const fleetAtom = createFleetAtom({
   shellSnapshotAtom: environmentSnapshotAtom,
   hostResourcesAtom: (environmentId) =>
     serverEnvironment.hostResources({ environmentId, input: {} }),
+  onlinePeersAtom: (environmentId) => serverEnvironment.onlinePeers({ environmentId, input: {} }),
 });
 
 const levelClass = (ratio: number) =>
@@ -78,6 +79,7 @@ const warningText = (warning: FleetWarning) =>
 const STATE_LABEL: Record<FleetMachine["state"], string> = {
   awake: "Awake",
   connecting: "Connecting",
+  busy: "Busy, not responding",
   asleep: "Asleep",
   unreachable: "Unreachable",
 };
@@ -100,7 +102,7 @@ function MachineCard({ machine, now }: { readonly machine: FleetMachine; readonl
     >
       <View className="flex-row items-center gap-2">
         <View
-          className={`size-2 rounded-full ${awake ? "bg-primary" : machine.state === "asleep" ? "bg-icon-muted" : machine.state === "connecting" ? "bg-warning-foreground" : "bg-danger-foreground"}`}
+          className={`size-2 rounded-full ${awake ? "bg-primary" : machine.state === "asleep" ? "bg-icon-muted" : machine.state === "connecting" || machine.state === "busy" ? "bg-warning-foreground" : "bg-danger-foreground"}`}
         />
         <Text className="flex-shrink text-base font-cz-medium text-foreground" numberOfLines={1}>
           {machine.label}
@@ -198,7 +200,7 @@ function MachineCard({ machine, now }: { readonly machine: FleetMachine; readonl
                     {agent.project} · {agent.model} · {formatSince(agent.sinceMs, now)}
                   </Text>
                   <Text
-                    className={`font-mono text-xs ${agent.needsYou ? "text-warning-foreground" : "text-primary-text"}`}
+                    className={`font-mono text-xs ${agent.needsYou ? "text-warning-foreground" : agent.stuck ? "text-danger-foreground" : "text-primary-text"}`}
                     numberOfLines={1}
                   >
                     {agent.activity}
