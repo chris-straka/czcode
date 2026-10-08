@@ -47,7 +47,11 @@ export function SchedulesPage() {
             <MachineJobs
               key={environment.environmentId}
               environmentId={environment.environmentId}
-              label={shown.length > 1 ? environment.label : null}
+              label={
+                shown.length > 1 || environment.environmentId !== primaryEnvironmentId
+                  ? environment.label
+                  : null
+              }
             />
           ))}
         </div>

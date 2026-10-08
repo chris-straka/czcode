@@ -38,7 +38,9 @@ describe("systemd jobs", () => {
     expect(calendarInWords("Mon,Thu *-*-* 8:00")).toBe("Weekly, Mon, Thu 08:00");
     expect(calendarInWords("*-*-01 06:00:00")).toBe("Monthly, day 1 06:00");
     expect(calendarInWords("daily")).toBe("Daily 00:00");
-    expect(calendarInWords("*:0/15")).toBe("*:0/15");
+    expect(calendarInWords("*:0/15")).toBe("Every 15 min");
+    expect(calendarInWords("*-*-* *:00/10:00")).toBe("Every 10 min");
+    expect(calendarInWords("*:5/15")).toBe("*:5/15");
   });
 
   it("reads systemctl show output with unix timestamps", () => {

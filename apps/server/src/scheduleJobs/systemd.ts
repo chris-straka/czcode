@@ -29,6 +29,9 @@ export function calendarInWords(onCalendar: string): string {
     hourly: "Hourly",
   };
   if (named[spec]) return named[spec];
+  // "*:0/10", which systemd shows as "*-*-* *:00/10:00".
+  const every = /^(?:\*-\*-\*\s+)?\*:0?0\/(\d+)(?::00)?$/.exec(spec);
+  if (every) return `Every ${Number(every[1])} min`;
   const match =
     /^(?:([A-Za-z,.]+)\s+)?(\*|\d{4})-(\*|\d{1,2})-(\*|\d{1,2})\s+(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(
       spec,
