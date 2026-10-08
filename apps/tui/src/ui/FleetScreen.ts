@@ -84,8 +84,12 @@ const warningText = (warning: FleetWarning) =>
       ? `memory ${Math.round(warning.usedRatio * 100)}% used`
       : `swap ${Math.round(warning.usedRatio * 100)}% used`;
 
+/** Agents listed under a machine until you step into it (then all of them). */
+const AGENTS_PER_MACHINE = 5;
+
 type Row =
   | { readonly kind: "machine"; readonly machine: FleetMachine }
+  | { readonly kind: "more"; readonly machine: FleetMachine; readonly count: number }
   | {
       readonly kind: "agent";
       readonly machine: FleetMachine;
@@ -147,10 +151,18 @@ export function FleetScreen(props: {
     return () => clearInterval(timer);
   }, [props.active, awakeIds, atoms, registry]);
 
-  const rows: Array<Row> = machines.flatMap((machine) => [
-    { kind: "machine" as const, machine },
-    ...machine.agents.map((agent) => ({ kind: "agent" as const, machine, agent })),
-  ]);
+  const rows: Array<Row> = machines.flatMap((machine): Array<Row> => {
+    const shown =
+      machine.environmentId === inside
+        ? machine.agents
+        : machine.agents.slice(0, AGENTS_PER_MACHINE);
+    const hidden = machine.agents.length - shown.length;
+    return [
+      { kind: "machine", machine },
+      ...shown.map((agent) => ({ kind: "agent" as const, machine, agent })),
+      ...(hidden > 0 ? [{ kind: "more" as const, machine, count: hidden }] : []),
+    ];
+  });
   const machineIndex = Math.min(machineCursor, Math.max(0, machines.length - 1));
   const focused = machines[machineIndex];
   const agents = inside !== null && focused?.environmentId === inside ? focused.agents : null;
@@ -401,6 +413,16 @@ export function FleetScreen(props: {
       if (awake && machine.agents.length === 0) {
         lines.push(h(Text, { key: `i:${machine.environmentId}`, dimColor: true }, "    idle"));
       }
+      return;
+    }
+    if (row.kind === "more") {
+      lines.push(
+        h(
+          Text,
+          { key: `more:${row.machine.environmentId}`, dimColor: true },
+          `    … ${row.count} more · l to see all`,
+        ),
+      );
       return;
     }
     const { agent } = row;
