@@ -89,7 +89,7 @@ function ProjectProjectionRetention() {
 
 /** Routes the feed itself answers; everything else opens over it as its own view. */
 function isFeedRoute(pathname: string): boolean {
-  return pathname === "/" || pathname === "/decisions";
+  return pathname === "/" || pathname === "/threads" || pathname === "/decisions";
 }
 
 /**

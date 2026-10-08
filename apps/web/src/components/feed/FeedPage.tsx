@@ -122,7 +122,6 @@ export function FeedPage() {
   const withdrawCommand = useAtomCommand(decisionEnvironment.withdraw, "dismiss decision");
   const selectedProjects = useFeedFilterStore((state) => state.projects);
   const group = useFeedFilterStore((state) => state.group);
-  const [tabChoice, setTab] = useState<"needs" | "threads" | null>(null);
   const [showAnswered, setShowAnswered] = useState(false);
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
@@ -302,7 +301,8 @@ export function FeedPage() {
       (group === null || threadGroupOf(thread) === group)
     );
   });
-  const tab = tabChoice ?? (needsYou.length > 0 ? "needs" : "threads");
+  // Two pages: Needs you at /, Threads at /threads.
+  const tab = location.pathname === "/threads" ? "threads" : "needs";
   const answeredShown = answered.entries.filter(
     (entry) =>
       (machine.type === "all" || entry.environmentId === machine.environmentId) &&
@@ -434,7 +434,10 @@ export function FeedPage() {
       top: () => focusFeedItem("first"),
       bottom: () => focusFeedItem("last"),
     },
-    (location.pathname === "/" || location.pathname === "/decisions") && openKey === null,
+    (location.pathname === "/" ||
+      location.pathname === "/threads" ||
+      location.pathname === "/decisions") &&
+      openKey === null,
   );
 
   const filters = (
@@ -463,7 +466,9 @@ export function FeedPage() {
             value={[tab]}
             onValueChange={(value) => {
               const next = value[0];
-              if (next === "needs" || next === "threads") setTab(next);
+              if (next === "needs" || (next === "threads" && tab !== next)) {
+                void navigate({ to: next === "threads" ? "/threads" : "/" });
+              }
             }}
           >
             <Toggle size="sm" value="needs">
@@ -533,6 +538,9 @@ export function FeedPage() {
                       <EmptyTitle>Nothing needs you</EmptyTitle>
                       <EmptyDescription>Agents' questions show up here.</EmptyDescription>
                     </EmptyHeader>
+                    <Button size="sm" variant="outline" render={<Link to="/threads" />}>
+                      See threads
+                    </Button>
                   </Empty>
                 )
               ) : null}
