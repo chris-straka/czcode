@@ -46,11 +46,13 @@ const clientPlatform = process.platform;
 if (clientPlatform === "darwin") {
   // Native window buttons do not scale with Chromium zoom. Keep their reserved
   // space in native points, including when a zoomed page is reloaded. The
-  // buttons sit at x=16 and end near 70pt; 78 leaves a small gap after them.
+  // buttons sit at x=16 and end near 74pt on macOS 26+; 86 leaves the same
+  // 12pt gap after them that the top bar keeps from the window edge in full
+  // screen, close to Finder and Safari.
   const syncWindowControlInset = () => {
     document.documentElement.style.setProperty(
       "--desktop-window-controls-inset",
-      `${78 / webFrame.getZoomFactor()}px`,
+      `${86 / webFrame.getZoomFactor()}px`,
     );
   };
   window.addEventListener("DOMContentLoaded", syncWindowControlInset, { once: true });
