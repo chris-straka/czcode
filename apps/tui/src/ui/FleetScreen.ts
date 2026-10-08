@@ -94,9 +94,10 @@ type Row =
 
 /**
  * Every paired machine at once, live: state, CPU, memory, swap and zram,
- * disks, load, and the agents working there now. j/k move, Enter opens an
- * agent's thread, s stops it, w wakes a sleeping machine (not a busy one,
- * which is on but too loaded to answer).
+ * disks, load, and the agents working there now. j/k move between machines;
+ * l or Enter steps into one, where j/k move between its agents, Enter opens
+ * an agent's thread, s stops it, and h or Esc steps back out. w wakes a
+ * sleeping machine (not a busy one, which is on but too loaded to answer).
  */
 export function FleetScreen(props: {
   readonly atoms: TuiAtoms;
@@ -122,7 +123,10 @@ export function FleetScreen(props: {
   const totals = fleetTotals(machines);
   const now = useNow(15_000);
   const { columns, rows: height } = useViewport();
-  const [cursor, setCursor] = useState(0);
+  const [machineCursor, setMachineCursor] = useState(0);
+  const [agentCursor, setAgentCursor] = useState(0);
+  // The machine whose agents j/k move through; null moves between machines.
+  const [inside, setInside] = useState<EnvironmentId | null>(null);
   const interrupt = useCommand(atoms.threadEnvironment.interruptTurn);
   const wakeHost = useWakeHost(atoms);
 
@@ -147,14 +151,53 @@ export function FleetScreen(props: {
     { kind: "machine" as const, machine },
     ...machine.agents.map((agent) => ({ kind: "agent" as const, machine, agent })),
   ]);
-  const selected = Math.min(cursor, Math.max(0, rows.length - 1));
+  const machineIndex = Math.min(machineCursor, Math.max(0, machines.length - 1));
+  const focused = machines[machineIndex];
+  const agents = inside !== null && focused?.environmentId === inside ? focused.agents : null;
+  const agentIndex = agents ? Math.min(agentCursor, Math.max(0, agents.length - 1)) : 0;
+  const selected = Math.max(
+    0,
+    rows.findIndex((row) =>
+      agents && agents.length > 0
+        ? row.kind === "agent" && row.agent === agents[agentIndex]
+        : row.kind === "machine" && row.machine === focused,
+    ),
+  );
   const current = rows[selected];
 
   const vim = useVimMotion();
   useKeys(
     (input, key) => {
-      if (vim(input, key, { cursor: selected, count: rows.length, page: 10, onMove: setCursor }))
-        return;
+      if (agents && agents.length > 0) {
+        const back = () => setInside(null);
+        if (
+          vim(input, key, {
+            cursor: agentIndex,
+            count: agents.length,
+            page: 10,
+            onMove: setAgentCursor,
+            onBack: back,
+          })
+        )
+          return;
+        if (key.escape) return back();
+      } else {
+        if (
+          vim(input, key, {
+            cursor: machineIndex,
+            count: machines.length,
+            page: 5,
+            onMove: setMachineCursor,
+          })
+        )
+          return;
+        if ((input === "l" || key.return) && focused) {
+          if (focused.agents.length === 0)
+            return setStatus(`No agents working on ${focused.label}.`);
+          setAgentCursor(0);
+          return setInside(focused.environmentId);
+        }
+      }
       if (!current) return;
       if (key.return && current.kind === "agent") {
         return props.onOpen(current.machine.environmentId, current.agent.threadId);
@@ -394,7 +437,9 @@ export function FleetScreen(props: {
     h(
       Text,
       { dimColor: true, wrap: "truncate" },
-      `${current?.kind === "agent" ? "enter open · s stop · " : ""}w wake · j/k move · live`,
+      current?.kind === "agent"
+        ? "enter open · s stop · h back · j/k move · live"
+        : "l/enter agents · w wake · j/k move · live",
     ),
   );
 }
