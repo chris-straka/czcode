@@ -128,6 +128,32 @@ describe("fleetMachines", () => {
     ]);
   });
 
+  it("counts a thread whose turn ended but whose background job still runs", () => {
+    const [art] = fleetMachines(
+      [
+        machine("art-ms-7917", {
+          shell: shell([
+            thread("bevy", {
+              pendingBackgroundTasks: [
+                { taskId: "t1", kind: "background_task", description: "cargo test --release" },
+                { taskId: "t2", kind: "background_task" },
+              ],
+            }),
+            thread("done"),
+            thread("parked", {
+              archivedAt: started,
+              pendingBackgroundTasks: [{ taskId: "t3", kind: "background_task" }],
+            }),
+          ]),
+        }),
+      ],
+      NOW,
+    );
+    expect(art?.agents.map((agent) => [agent.title, agent.activity])).toEqual([
+      ["bevy", "background: cargo test --release +1"],
+    ]);
+  });
+
   it("doesn't list threads from a machine that stopped answering", () => {
     const [asleep] = fleetMachines(
       [

@@ -37,8 +37,12 @@ export function matchThread(
     : `${wanted} matches ${matches.length} threads; give more of the id.`;
 }
 
+/** "running" for a turn, "busy" for background work left after one, else "idle". */
+export const threadStateWord = (thread: Pick<ThreadControlSummary, "running" | "busy">) =>
+  thread.running ? "running" : thread.busy ? "busy   " : "idle   ";
+
 const describe = (thread: ThreadControlSummary) =>
-  `${shortThreadId(thread.threadId)}  ${thread.running ? "running" : "idle   "}  ${thread.model}  ${thread.projectTitle ?? "?"} / ${thread.title}`;
+  `${shortThreadId(thread.threadId)}  ${threadStateWord(thread)}  ${thread.model}  ${thread.projectTitle ?? "?"} / ${thread.title}`;
 
 const listCommand = Command.make("list", {
   baseDir: baseDirFlag,

@@ -168,13 +168,26 @@ export function isPeerOnline(host: string | null, peers: OnlinePeers["peers"]): 
 const toMs = (value: DateTime.Utc | null | undefined) =>
   value == null ? null : DateTime.toEpochMillis(value);
 
-/** A thread counts as running while it has an active run or is waiting on you. */
+/**
+ * A thread counts as running while it has an active run, is waiting on you, or
+ * still has background work going after its turn ended (a Claude background
+ * Bash build): that work holds the machine as surely as a turn does.
+ */
 function isRunningAgent(thread: OrchestrationV2ThreadShell): boolean {
   return (
     thread.deletedAt === null &&
     thread.archivedAt === null &&
-    (thread.activeRunId !== null || thread.pendingRuntimeRequest !== null)
+    (thread.activeRunId !== null ||
+      thread.pendingRuntimeRequest !== null ||
+      (thread.pendingBackgroundTasks?.length ?? 0) > 0)
   );
+}
+
+/** "background: cargo test", "+2" when there are more: work left after the turn. */
+function backgroundActivity(thread: OrchestrationV2ThreadShell): string {
+  const tasks = thread.pendingBackgroundTasks ?? [];
+  const named = tasks[0]?.description ?? "job";
+  return `background: ${named}${tasks.length > 1 ? ` +${tasks.length - 1}` : ""}`;
 }
 
 function agentsOf(shell: FleetMachineInput["shell"], nowMs: number): Array<FleetAgent> {
@@ -197,7 +210,9 @@ function agentsOf(shell: FleetMachineInput["shell"], nowMs: number): Array<Fleet
           ? "needs you"
           : stuck
             ? "stuck starting"
-            : (thread.currentActivity ?? thread.activityRunStatus ?? "working"),
+            : thread.activeRunId === null
+              ? backgroundActivity(thread)
+              : (thread.currentActivity ?? thread.activityRunStatus ?? "working"),
         needsYou,
         sinceMs,
         stuck,

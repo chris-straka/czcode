@@ -1,7 +1,7 @@
 import type { ThreadControlSummary } from "@cz/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { matchThread, shortThreadId, threadsTitled } from "./thread.ts";
+import { matchThread, shortThreadId, threadStateWord, threadsTitled } from "./thread.ts";
 
 const summary = (threadId: string) => ({ threadId }) as ThreadControlSummary;
 
@@ -37,5 +37,13 @@ describe("cz thread archive --titled", () => {
     ];
     expect(threadsTitled(threads, "Lead: ").map((t) => t.threadId)).toEqual(["a"]);
     expect(threadsTitled(threads, "Host lead: ").map((t) => t.threadId)).toEqual(["d"]);
+  });
+});
+
+describe("cz thread list states", () => {
+  it("calls a thread with background work busy, not idle", () => {
+    expect(threadStateWord({ running: true, busy: true })).toBe("running");
+    expect(threadStateWord({ running: false, busy: true }).trim()).toBe("busy");
+    expect(threadStateWord({ running: false, busy: false }).trim()).toBe("idle");
   });
 });
