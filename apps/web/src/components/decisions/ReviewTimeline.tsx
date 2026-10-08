@@ -79,6 +79,8 @@ export function ReviewTimeline({
   const [selection, setSelection] = useState<{ start: number; end: number } | null>(null);
   const [pending, setPending] = useState<{ start: number; end: number } | null>(null);
   const [note, setNote] = useState("");
+  /** The mark being edited, when a chip was clicked. */
+  const [editing, setEditing] = useState<number | null>(null);
   const drag = useRef<{ x: number; ratio: number; moved: boolean } | null>(null);
 
   const ratioAt = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -96,13 +98,29 @@ export function ReviewTimeline({
     setPending(null);
     setSelection(null);
     setNote("");
+    setEditing(null);
   };
   const save = (tag: TimelineTag) => {
     if (!pending || !onMarks) return;
     const trimmed = note.trim();
     if (tag === "note" && !trimmed) return;
-    onMarks([...marks, { ...pending, tag, ...(trimmed ? { note: trimmed } : {}) }]);
+    const mark = { ...pending, tag, ...(trimmed ? { note: trimmed } : {}) };
+    onMarks(
+      editing === null
+        ? [...marks, mark]
+        : marks.map((other, index) => (index === editing ? mark : other)),
+    );
     close();
+  };
+  /** A chip jumps the player to its mark and opens the mark to edit. */
+  const edit = (index: number) => {
+    const mark = marks[index];
+    if (!mark) return;
+    onSeek(mark.start);
+    setSelection(null);
+    setPending({ start: mark.start, end: mark.end });
+    setNote(mark.note ?? "");
+    setEditing(index);
   };
   const moment = pending !== null && pending.start === pending.end;
 
@@ -245,20 +263,26 @@ export function ReviewTimeline({
             >
               <button
                 type="button"
-                className="tabular-nums hover:underline"
-                onClick={() => onSeek(mark.start)}
+                aria-label={`Play from ${clock(mark.start)} and edit`}
+                className="text-start hover:underline"
+                onClick={() => edit(index)}
               >
-                {TAG_WORD[mark.tag]}{" "}
-                {mark.start === mark.end
-                  ? clock(mark.start)
-                  : `${clock(mark.start)}–${clock(mark.end)}`}
+                <span className="tabular-nums">
+                  {TAG_WORD[mark.tag]}{" "}
+                  {mark.start === mark.end
+                    ? clock(mark.start)
+                    : `${clock(mark.start)}–${clock(mark.end)}`}
+                </span>
+                {mark.note ? <span className="text-muted-foreground"> · {mark.note}</span> : null}
               </button>
-              {mark.note ? <span className="text-muted-foreground">· {mark.note}</span> : null}
               <button
                 type="button"
                 aria-label="Remove mark"
                 className="text-muted-foreground hover:text-foreground"
-                onClick={() => onMarks(marks.filter((_, other) => other !== index))}
+                onClick={() => {
+                  if (editing !== null) close();
+                  onMarks(marks.filter((_, other) => other !== index));
+                }}
               >
                 <XIcon className="size-3" />
               </button>

@@ -25,9 +25,11 @@ and pictures show above the question. Sound plays from its waveform,
 and a video has a timeline under it: click to jump, and on a review drag
 across it to mark a part (sound: like or change; video: keep, cut, or
 change) with a note, or use **Comment at** to pin a note to the moment
-playing. The agent gets the marks and comments with your answer. An
+playing. Click a mark's chip to jump there and edit its note; Space plays
+or pauses. The agent gets the marks and comments with your answer. An
 open Decision shows its media first, with any longer write-up under
-**Details**.
+**Details**. Paste, drop or attach pictures on the note to send them with
+your answer.
 
 On a pick, **None of these** sends your note, if any, and asks the agent
 for new options. Click a selected option again, or press Esc, to clear it.

@@ -137,3 +137,17 @@ describe("toggleOptionId", () => {
     expect(toggleOptionId(multi, ["a", "b"], "a")).toEqual(["b"]);
   });
 });
+
+describe("note pictures", () => {
+  it("go with any answer, and a review still reads as its verdict", () => {
+    const review = item({ kind: "review" });
+    const picture = { type: "image", key: "k", name: "ref.png", mime: "image/png", size: 1 } as const;
+    const answer = draftToAnswer(review, {
+      ...emptyDraft(review),
+      choice: "changes",
+      uploads: [picture],
+    });
+    expect(answer).toMatchObject({ choice: "changes", uploads: [picture] });
+    expect(answerSummary(review, answer)).toBe("Ask for changes");
+  });
+});
