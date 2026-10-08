@@ -25,13 +25,17 @@ and pictures show above the question. Sound plays from its waveform,
 and a video has a timeline under it: click to jump, and on a review drag
 across it to mark a part (sound: like or change; video: keep, cut, or
 change) with a note, or use **Comment at** to pin a note to the moment
-playing. The agent gets the marks and comments with your answer. A
-Decision with a video shows the video first, with the write-up under
+playing. The agent gets the marks and comments with your answer. An
+open Decision shows its media first, with any longer write-up under
 **Details**.
 
 On a pick, **None of these** turns all the options down, and **Try again**
 (**None of these, try again** in the full view) asks the agent for new
 ones; a note is optional.
+
+In an open Decision, answering moves straight to the next open one, and
+after the last it returns to Needs you. The arrows at the top step through
+them without answering.
 
 **No longer relevant** on any Decision dismisses it (you can undo for a few
 seconds). Decisions also close themselves when the agent asks the same

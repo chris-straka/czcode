@@ -55,7 +55,6 @@ type Upload = (
 type Params = {
   readonly environmentId: string;
   readonly id: string;
-  readonly session?: string;
 };
 
 /** One decision, full screen, with its answer controls pinned to the bottom. */
@@ -79,11 +78,11 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => () => void (timer.current && clearInterval(timer.current)), []);
 
+  // After an answer, or on Skip, the next open Decision; after the last, back to the list.
+  const others = feed.entries.filter((candidate) => candidate.item.id !== params.id);
   const goNext = () => {
-    const next =
-      params.session === "1"
-        ? feed.entries.find((candidate) => candidate.item.id !== params.id)
-        : undefined;
+    const index = feed.entries.findIndex((candidate) => candidate.item.id === params.id);
+    const next = others[index] ?? others[0];
     if (next) {
       navigation.setParams({ environmentId: next.environmentId, id: next.item.id } as never);
       setFrozen(null);
@@ -155,7 +154,7 @@ export function DecisionRouteScreen({ route }: StaticScreenProps<Params>) {
             icon: "xmark.circle.fill" as const,
             onPress: () => submit(null),
           },
-          ...(params.session === "1"
+          ...(others.length > 0
             ? [{ accessibilityLabel: "Skip", icon: "chevron.right" as const, onPress: goNext }]
             : []),
         ]}
