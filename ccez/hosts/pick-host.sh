@@ -28,7 +28,7 @@ done
 
 # One line per candidate: score, host, login, note.
 probe() {
-  local host=$1 login=$2 stats
+  local host=$1 login=$2 tags=$3 stats
   # shellcheck disable=SC2016 # expands on the host
   # Linux reads /proc; a Mac host (a MacBook in the fleet) answers through
   # sysctl and vm_stat. Both print: threads, 5-minute load, "GB-free swap%".
@@ -46,12 +46,18 @@ probe() {
   fi
   if [ -z "$stats" ]; then
     # Asleep (or down): idle if it wakes.
-    online "$host" || echo "0.00 $host $login asleep, wakes when picked"
+    online "$host" || awk -v tags="$tags" -v host="$host" -v login="$login" 'BEGIN {
+      speed = match(tags, /speed=[0-9.]+/) ? substr(tags, RSTART + 6, RLENGTH - 6) + 0 : 1
+      printf "%.2f %s %s asleep, wakes when picked\n", 0.2 / speed, host, login }'
     return
   fi
-  awk -v host="$host" -v login="$login" 'NR == 1 {threads = $1} NR == 2 {load = $1}
+  # Busy share of the cores, plus a little so idle machines still rank by
+  # speed, divided by per-core speed (hosts.txt `speed=`): a fast machine
+  # takes work until it's clearly busier than a slow one.
+  awk -v host="$host" -v login="$login" -v tags="$tags" 'NR == 1 {threads = $1} NR == 2 {load = $1}
     NR == 3 {
-      score = load / threads; note = sprintf("load %.1f on %d threads, %d GB free, swap %d%% used", load, threads, $1, $2)
+      speed = match(tags, /speed=[0-9.]+/) ? substr(tags, RSTART + 6, RLENGTH - 6) + 0 : 1
+      score = (load / threads + 0.15) / speed; note = sprintf("load %.1f on %d threads, %d GB free, swap %d%% used", load, threads, $1, $2)
       if ($2 > 50) score += 1
       if ($1 < 4) score += 1
       printf "%.2f %s %s %s\n", score, host, login, note
@@ -59,8 +65,8 @@ probe() {
 }
 
 candidates=$(awk -v need="$need" '!/^#/ && NF >= 2 && $2 != "-" &&
-    (need == "cpu" || index("," $4 ",", "," need ",")) {print $1, $2}' "$hosts_dir/hosts.txt" |
-  { while read -r host login; do probe "$host" "$login" & done; wait; } | sort -n)
+    (need == "cpu" || index("," $4 ",", "," need ",")) {print $1, $2, $4}' "$hosts_dir/hosts.txt" |
+  { while read -r host login tags; do probe "$host" "$login" "$tags" & done; wait; } | sort -n)
 [ -n "$candidates" ] || { echo "No reachable host has '$need'." >&2 && exit 1; }
 $list && awk '{printf "%-12s %s  ", $2, $1; for (i = 4; i <= NF; i++) printf "%s ", $i; print ""}' <<< "$candidates" >&2
 read -r _ host login note <<< "$(head -1 <<< "$candidates")"
