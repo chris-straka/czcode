@@ -117,7 +117,7 @@ export type CzProjectFile = typeof CzProjectFile.Type;
  * change for a new file-backed setting.
  */
 export const PROJECT_FILE_BACKED_SETTINGS = {
-  defaultThreadEnvMode: { field: "defaultThreadEnvMode", builtIn: "local" },
+  defaultThreadEnvMode: { field: "defaultThreadEnvMode", builtIn: "worktree" },
   worktreeSubmodules: { field: "worktreeSubmodules", builtIn: "recursive" },
 } as const satisfies {
   readonly [K in ProjectScopedServerSettingKey]?: {

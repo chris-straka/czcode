@@ -1072,6 +1072,21 @@ export function createServerEnvironmentAtoms<R, E>(
       execute: (input: EnvironmentRpcInput<typeof WS_METHODS.serverGetHostResources>) =>
         request(WS_METHODS.serverGetHostResources, input).pipe(Effect.timeout("5 seconds")),
     }),
+    // Minute samples move slowly; one read per range per minute is plenty.
+    hostLoadHistory: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:host-load-history",
+      tag: WS_METHODS.serverGetHostLoadHistory,
+      staleTimeMs: 60_000,
+    }),
+    // Fleet asks connected machines which tailnet peers are online, to tell
+    // a busy machine from a sleeping one. Servers cache it for 15 seconds.
+    onlinePeers: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:online-peers",
+      tag: WS_METHODS.serverGetOnlinePeers,
+      idleTtlMs: 0,
+      staleTimeMs: 15_000,
+      refreshIntervalMs: 15_000,
+    }),
     processResourceHistory: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:server:process-resource-history",
       tag: WS_METHODS.serverGetProcessResourceHistory,

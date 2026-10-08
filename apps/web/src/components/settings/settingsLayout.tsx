@@ -28,6 +28,9 @@ import {
   isProjectScopedSettingKey,
   listProjectOverrides,
   scopedSettingsAreMixed,
+  describeMachineDifferences,
+  DIFFERS_BY_MACHINE,
+  effectiveScopedSetting,
   scopedSettingsSource,
 } from "./scopedSettings";
 import { useClearProjectOverrides, useClearScopedSettings } from "./useScopedSettings";
@@ -36,6 +39,7 @@ import {
   type SettingInheritanceState,
   type SettingOverridingProject,
 } from "./SettingInheritance";
+import { formatValue } from "./settingValueLabels";
 
 const EMPTY_SETTING_KEYS: readonly (keyof ServerSettings)[] = [];
 
@@ -369,9 +373,9 @@ export function SettingsRow({
       <TooltipPopup side="top">{message}</TooltipPopup>
     </Tooltip>
   );
-  // A mixed selection keeps the real control with "Mixed" as its placeholder
-  // (the multi-selection inspector convention): the popover shows who has
-  // what, and picking a value applies it to every target.
+  // A mixed selection keeps the real control with "Differs by machine" as its
+  // placeholder and names who has what under the description; picking a
+  // value applies it to every target.
   const renderedControl =
     unavailable && control
       ? inertControl(
@@ -396,7 +400,7 @@ export function SettingsRow({
       }),
     );
   const inheritance: { state: SettingInheritanceState; summary: string } = mixed
-    ? { state: "mixed", summary: "Mixed across selected environments" }
+    ? { state: "mixed", summary: DIFFERS_BY_MACHINE }
     : source === "project"
       ? { state: "overridden", summary: "Overridden for this project" }
       : source === "cz.json"
@@ -418,7 +422,19 @@ export function SettingsRow({
         onClearOverrides={(entries) => clearProjectOverrides(entries, scopedKeys)}
       />
     ) : null;
-  const renderedStatus = status;
+  const renderedStatus =
+    mixed && context !== null && settingKeys.length > 0 ? (
+      <>
+        <span className="text-warning">{DIFFERS_BY_MACHINE}:</span>{" "}
+        {describeMachineDifferences(context.targets, (target) =>
+          settingKeys
+            .map((key) => formatValue(key, effectiveScopedSetting(target.settings, key)))
+            .join(" / "),
+        )}
+      </>
+    ) : (
+      status
+    );
 
   return (
     <div

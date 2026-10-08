@@ -15,6 +15,7 @@ import {
   planProjectOverridesClear,
   planScopedSettingsClear,
   planScopedSettingsPatch,
+  describeMachineDifferences,
   resolveScopedSettingsTargets,
   scopedSettingsAreMixed,
   scopedSettingsSource,
@@ -131,14 +132,14 @@ describe("scoped settings targets", () => {
   it("resolves each member's effective settings and source at project scope", () => {
     const overridden = environment("Server", {
       settings: {
-        defaultAutoPull: false,
-        projectSettingsOverrides: { [projectId]: { defaultAutoPull: true } },
+        defaultAutoPull: true,
+        projectSettingsOverrides: { [projectId]: { defaultAutoPull: false } },
       },
     });
     const targets = resolveScopedSettingsTargets(project, [laptop, overridden]);
     expect(targets.map((target) => [target.projectId, target.settings.defaultAutoPull])).toEqual([
-      [projectId, true],
-      [laptopProjectId, false],
+      [projectId, false],
+      [laptopProjectId, true],
     ]);
     expect(scopedSettingsSource(targets, ["defaultAutoPull"])).toBe("mixed");
     expect(scopedSettingsSource([targets[0]!], ["defaultAutoPull"])).toBe("project");
@@ -324,8 +325,8 @@ describe("scoped settings writes", () => {
             rules: {
               worktreeAfterDays: 30,
               worktreeOnDelete: true,
-              worktreeOnMerge: false,
-              worktreeUnchanged: false,
+              worktreeOnMerge: true,
+              worktreeUnchanged: true,
             },
           },
         },
@@ -618,5 +619,36 @@ describe("partial object patches at project scope", () => {
         },
       },
     });
+  });
+});
+
+describe("differs by machine", () => {
+  it("does not count an unset repository-backed value as differing from the built-in", () => {
+    const unset = environment("z", { settings: { defaultThreadEnvMode: null } });
+    const explicit = environment("basement", { settings: { defaultThreadEnvMode: "worktree" } });
+    const local = environment("f-MS-7917", { settings: { defaultThreadEnvMode: "local" } });
+    const scope = all;
+    expect(
+      scopedSettingsAreMixed(resolveScopedSettingsTargets(scope, [unset, explicit]), [
+        "defaultThreadEnvMode",
+      ]),
+    ).toBe(false);
+    expect(
+      scopedSettingsAreMixed(resolveScopedSettingsTargets(scope, [unset, explicit, local]), [
+        "defaultThreadEnvMode",
+      ]),
+    ).toBe(true);
+  });
+
+  it("names which machines hold each value, once per machine", () => {
+    const targets = [
+      { label: "z", value: "New worktree" },
+      { label: "basement", value: "New worktree" },
+      { label: "basement", value: "New worktree" },
+      { label: "f-MS-7917", value: "Current checkout" },
+    ];
+    expect(describeMachineDifferences(targets, (target) => target.value)).toBe(
+      "z, basement: New worktree · f-MS-7917: Current checkout",
+    );
   });
 });

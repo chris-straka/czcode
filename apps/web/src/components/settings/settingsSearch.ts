@@ -21,7 +21,6 @@ export type SettingsPath =
   | "/settings/integrations"
   | "/settings/scheduled-tasks"
   | "/settings/source-control"
-  | "/settings/storage"
   | "/settings/connections"
   | "/settings/archived";
 
@@ -68,6 +67,8 @@ export interface SettingsSearchItem {
    */
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
+  /** Its row only renders while Developer controls is on (Settings > General). */
+  readonly developerOnly?: boolean;
 }
 
 export interface SettingsSearchAvailability {
@@ -80,6 +81,7 @@ export interface SettingsSearchAvailability {
   readonly isWslSettingsRowVisible: boolean;
   readonly hasThreadAutoSettlement: boolean;
   readonly managedTunnelActive?: boolean;
+  readonly developerControls?: boolean;
 }
 
 /**
@@ -96,7 +98,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/integrations": "Integrations",
   "/settings/scheduled-tasks": "Scheduled Tasks",
   "/settings/source-control": "Source Control",
-  "/settings/storage": "Storage",
   "/settings/connections": "Connections",
   "/settings/archived": "Archive",
 };
@@ -137,7 +138,8 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktrees",
     title: "Worktree cleanup",
-    to: "/settings/storage",
+    to: "/settings/source-control",
+    developerOnly: true,
     scope: "project-defaults",
     searchTerms: [
       "disk storage delete deleted archived threads old inactive merged unchanged worktrees retention days project inherit off custom",
@@ -146,14 +148,16 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktrees-location",
     title: "Worktree location",
-    to: "/settings/storage",
+    to: "/settings/source-control",
+    developerOnly: true,
     scope: "environment-defaults",
     searchTerms: ["worktree location folder directory path drive external disk"],
   },
   {
     id: "storage-artifacts",
     title: "Artifacts and logs",
-    to: "/settings/storage",
+    to: "/settings/general",
+    developerOnly: true,
     scope: "environment-defaults",
     searchTerms: ["disk storage browser screenshots captures rotated logs cleanup retention"],
   },
@@ -172,14 +176,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "default-model",
-    title: "Default model",
+    title: "Model",
     to: "/settings/general",
     scope: "project-defaults",
-    searchTerms: ["new thread project provider reasoning effort"],
+    searchTerms: ["default model new thread project provider reasoning effort ai"],
   },
   {
     id: "default-permissions",
-    title: "Permissions",
+    title: "What agents may do",
     to: "/settings/general",
     scope: "project-defaults",
     searchTerms: [
@@ -238,6 +242,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "environment-identification",
     title: "Environment identification",
     to: "/settings/appearance",
+    developerOnly: true,
     searchTerms: ["dev nightly artwork pill label hide none"],
     // The setting is stage-dependent, so its parent section is the stable destination.
     targetId: "appearance-interface",
@@ -283,28 +288,32 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "composer-context",
     title: "Composer context",
     to: "/settings/appearance",
+    developerOnly: true,
   },
   {
     id: "project-grouping",
     title: "Project grouping",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["combine matching repositories environments sidebar"],
   },
   {
     id: "project-order",
     title: "Project order",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["sort projects sidebar manual created recent"],
   },
   {
     id: "snooze-limited-threads",
     title: "Snooze limited threads",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["usage quota rate limit reset wake recover continue"],
   },
   {
     id: "auto-resume-limited-threads",
-    title: "Auto-resume limited threads",
+    title: "Resume after usage limits",
     to: "/settings/general",
     searchTerms: ["usage quota rate limit reset recover continue"],
   },
@@ -312,12 +321,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "working-shelf",
     title: "Working section (beta)",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
   },
   {
     id: "auto-settle-inactive-threads",
     title: "Auto-settle inactive threads",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["sidebar inactivity days no activity automatically"],
     requiresThreadAutoSettlement: true,
     scope: "project-defaults",
@@ -326,6 +337,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "auto-settle-merged-threads",
     title: "Auto-settle merged threads",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["pull request merge closed automatically sidebar"],
     requiresThreadAutoSettlement: true,
     scope: "project-defaults",
@@ -334,6 +346,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "days-before-auto-settle",
     title: "Days of inactivity before auto-settle",
     to: "/settings/general",
+    developerOnly: true,
     targetId: "auto-settle-inactive-threads",
     searchTerms: ["thread timeout activity sidebar"],
     requiresThreadAutoSettlement: true,
@@ -361,6 +374,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "response-streaming",
     title: "Response streaming",
     to: "/settings/general",
+    developerOnly: true,
     scope: "project-defaults",
     searchTerms: ["output token paragraph buffered wait turn legacy"],
   },
@@ -368,42 +382,49 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "hide-whitespace-changes",
     title: "Hide whitespace changes",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["diff ignore spaces edits default"],
   },
   {
     id: "default-diff-file-state",
     title: "Default diff file state",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["collapsed expanded collapse expand files pull request pr code tab"],
   },
   {
     id: "diff-layout",
     title: "Diff layout",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["stacked split side by side unified inline view"],
   },
   {
     id: "proactive-panels",
     title: "Proactive panels",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["automatically open diff pull request pr right panel agent completion"],
   },
   {
     id: "skills-in-slash-menu",
     title: "Show skills in slash menu",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["command menu dollar $ slash /"],
   },
   {
     id: "composer-rich-text",
     title: "Rich text composer",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
   },
   {
     id: "composer-collapse",
     title: "Collapse composer on scroll",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["composer rest resting scroll wheel conversation timeline shrink minimize"],
   },
   {
@@ -414,20 +435,21 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "follow-up-behavior",
-    title: "Follow-up behavior",
+    title: "Messages while an agent works",
     to: "/settings/general",
     searchTerms: ["queue steer running turn send default behavior composer"],
   },
   {
     id: "provider-update-checks",
-    title: "Provider update checks",
+    title: "Check for provider updates",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["installed cli versions newer available codex claude cursor grok opencode"],
     scope: "environment-defaults",
   },
   {
     id: "continue-threads-after-server-update",
-    title: "Continue threads after restarts",
+    title: "Pick up threads after a restart",
     to: "/settings/general",
     scope: "project-defaults",
     searchTerms: [
@@ -438,6 +460,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "background-activity",
     title: "Background activity",
     to: "/settings/general",
+    developerOnly: true,
     scope: "environment-defaults",
     searchTerms: [
       "balanced performance battery saver advanced git fetch provider health refresh host power monitor idle policy",
@@ -445,7 +468,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "new-threads",
-    title: "New threads",
+    title: "Where new threads work",
     to: "/settings/general",
     scope: "project-defaults",
     searchTerms: ["default workspace mode draft local worktree"],
@@ -454,6 +477,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "worktree-submodules",
     title: "Submodules",
     to: "/settings/general",
+    developerOnly: true,
     scope: "project-defaults",
     searchTerms: ["git submodule init recursive top-level none worktree cz.json"],
   },
@@ -461,6 +485,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "start-from-origin",
     title: "Start from origin",
     to: "/settings/general",
+    developerOnly: true,
     scope: "project-defaults",
     searchTerms: ["new worktrees latest matching remote branch local"],
   },
@@ -468,6 +493,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "add-project-starts-in",
     title: "Add project starts in",
     to: "/settings/general",
+    developerOnly: true,
     scope: "environment-defaults",
     searchTerms: ["base directory folder browser path home"],
   },
@@ -500,13 +526,21 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "text-generation-model",
     title: "Text generation model",
     to: "/settings/general",
+    developerOnly: true,
     scope: "project-defaults",
     searchTerms: ["generated thread titles source control content default provider"],
+  },
+  {
+    id: "developer-controls",
+    title: "Developer controls",
+    to: "/settings/general",
+    searchTerms: ["advanced technical git merge worktree diff show hidden settings programmer"],
   },
   {
     id: "diagnostics",
     title: "Diagnostics",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["logs traces processes resource history failures spans cpu memory"],
   },
   {
@@ -518,18 +552,21 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "legacy-plan-mode",
     title: "Plan mode (legacy)",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["build plan composer old"],
   },
   {
     id: "legacy-context-window-indicator",
     title: "Context window indicator (legacy)",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["composer meter usage tokens circle old"],
   },
   {
     id: "legacy-sidebar",
     title: "Sidebar (legacy)",
     to: "/settings/general",
+    developerOnly: true,
     searchTerms: ["project thread tree old flat list"],
   },
   {
@@ -607,6 +644,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "provider-health-check-interval",
     title: "Health check interval",
     to: "/settings/providers",
+    developerOnly: true,
     searchTerms: ["refresh availability versions auth state models background probes seconds off"],
     providerSettingsOnly: true,
   },
@@ -621,12 +659,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "device-hosts",
     title: "Device hosts",
     to: "/settings/integrations",
+    developerOnly: true,
     searchTerms: ["ssh remote simulator emulator ios android mac mini identity key connection"],
   },
   {
     id: "agent-device-access",
     title: "Agent device access",
     to: "/settings/integrations",
+    developerOnly: true,
     targetId: "devices",
     searchTerms: ["allow simulator emulator ios android drive tools sessions"],
   },
@@ -634,6 +674,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "device-hub",
     title: "Device hub",
     to: "/settings/integrations",
+    developerOnly: true,
     targetId: "devices",
     searchTerms: ["simulator emulator ios android install start"],
   },
@@ -641,6 +682,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "device-platform-support",
     title: "Simulator support",
     to: "/settings/integrations",
+    developerOnly: true,
     targetId: "devices",
     searchTerms: ["xcode android studio sdk avd runtime"],
   },
@@ -648,47 +690,55 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "browser-profiles",
     title: "Browser profiles",
     to: "/settings/integrations",
+    developerOnly: true,
     targetId: "browser",
   },
   {
     id: "browser-default-profile",
     title: "Default browser profile",
     to: "/settings/integrations",
+    developerOnly: true,
     targetId: "browser-profiles",
   },
   {
     id: "browser-default-viewport",
     title: "Default browser viewport",
     to: "/settings/integrations",
+    developerOnly: true,
     searchTerms: ["preview size width height device desktop mobile rotate"],
   },
   {
     id: "browser-default-zoom",
     title: "Default browser zoom",
     to: "/settings/integrations",
+    developerOnly: true,
     searchTerms: ["preview page scale tabs percent"],
   },
   {
     id: "browser-default-appearance",
     title: "Default browser appearance",
     to: "/settings/integrations",
+    developerOnly: true,
     searchTerms: ["preview color scheme light dark system os"],
   },
   {
     id: "browser-recording-frame-rate",
     title: "Browser recording frame rate",
     to: "/settings/integrations",
+    developerOnly: true,
   },
   {
     id: "browser-recording-key-presses",
     title: "Show key presses in recordings",
     to: "/settings/integrations",
+    developerOnly: true,
     searchTerms: ["browser preview keyboard shortcuts keystrokes overlay capture"],
   },
   {
     id: "browser-recording-mouse-presses",
     title: "Show mouse presses in recordings",
     to: "/settings/integrations",
+    developerOnly: true,
     searchTerms: ["browser preview clicks buttons drag overlay capture"],
   },
   {
@@ -701,19 +751,23 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "browser-auto-show-floating-preview",
     title: "Auto-show floating preview",
     to: "/settings/integrations",
+    developerOnly: true,
     searchTerms: ["agent opens browser device simulator pop into view hide"],
   },
   {
     id: "automatic-pull",
-    title: "Automatically pull",
+    title: "Keep projects up to date",
     to: "/settings/source-control",
     scope: "project-defaults",
-    searchTerms: ["auto pull default branch current checkout fast forward upstream"],
+    searchTerms: [
+      "automatically pull auto pull latest main default branch current checkout fast forward upstream",
+    ],
   },
   {
     id: "remove-agent-credits-on-merge",
     title: "Remove agent credits when merging",
     to: "/settings/source-control",
+    developerOnly: true,
     scope: "project-defaults",
     searchTerms: ["pull request github squash co-authored-by attribution claude codex generated"],
   },
@@ -721,6 +775,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "pull-request-merge-method",
     title: "Default merge method",
     to: "/settings/source-control",
+    developerOnly: true,
     scope: "project-defaults",
     searchTerms: ["pull request merge squash rebase last selected"],
   },
@@ -737,6 +792,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "git-fetch-interval",
     title: "Git fetch interval",
     to: "/settings/source-control",
+    developerOnly: true,
     searchTerms: [
       "automatic remote branch refresh background credentials security keys seconds off",
     ],
@@ -747,6 +803,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "worktree-branch-naming",
     title: "Worktree branch naming",
     to: "/settings/source-control",
+    developerOnly: true,
     searchTerms: ["static semantic prefix custom prompt instructions feat fix refactor chore"],
     environmentOnly: true,
     scope: "project-defaults",
@@ -765,6 +822,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "bitbucket-credentials",
     title: "Bitbucket credentials",
     to: "/settings/source-control",
+    developerOnly: true,
     searchTerms: ["bitbucket atlassian access token api token email credentials sign in"],
     environmentOnly: true,
     scope: "environment-defaults",
@@ -773,6 +831,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "source-control-writing-style",
     title: "Source control writing style",
     to: "/settings/source-control",
+    developerOnly: true,
     searchTerms: [
       "repository conventions conventional commits custom instructions change descriptions request titles",
     ],
@@ -782,6 +841,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "follow-change-request-templates",
     title: "Follow change request templates",
     to: "/settings/source-control",
+    developerOnly: true,
     searchTerms: ["repository pr pull request description structure"],
     environmentOnly: true,
   },
@@ -789,6 +849,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "source-control-writer-model",
     title: "Source control writer model",
     to: "/settings/source-control",
+    developerOnly: true,
     searchTerms: [
       "override generated commit change request pr titles descriptions branch bookmark",
     ],
@@ -926,7 +987,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/providers": null,
   "/settings/integrations": null,
   "/settings/source-control": "environment-defaults",
-  "/settings/storage": "project-defaults",
   "/settings/connections": "connections",
   "/settings/scheduled-tasks": null,
   "/settings/archived": "project-defaults",
@@ -1049,7 +1109,8 @@ export function filterAvailableSettingsSearchItems(
       (!item.localEnvironmentOnly || !availability.localEnvironmentDisabled) &&
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
-      (!item.managedTunnelOnly || availability.managedTunnelActive === true),
+      (!item.managedTunnelOnly || availability.managedTunnelActive === true) &&
+      (!item.developerOnly || availability.developerControls === true),
   );
 }
 

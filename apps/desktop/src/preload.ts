@@ -45,11 +45,12 @@ const clientPlatform = process.platform;
 
 if (clientPlatform === "darwin") {
   // Native window buttons do not scale with Chromium zoom. Keep their reserved
-  // space in native points, including when a zoomed page is reloaded.
+  // space in native points, including when a zoomed page is reloaded. The
+  // buttons sit at x=16 and end near 70pt; 78 leaves a small gap after them.
   const syncWindowControlInset = () => {
     document.documentElement.style.setProperty(
       "--desktop-window-controls-inset",
-      `${90 / webFrame.getZoomFactor()}px`,
+      `${78 / webFrame.getZoomFactor()}px`,
     );
   };
   window.addEventListener("DOMContentLoaded", syncWindowControlInset, { once: true });

@@ -1,8 +1,4 @@
-import {
-  answerSummary,
-  VERDICT_BUTTONS,
-  optionMedia,
-} from "@cz/client-runtime/decisions/draft";
+import { answerSummary, VERDICT_BUTTONS, optionMedia } from "@cz/client-runtime/decisions/draft";
 import { briefWindow, buildMorningBrief } from "@cz/client-runtime/decisions/morningBrief";
 import {
   buildOneFeed,
@@ -36,10 +32,7 @@ import { useJobsOn } from "~/state/jobs";
 import { useNavigateBack } from "~/hooks/useNavigateBack";
 import { useVimKeys } from "~/hooks/useVimKeys";
 import { useAtomCommand } from "~/state/use-atom-command";
-import {
-  DECISION_OPTION_FRAME_CLASS,
-  DecisionMedia,
-} from "../decisions/DecisionMedia";
+import { DECISION_OPTION_FRAME_CLASS, DecisionMedia } from "../decisions/DecisionMedia";
 import { DecisionView, type UploadDecisionMedia } from "../decisions/DecisionView";
 import { NoProjectsHero } from "../NoProjectsHero";
 import { SidebarUpdateArchitectureWarning } from "../sidebar/SidebarUpdatePill";
@@ -53,25 +46,36 @@ import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { FeedModal } from "./FeedModal";
 import { FeedThreadCard } from "./FeedThreadCard";
 import { FeedGroupToggle, type FeedProjectChoice, FeedProjectsMenu } from "./FeedFilters";
-import { FeedThreadGroups } from "./FeedThreadGroups";
+import { FeedThreadGroups, ThreadsViewControls } from "./FeedThreadGroups";
 import { FeedTopBar } from "./FeedTopBar";
 import { MorningBriefCard } from "./MorningBriefCard";
 
-/** Moves focus to the next, previous, first, or last card, row or group in the feed. */
-function focusFeedItem(step: 1 | -1 | "first" | "last") {
+/**
+ * Moves focus through the feed's cards, rows and groups: by `step` items, to
+ * an end, or by half a screen ("half"), keeping the focused item in view.
+ */
+function focusFeedItem(step: number | "first" | "last" | "half-down" | "half-up") {
   const items = [
     ...document.querySelectorAll<HTMLElement>("[data-feed-page] [data-feed-item]"),
   ].filter((item) => item.offsetParent !== null);
   if (items.length === 0) return;
   const current = items.indexOf(document.activeElement as HTMLElement);
-  const next =
-    step === "first"
-      ? items[0]
-      : step === "last"
-        ? items.at(-1)
-        : current === -1
-          ? items[step === 1 ? 0 : items.length - 1]
-          : items[Math.min(items.length - 1, Math.max(0, current + step))];
+  let next: HTMLElement | undefined;
+  if (step === "first") next = items[0];
+  else if (step === "last") next = items.at(-1);
+  else if (step === "half-down" || step === "half-up") {
+    const from = items[current]?.getBoundingClientRect().top ?? 0;
+    const offset = (step === "half-down" ? 1 : -1) * (window.innerHeight / 2);
+    const goal = from + offset;
+    next =
+      step === "half-down"
+        ? (items.find((item) => item.getBoundingClientRect().top >= goal) ?? items.at(-1))
+        : (items.findLast((item) => item.getBoundingClientRect().top <= goal) ?? items[0]);
+  } else
+    next =
+      current === -1
+        ? items[step > 0 ? 0 : items.length - 1]
+        : items[Math.min(items.length - 1, Math.max(0, current + step))];
   next?.focus();
   next?.scrollIntoView({ block: "nearest" });
 }
@@ -120,6 +124,7 @@ export function FeedPage() {
   const withdrawCommand = useAtomCommand(decisionEnvironment.withdraw, "dismiss decision");
   const selectedProjects = useFeedFilterStore((state) => state.projects);
   const group = useFeedFilterStore((state) => state.group);
+  const threadsView = useFeedFilterStore((state) => state.threadsView);
   const [showAnswered, setShowAnswered] = useState(false);
   const location = useLocation({
     select: (value) => ({ pathname: value.pathname, search: value.search }),
@@ -299,6 +304,12 @@ export function FeedPage() {
   });
   // Needs you (/) and Threads (/threads) are two pages; a Decision opens over Needs you.
   const tab: "needs" | "threads" = location.pathname === "/threads" ? "threads" : "needs";
+  const openProject =
+    tab === "threads" && typeof location.search.project === "string"
+      ? location.search.project
+      : null;
+  // The project grid needs room; every other view reads as one column.
+  const wide = tab === "threads" && openProject === null && threadsView === "grid";
   // Each page keeps its own scroll position across switches.
   const scrollerRef = useRef<HTMLDivElement>(null);
   const scrollTops = useRef({ needs: 0, threads: 0 });
@@ -438,13 +449,25 @@ export function FeedPage() {
     />
   );
 
-  // j/k step through cards, rows and groups; gg and G jump to the ends; Enter opens.
+  // ccez-llm motions over cards, rows and groups: j/k one, d/u three, Ctrl+D/U
+  // half a screen, gg/G the ends; l or Enter opens the focused one.
   useVimKeys(
     {
-      down: () => focusFeedItem(1),
-      up: () => focusFeedItem(-1),
+      move: (direction, size) =>
+        focusFeedItem(
+          size === "half"
+            ? direction > 0
+              ? "half-down"
+              : "half-up"
+            : direction * (size === "skip" ? 3 : 1),
+        ),
       top: () => focusFeedItem("first"),
       bottom: () => focusFeedItem("last"),
+      open: () => {
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && focused.closest("[data-feed-page] [data-feed-item]"))
+          focused.click();
+      },
     },
     (location.pathname === "/" ||
       location.pathname === "/threads" ||
@@ -470,29 +493,43 @@ export function FeedPage() {
         }}
         filters={filters}
       />
-      {/* The page never scrolls sideways; only the chip row does. */}
+      {/* The page never scrolls sideways; only the chip row does. A long URL or word wraps. */}
       <div ref={scrollerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl min-w-0 space-y-3 px-4 py-4">
+        <div
+          className={cn(
+            "mx-auto w-full min-w-0 space-y-3 px-4 py-4 wrap-anywhere",
+            wide ? "max-w-7xl" : "max-w-2xl",
+          )}
+        >
           <SidebarUpdateArchitectureWarning />
-          <ToggleGroup
-            aria-label="Feed"
-            value={[tab]}
-            onValueChange={(value) => {
-              const next = value[0];
-              if ((next === "needs" || next === "threads") && next !== tab) {
-                void navigate({ to: next === "threads" ? "/threads" : "/" });
-              }
-            }}
-          >
-            <Toggle size="sm" value="needs">
-              Needs you
-              <span className="tabular-nums text-warning-foreground">{needsYou.length}</span>
-            </Toggle>
-            <Toggle size="sm" value="threads">
-              Threads
-              <span className="tabular-nums text-muted-foreground">{groupedThreads.length}</span>
-            </Toggle>
-          </ToggleGroup>
+          <div className="flex flex-wrap items-center gap-2">
+            <ToggleGroup
+              aria-label="Feed"
+              value={[tab]}
+              onValueChange={(value) => {
+                const next = value[0];
+                if ((next === "needs" || next === "threads") && next !== tab) {
+                  void navigate({ to: next === "threads" ? "/threads" : "/" });
+                }
+              }}
+            >
+              <Toggle size="sm" value="needs">
+                Needs you
+                <span className="tabular-nums text-warning-foreground">{needsYou.length}</span>
+              </Toggle>
+              <Toggle size="sm" value="threads">
+                Threads
+                <span className="tabular-nums text-muted-foreground">{groupedThreads.length}</span>
+              </Toggle>
+            </ToggleGroup>
+            {tab === "threads" && openProject === null ? (
+              <ThreadsViewControls
+                projects={[
+                  ...new Set(groupedThreads.map((thread) => feedProjectKey(folderOf(thread)))),
+                ]}
+              />
+            ) : null}
+          </div>
           {/* Beside the search bar on wider screens; here on a phone. */}
           <div className="flex flex-wrap items-center gap-1.5 md:hidden">{filters}</div>
           {selectedBlurbs.map(({ project, description }) => (
@@ -524,7 +561,9 @@ export function FeedPage() {
                   thread.hasPendingApprovals ||
                   thread.hasPendingUserInput
                 }
+                project={openProject}
                 now={now}
+                enabled={openKey === null}
               />
             )
           ) : feed.isPending && threads.length === 0 ? (
@@ -793,8 +832,7 @@ function DecisionCard({
       ? []
       : item.media.filter((media) => media.type === "image").slice(0, 3);
   // A review or pitch answers right on the card; a wrong answer is undone from its toast.
-  const quick =
-    item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
+  const quick = item.kind === "review" || item.kind === "pitch" ? VERDICT_BUTTONS[item.kind] : null;
   const mediaOf = (option: (typeof item.options)[number]) => optionMedia(item, option);
   // Only single-choice picks answer from the card; the rest open the full view.
   const inlinePick = item.kind === "pick" && item.max_choices === 1 && item.options.length > 0;

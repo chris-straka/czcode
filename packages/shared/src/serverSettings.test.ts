@@ -35,8 +35,8 @@ describe("serverSettings helpers", () => {
     ).toEqual({
       worktreeAfterDays: null,
       worktreeOnMerge: true,
-      worktreeOnDelete: false,
-      worktreeUnchanged: false,
+      worktreeOnDelete: true,
+      worktreeUnchanged: true,
       browserArtifactsAfterDays: null,
       logsAfterDays: 30,
     });
@@ -144,13 +144,10 @@ describe("serverSettings helpers", () => {
     expect(resolveProjectScripts(secondUpdate, firstProject)).toEqual([firstAction]);
   });
 
-  it("inherits automatic pull while preserving legacy opt-ins and explicit overrides", () => {
+  it("pulls by default while honoring project overrides and a disabled default", () => {
     const projectId = ProjectId.make("project-pull");
-    expect(resolveProjectAutoPull(DEFAULT_SERVER_SETTINGS, projectId, false)).toBe(false);
-    expect(resolveProjectAutoPull(DEFAULT_SERVER_SETTINGS, projectId, true)).toBe(true);
-    const enabled = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, { defaultAutoPull: true });
-    expect(resolveProjectAutoPull(enabled, projectId, false)).toBe(true);
-    const overridden = applyServerSettingsPatch(enabled, {
+    expect(resolveProjectAutoPull(DEFAULT_SERVER_SETTINGS, projectId, false)).toBe(true);
+    const overridden = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       projectAutoPullOverrides: { [projectId]: false },
     });
     expect(resolveProjectAutoPull(overridden, projectId, true)).toBe(false);
@@ -164,6 +161,8 @@ describe("serverSettings helpers", () => {
     });
     expect(resolveProjectAutoPull(disabled, projectId, false)).toBe(true);
     expect(resolveProjectAutoPull(disabled, ProjectId.make("other-project"), false)).toBe(false);
+    // Existing per-project opt-ins stay on even when the default is off.
+    expect(resolveProjectAutoPull(disabled, ProjectId.make("other-project"), true)).toBe(true);
   });
 
   it("inherits browser access and restores inheritance when a project override is removed", () => {

@@ -1,7 +1,7 @@
 import type { ScheduleJob } from "@cz/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { scheduleJobRunLabel, sortScheduleJobs } from "./jobs.ts";
+import { isSystemTimer, scheduleJobRunLabel, sortScheduleJobs } from "./jobs.ts";
 
 const job = (id: string, overrides: Partial<ScheduleJob>): ScheduleJob => ({
   id,
@@ -46,5 +46,14 @@ describe("scheduleJobRunLabel", () => {
       scheduleJobRunLabel({ status: "failed", at: now - 6 * 60 * 60 * 1000, reason: null }, now),
     ).toBe("Failed 6h 0m ago");
     expect(scheduleJobRunLabel({ status: "never", at: null, reason: null }, now)).toBe("Never run");
+  });
+});
+
+describe("isSystemTimer", () => {
+  it("hides the OS's timers and keeps ours, treating older servers' unregistered timers as the OS's", () => {
+    expect(isSystemTimer(job("a", {}))).toBe(false);
+    expect(isSystemTimer(job("b", { registered: false, system: false }))).toBe(false);
+    expect(isSystemTimer(job("c", { registered: false, system: true }))).toBe(true);
+    expect(isSystemTimer(job("d", { registered: false }))).toBe(true);
   });
 });

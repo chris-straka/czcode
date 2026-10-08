@@ -249,6 +249,7 @@ describe("searchSettings", () => {
       canManageLocalBackend: false,
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: true,
+      developerControls: true,
     });
 
     expect(searchSettings("auto-settle", available).map((item) => item.id)).toEqual([
@@ -352,6 +353,31 @@ describe("searchSettings", () => {
     expect(searchSettings("external links")[0]).toMatchObject({ id: "browser-link-target" });
   });
 
+  it("finds technical settings only while Developer controls is on", () => {
+    const availability = {
+      hasCloudPublicConfig: false,
+      hasEnvironment: true,
+      hasProviderSettingsEnvironment: true,
+      hasMacProviderSettingsEnvironment: false,
+      canManageLocalBackend: false,
+      isWslSettingsRowVisible: false,
+      hasThreadAutoSettlement: true,
+    };
+    const ids = (developerControls: boolean) =>
+      searchSettings(
+        "merge method",
+        filterAvailableSettingsSearchItems({ ...availability, developerControls }),
+      ).map((item) => item.id);
+    expect(ids(false)).not.toContain("pull-request-merge-method");
+    expect(ids(true)).toContain("pull-request-merge-method");
+    expect(
+      searchSettings(
+        "keep projects up to date",
+        filterAvailableSettingsSearchItems(availability),
+      )[0]?.id,
+    ).toBe("automatic-pull");
+  });
+
   it("finds the default browser profile action in the profiles list", () => {
     expect(searchSettings("default profile")[0]).toMatchObject({
       id: "browser-default-profile",
@@ -380,6 +406,7 @@ describe("searchSettings", () => {
       canManageLocalBackend: false,
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: true,
+      developerControls: true,
     });
     expect(searchSettings("writing style", available)[0]?.id).toBe("source-control-writing-style");
     expect(searchSettings("auto-settle", available)).toHaveLength(3);
@@ -475,6 +502,7 @@ describe("auto-settlement search availability", () => {
       canManageLocalBackend: false,
       isWslSettingsRowVisible: false,
       hasThreadAutoSettlement: availability.eligibleEnvironmentIds.length > 0,
+      developerControls: true,
     });
     expect(searchSettings("auto-settle", items).map((item) => item.id)).toEqual([
       "auto-settle-inactive-threads",

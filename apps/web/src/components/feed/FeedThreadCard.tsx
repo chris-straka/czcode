@@ -40,7 +40,7 @@ const STATUS_BADGE: Record<
   idle: { label: "Idle", variant: "secondary" },
 };
 
-function FeedStatusBadge({ status }: { readonly status: FeedThreadStatus }) {
+export function FeedStatusBadge({ status }: { readonly status: FeedThreadStatus }) {
   const { label, variant } = STATUS_BADGE[status];
   return (
     <Badge variant={variant} size="sm">
@@ -133,6 +133,8 @@ export function FeedThreadRow({
   age,
   status,
   excerpt,
+  tries = 1,
+  hoverTarget,
 }: {
   readonly thread: EnvironmentThreadShell;
   readonly machine: string;
@@ -140,9 +142,14 @@ export function FeedThreadRow({
   readonly age: string;
   readonly status: FeedThreadStatus;
   readonly excerpt: string | null;
+  /** Retries of the same title folded into this row. */
+  readonly tries?: number;
+  /** Names the row to the hover keys. */
+  readonly hoverTarget?: string;
 }) {
   return (
     <Link
+      data-hover-target={hoverTarget}
       to="/$environmentId/$threadId"
       params={{ environmentId: thread.environmentId, threadId: thread.id }}
       className={cn(
@@ -154,6 +161,9 @@ export function FeedThreadRow({
       <div className="flex min-w-0 items-center gap-2">
         <FeedStatusBadge status={status} />
         <span className="truncate font-medium text-foreground">{thread.title}</span>
+        {tries > 1 ? (
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">×{tries}</span>
+        ) : null}
       </div>
       {excerpt ? <p className="truncate text-sm text-muted-foreground">{excerpt}</p> : null}
       <FeedMeta machine={machine} folder={folder} model={threadModelLabel(thread)} age={age} />

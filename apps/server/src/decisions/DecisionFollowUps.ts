@@ -33,6 +33,7 @@ import * as OrchestratorV2 from "../orchestration-v2/Orchestrator.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ResetQueueService from "../resetQueue/ResetQueueService.ts";
+import { forkParked } from "../serverActivation.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as DecisionService from "./DecisionService.ts";
 
@@ -230,7 +231,10 @@ const make = Effect.gen(function* () {
       ),
     );
 
-  yield* Effect.forkScoped(
+  // Parked until startup recovery is done: a follow-up launched during
+  // recovery has its start effect retired as if a dead process left it, and
+  // the run then sits in "starting" forever.
+  yield* forkParked(
     Effect.gen(function* () {
       const since = (yield* Clock.currentTimeMillis) - CATCH_UP_MS;
       const recent = yield* decisions.history({ limit: 200 }).pipe(Effect.orElseSucceed(() => []));
