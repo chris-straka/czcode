@@ -4,6 +4,7 @@ import * as NodeNet from "node:net";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
+import { HostProcessPlatform } from "@cz/shared/hostProcess";
 
 vi.mock("electron", () => ({
   nativeImage: {
@@ -15,6 +16,9 @@ vi.mock("electron", () => ({
 }));
 import { captureNiriWindow, checkNiriCaptureSupport, niriSocketPath } from "./NiriSnapShot.ts";
 import { captureLinuxWindow, getLinuxCaptureSupport } from "./LinuxSnapShot.ts";
+
+// Niri is a Linux compositor reached over a Unix socket.
+const itOnUnix = it.skipIf(HostProcessPlatform.defaultValue() === "win32");
 
 const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
 const window = {
@@ -108,7 +112,7 @@ afterEach(async () => {
   await NodeFSP.rm(directory, { recursive: true, force: true });
 });
 
-it("selects the native adapter without needing a portal or GNOME extension", async () => {
+itOnUnix("selects the native adapter without needing a portal or GNOME extension", async () => {
   expect(await getLinuxCaptureSupport("uk.ccez.cz")).toEqual({
     linuxBackend: "niri",
     linuxFeedbackAvailable: false,
@@ -129,7 +133,7 @@ it("selects the native adapter without needing a portal or GNOME extension", asy
   expect(await NodeFSP.stat(NodePath.dirname(capturePath!)).catch(() => undefined)).toBeUndefined();
 });
 
-it("does not activate cz until requested, then matches PID and title", async () => {
+itOnUnix("does not activate cz until requested, then matches PID and title", async () => {
   const snapshot = await captureNiriWindow(socketPath);
   expect(calls.some((call) => typeof call !== "string" && call.Action.FocusWindow)).toBe(false);
   windows = [
@@ -141,7 +145,7 @@ it("does not activate cz until requested, then matches PID and title", async () 
   expect(calls).toContainEqual({ Action: { FocusWindow: { id: 3 } } });
 });
 
-it("waits for the restored cz window to map instead of polling", async () => {
+itOnUnix("waits for the restored cz window to map instead of polling", async () => {
   const snapshot = await captureNiriWindow(socketPath);
   const original = handler;
   handler = async (request, socket) => {
@@ -155,13 +159,13 @@ it("waits for the restored cz window to map instead of polling", async () => {
   expect(calls).toContainEqual({ Action: { FocusWindow: { id: 4 } } });
 });
 
-it("rejects ambiguous activation targets", async () => {
+itOnUnix("rejects ambiguous activation targets", async () => {
   const snapshot = await captureNiriWindow(socketPath);
   windows = [1, 2].map((id) => ({ ...window, id, pid: process.pid, title: "czcode" }));
   await expect(snapshot.feedback!.activate("czcode")).rejects.toThrow("More than one");
 });
 
-it("cancels pending activation when capture feedback is closed", async () => {
+itOnUnix("cancels pending activation when capture feedback is closed", async () => {
   const snapshot = await captureNiriWindow(socketPath);
   const started = Promise.withResolvers<void>();
   const original = handler;
@@ -176,20 +180,20 @@ it("cancels pending activation when capture feedback is closed", async () => {
   expect(calls.some((call) => typeof call !== "string" && call.Action.FocusWindow)).toBe(false);
 });
 
-it("does not attach accessibility identity if the captured window changed", async () => {
+itOnUnix("does not attach accessibility identity if the captured window changed", async () => {
   windows = [{ ...window, title: "Different document" }];
   const snapshot = await captureNiriWindow(socketPath);
   expect(snapshot.png).toEqual(png);
   expect(snapshot.window).toBeUndefined();
 });
 
-it("fails without a focused window rather than taking the screen", async () => {
+itOnUnix("fails without a focused window rather than taking the screen", async () => {
   focused = null;
   await expect(captureNiriWindow(socketPath)).rejects.toThrow("no focused window");
   expect(capturePath).toBeUndefined();
 });
 
-it("rejects compositor errors and cleans up its temporary image", async () => {
+itOnUnix("rejects compositor errors and cleans up its temporary image", async () => {
   const original = handler;
   handler = async (request, socket) => {
     if (typeof request !== "string" && request.Action.ScreenshotWindow) {
@@ -201,17 +205,20 @@ it("rejects compositor errors and cleans up its temporary image", async () => {
   expect(await NodeFSP.stat(NodePath.dirname(capturePath!)).catch(() => undefined)).toBeUndefined();
 });
 
-it.each(["24.11", "25.05", "unknown"])("rejects unsupported Niri version %s", async (value) => {
-  version = value;
-  await expect(checkNiriCaptureSupport(socketPath)).rejects.toThrow("25.11 or newer");
-});
+itOnUnix.each(["24.11", "25.05", "unknown"])(
+  "rejects unsupported Niri version %s",
+  async (value) => {
+    version = value;
+    await expect(checkNiriCaptureSupport(socketPath)).rejects.toThrow("25.11 or newer");
+  },
+);
 
-it.each(["25.11", "26.04", "niri 26.04 (abc)"])("accepts Niri version %s", async (value) => {
+itOnUnix.each(["25.11", "26.04", "niri 26.04 (abc)"])("accepts Niri version %s", async (value) => {
   version = value;
   await checkNiriCaptureSupport(socketPath);
 });
 
-it.each(["garbage\n", "x".repeat(4 * 1024 * 1024 + 1)])(
+itOnUnix.each(["garbage\n", "x".repeat(4 * 1024 * 1024 + 1)])(
   "bounds malformed compositor replies",
   async (reply) => {
     handler = async (_request, socket) => {
@@ -221,14 +228,14 @@ it.each(["garbage\n", "x".repeat(4 * 1024 * 1024 + 1)])(
   },
 );
 
-it("fails promptly when Niri disconnects", async () => {
+itOnUnix("fails promptly when Niri disconnects", async () => {
   handler = async (_request, socket) => {
     socket.end();
   };
   await expect(checkNiriCaptureSupport(socketPath)).rejects.toThrow("disconnected");
 });
 
-it("bounds requests even when the compositor never answers", async () => {
+itOnUnix("bounds requests even when the compositor never answers", async () => {
   vi.useFakeTimers();
   const received = Promise.withResolvers<void>();
   handler = async () => received.resolve();
@@ -238,7 +245,7 @@ it("bounds requests even when the compositor never answers", async () => {
   await result;
 });
 
-it("does not use stale, relative, or sandboxed Niri sockets", () => {
+itOnUnix("does not use stale, relative, or sandboxed Niri sockets", () => {
   expect(niriSocketPath()).toBe(socketPath);
   expect(niriSocketPath({ XDG_CURRENT_DESKTOP: "GNOME", NIRI_SOCKET: socketPath })).toBeUndefined();
   expect(niriSocketPath({ XDG_CURRENT_DESKTOP: "niri", NIRI_SOCKET: "relative" })).toBeUndefined();

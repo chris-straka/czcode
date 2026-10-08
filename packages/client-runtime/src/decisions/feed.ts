@@ -6,7 +6,7 @@
 import type { DecisionItem, DecisionKind } from "@cz/contracts";
 
 /** Projects that sort ahead of the rest, highest first (ccez/DECISIONS.md). */
-export const DEFAULT_PROJECT_ORDER: readonly string[] = ["hll"];
+const DEFAULT_PROJECT_ORDER: readonly string[] = ["hll"];
 
 // "hll", "hll-bevy", and "hll:art" all belong to the hll project.
 function projectRank(project: string, order: readonly string[]): number {
@@ -39,7 +39,7 @@ export function orderFeed(
 ): DecisionItem[] {
   return items
     .filter((item) => item.status === "open")
-    .toSorted((a, b) => compareFeedItems(a, b, projectOrder));
+    .sort((a, b) => compareFeedItems(a, b, projectOrder));
 }
 
 export interface FeedFilter {
@@ -63,7 +63,7 @@ export function filterChips(items: readonly DecisionItem[]): {
   const count = <K>(keys: readonly K[]) => {
     const counts = new Map<K, number>();
     for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
-    return [...counts].toSorted((a, b) => b[1] - a[1]).map(([key]) => key);
+    return [...counts].sort((a, b) => b[1] - a[1]).map(([key]) => key);
   };
   return {
     projects: count(items.map((item) => item.project)),

@@ -1,6 +1,14 @@
+import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
-import { activeUserSessions, asleepMs, nextWakeAt, shouldSleep } from "./idle.ts";
+import {
+  activeUserSessions,
+  asleepMs,
+  nextDailyWakeAt,
+  nextWakeAt,
+  runningHostJobs,
+  shouldSleep,
+} from "./idle.ts";
 
 const MIN = 60 * 1000;
 
@@ -50,5 +58,33 @@ describe("host sleep rules", () => {
     ] as const;
     expect(asleepMs(events, 0, 160 * MIN)).toBe(100 * MIN);
     expect(asleepMs(events, 30 * MIN, 160 * MIN)).toBe(70 * MIN);
+  });
+
+  it("stays awake for a running host job, not for agent scopes or other units", () => {
+    const output = [
+      "cz-job-backup.service loaded activating start start cz host job: backup",
+      "cz-agent-123-claude.scope loaded active running claude",
+      "other.service loaded activating start start something else",
+    ].join("\n");
+    expect(runningHostJobs(output)).toEqual(["cz-job-backup.service"]);
+    expect(runningHostJobs("")).toEqual([]);
+  });
+
+  it("wakes at the next daily wake time in the host's time zone", () => {
+    const zone = DateTime.zoneMakeNamedUnsafe("America/Edmonton");
+    const at = (iso: string) => DateTime.toEpochMillis(DateTime.makeUnsafe(iso));
+    // 22:00 MDT on Oct 7 is 04:00Z on Oct 8; 03:30 MDT on Oct 8 is 09:30Z.
+    expect(nextDailyWakeAt("03:30", at("2026-10-08T04:00:00Z"), zone)).toBe(
+      at("2026-10-08T09:30:00Z"),
+    );
+    // Just past 03:30 the next one is tomorrow's; the earliest of several wins.
+    expect(nextDailyWakeAt("03:30", at("2026-10-08T09:31:00Z"), zone)).toBe(
+      at("2026-10-09T09:30:00Z"),
+    );
+    expect(nextDailyWakeAt("12:00, 03:30", at("2026-10-08T09:31:00Z"), zone)).toBe(
+      at("2026-10-08T18:00:00Z"),
+    );
+    expect(nextDailyWakeAt("", 0, zone)).toBeNull();
+    expect(nextDailyWakeAt("25:00,soon", 0, zone)).toBeNull();
   });
 });

@@ -14,6 +14,11 @@ export const ThreadControlSummary = Schema.Struct({
   /** instance/model, like claudeAgent/claude-opus-5-5. */
   model: Schema.String,
   running: Schema.Boolean,
+  /**
+   * Running, about to start a turn, or still running background tasks: a
+   * server restart would cut it off. Absent from older servers.
+   */
+  busy: Schema.optional(Schema.Boolean),
   archived: Schema.Boolean,
   updatedAt: Schema.String,
 });

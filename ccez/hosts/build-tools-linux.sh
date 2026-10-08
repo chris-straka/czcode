@@ -2,7 +2,8 @@
 # Everything an agent host needs to build the factory's projects, roughly
 # matching the Mac (`z`): Rust, Go, Java/Kotlin, Android SDK + NDK, C/C++,
 # Python, Node/bun, .NET, Docker, Kubernetes tools, Bevy's system libraries,
-# Blender, media tools, and an NVIDIA driver when the GPU is recent enough.
+# Blender, media tools, an NVIDIA driver when the GPU is recent enough, and
+# an Android emulator for agents (android-emulator.sh).
 # linux.sh runs this for you; run it alone to add tools to an existing host:
 #
 #   bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh
@@ -18,7 +19,7 @@
 set -euo pipefail
 
 BLENDER_VERSION=5.2.1                         # same as the Mac
-NDK_VERSIONS="28.2.13676358 30.0.16138531"    # first one is the default (games/tools/build_android.sh)
+NDK_VERSIONS="28.2.13676358 30.0.16138531"    # first one is the default (games/_tools/build_android.sh)
 ANDROID_PACKAGES="cmdline-tools;latest platform-tools platforms;android-36 build-tools;36.0.0 cmake;4.1.2 emulator system-images;android-36;google_apis;x86_64"
 JDK=21
 
@@ -220,6 +221,12 @@ if want android && [ "$arch" = amd64 ]; then
   # Google's Android CLI: `android init` installs its skill for Claude, Codex and OpenCode.
   android_cli="$ANDROID_HOME/cmdline-tools/latest/bin/android"
   [ ! -x "$android_cli" ] || "$android_cli" init > /dev/null
+  # The emulator agents test on (android-emulator.sh): GPU-backed on hosts
+  # tagged `emulator` in hosts.txt, software-rendered elsewhere. Made once.
+  if [ ! -f "$HOME/.android/avd/cz.avd/config.ini" ]; then
+    bash "$(dirname "$0")/android-emulator.sh" setup ||
+      echo "Emulator not set up yet; after logging in again, run android-emulator.sh setup."
+  fi
 fi
 
 step "Environment for shells and the cz service"
@@ -253,8 +260,8 @@ done
 . "$HOME/.config/cz-host/env.sh"
 
 step "Factory CLIs from this machine's checkouts"
-if [ -d "$HOME/SWE/games/tools/gk" ] && ! have gk; then
-  cargo install --locked --path "$HOME/SWE/games/tools/gk" || echo "gk did not build; re-run later."
+if [ -d "$HOME/SWE/games/_tools/gk" ] && ! have gk; then
+  cargo install --locked --path "$HOME/SWE/games/_tools/gk" || echo "gk did not build; re-run later."
 fi
 
 step "Check"

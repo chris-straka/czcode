@@ -24,7 +24,7 @@ export const DecisionKind = Schema.Literals([
 export type DecisionKind = typeof DecisionKind.Type;
 
 /** Kinds stored before the Decisions redesign, and what each became. */
-export const LEGACY_DECISION_KIND_MAP = {
+const LEGACY_DECISION_KIND_MAP = {
   approve: "review",
   freeform: "request",
   build: "playtest",

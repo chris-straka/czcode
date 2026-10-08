@@ -1,5 +1,12 @@
 # Set up a computer as a cz agent host
 
+Every machine, its role, and an agent's runbook for setting up a new one:
+[FLEET.md](FLEET.md).
+
+How upstream's author runs his own fleet, and how this setup compares:
+[../docs/upstream-fleet.md](../docs/upstream-fleet.md). Read it before changing
+how hosts work.
+
 Linux and Windows PCs use `linux.sh` (below). Macs use `mac.sh`
 ([A Mac](#a-mac)).
 
@@ -15,8 +22,9 @@ wget -qO /tmp/cz-host.sh https://raw.githubusercontent.com/chris-straka/czcode/m
 
 It installs Tailscale, cz, Claude Code, Codex, and OpenCode, and keeps cz
 running in the background. It walks you through each sign-in, then prints a
-pairing link to open in czcode on your other devices. Run it again any time to
-update cz.
+pairing link to open in czcode on your other devices. It also sets up the
+[host jobs](#host-jobs), so cz updates itself and the host keeps its repos,
+backups and health in order. Run it again any time for new tools.
 
 - **Claude:** sign in with this computer's browser. Claude shows a code to
   paste back into the terminal.
@@ -50,6 +58,101 @@ From another machine, quote the path so `~` expands on the host:
 `ssh -t b@basement 'bash ~/SWE/czcode/ccez/hosts/build-tools-linux.sh'`.
 To leave groups out, set `CZ_TOOLS_SKIP`, for example
 `CZ_TOOLS_SKIP="android blender"`.
+
+## Host jobs
+
+Each Linux host runs these jobs every night (`host-jobs.sh` installs them as
+systemd user timers named `cz-job-<name>`):
+
+| Time  | Job      | What it does                                               |
+| ----- | -------- | ---------------------------------------------------------- |
+| 03:30 | `health` | Disk space, SMART, logs, failed units, memory, other hosts |
+| 03:35 | `backup` | Copies `~/.cz/userdata` to another host, 7 days kept       |
+| 03:45 | `sync`   | Clones and fast-forwards the repos in `repos.txt`          |
+| 04:00 | `update` | Builds the latest cz, restarts into it when idle           |
+
+Hosts that sleep when idle wake at 03:30 for them and stay awake until they
+finish. A job that was missed (the host was off) runs when it next wakes.
+
+**See how they went** on every host at once, from any host:
+
+```sh
+bash ~/SWE/czcode/ccez/hosts/fleet-status.sh
+```
+
+Each line is a job's last run: `ok`, `attention` (it ran and found something
+for you, listed in its summary) or `failed`. `--json` gives the same for
+scripts such as the morning brief. On the host itself, the last run's output
+is in `~/.local/state/cz-host/jobs/<name>.log`, every run is in
+`history.jsonl` there, and the schedule is in `~/.config/cz-host/jobs.toml`.
+
+**Run one now:** `systemctl --user start --no-block cz-job-<name>.service`.
+
+- **health:** reports a disk over 85% full, SMART warnings or kernel disk
+  errors, oversized logs, failed services (yours and agents', not the
+  desktop's), timers whose program is missing, low memory, heavy swap or
+  out-of-memory kills, cz not running, and hosts in `hosts.txt` that don't
+  answer.
+- **backup:** the host each one backs up to is the third column of
+  `hosts.txt`. Backups are in `~/cz-backups/<host>/<date>` on that host,
+  including cz's secrets, so keep that folder private. To restore, stop cz
+  (`systemctl --user stop cz-host`), copy a day's folder over
+  `~/.cz/userdata` on the host it came from, and start cz again.
+- **sync:** clones repos that are missing, fetches all of them, and
+  fast-forwards ones with no local changes. It never discards work: changes,
+  unpushed or diverged commits, other branches, and repos that aren't in
+  `repos.txt` (some exist on one machine only) are listed for you. A
+  `pnpm-lock.yaml` that is the only change is `vp i` churn and is put back.
+  Add a line to `repos.txt` for a repo every host should have.
+- **update:** cz runs from a build in `~/.local/lib/cz-host/cz`, not from
+  `~/SWE/czcode`, so agents' edits there never break it. The job builds the
+  latest `main` next to the running build, then restarts cz only when no
+  thread is working and no queued run or scheduled task is due within 10
+  minutes, checking for up to 3 hours. If the new build doesn't start, it
+  goes back to the old one. Update a host now (still waiting for idle):
+  `systemctl --user start --no-block cz-job-update.service`.
+- **pr-automerge** (one host, every 10 minutes): merges your green pull
+  requests in all your repos, and asks Dependabot once to rebase a PR that
+  has conflicts. Turn it on with `CZ_HOST_PR_AUTOMERGE=1` before `linux.sh`
+  (or `host-jobs.sh`); `CZ_HOST_PR_AUTOMERGE=0` turns it off. It runs on
+  `f-ms-7917`.
+
+The Mac isn't part of the host jobs: it has no SSH server for the others to
+reach, so `health` and `fleet-status.sh` only check that it's online.
+
+## Where heavy work goes
+
+Before starting a long build, render or test run, agents ask which host has
+room:
+
+```sh
+bash ~/SWE/czcode/ccez/hosts/pick-host.sh cpu        # or gpu, emulator; --list explains
+```
+
+It prints the least loaded Linux host with the hardware the work needs (the
+fourth column of `hosts.txt`), for example `basement b@basement`, waking it
+if it's asleep. `art-ms-7917` (RTX 2060 SUPER) is the only `gpu` and
+`emulator` host: Blender GPU renders, Whisper, local models, shader work and
+fast Android testing go there. CPU work goes wherever the load is lowest;
+`f-ms-7917` has the most threads (8) when it isn't busy.
+
+## Android emulator
+
+Android testing happens on emulators only; the phone is the owner's. Every
+Linux host has one AVD, `cz`, set up by the build tools:
+
+```sh
+serial=$(bash ~/SWE/czcode/ccez/hosts/android-emulator.sh start)   # e.g. emulator-5554
+adb -s "$serial" install app.apk
+bash ~/SWE/czcode/ccez/hosts/android-emulator.sh stop
+```
+
+It starts from a saved snapshot in under 10 seconds and is shared by the
+agents on that host. On `art-ms-7917` it has 4 cores, 4 GB and renders on
+the GPU, so frame rates there are realistic; that needs a desktop session on
+art (automatic login, in [FLEET.md](FLEET.md)), and without one it renders in software like the others. On
+`f-ms-7917` and `basement` it has 2 cores, 3 GB and a software GPU: right
+for checking that things work, not for judging smoothness.
 
 ## A Mac
 

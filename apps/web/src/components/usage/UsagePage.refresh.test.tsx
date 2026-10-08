@@ -14,6 +14,7 @@ vi.mock("@effect/atom-react", () => ({
   useAtomValue: (atom: unknown) =>
     atom === "keybindings" ? DEFAULT_RESOLVED_KEYBINDINGS : state.presentations,
 }));
+vi.mock("./ResetQueueSection", () => ({ ResetQueueSection: () => null }));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
   useCanGoBack: () => false,

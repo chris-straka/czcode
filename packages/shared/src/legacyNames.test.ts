@@ -6,6 +6,7 @@ import * as NodeSqlite from "node:sqlite";
 
 import { afterEach, describe, expect, it } from "vite-plus/test";
 
+import { HostProcessPlatform } from "./hostProcess.ts";
 import { adoptLegacyEnv, migrateLegacyHome } from "./legacyNames.ts";
 
 describe("adoptLegacyEnv", () => {
@@ -60,9 +61,11 @@ describe("migrateLegacyHome", () => {
     expect(NodeFS.readFileSync(NodePath.join(next, "userdata", "settings.json"), "utf8")).toBe(
       '{"theme":"dark"}',
     );
-    expect(NodeFS.statSync(NodePath.join(next, "userdata", "secrets", "key")).mode & 0o777).toBe(
-      0o600,
-    );
+    const keyMode = NodeFS.statSync(NodePath.join(next, "userdata", "secrets", "key")).mode;
+    // Windows has no POSIX permission bits to keep.
+    if (HostProcessPlatform.defaultValue() !== "win32") {
+      expect(keyMode & 0o777).toBe(0o600);
+    }
     const copy = new NodeSqlite.DatabaseSync(NodePath.join(next, "userdata", "state.sqlite"), {
       readOnly: true,
     });

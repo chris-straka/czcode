@@ -12,7 +12,9 @@
 # - Disk swap file of min(RAM, 16 GB), the backstop before the out-of-memory
 #   killer.
 # - Higher file-watcher limits (dev servers, cargo watch, editors).
-# - A cap on journald and Docker logs, so logs can't fill the disk.
+# - A cap on journald and Docker logs, and no rsyslog copies in /var/log
+#   (a dying drive's kernel errors once filled 106 GB there), so logs can't
+#   fill the disk.
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Run with sudo." >&2; exit 1; }
 in_wsl=false
@@ -92,6 +94,12 @@ step "Log size caps"
 mkdir -p /etc/systemd/journald.conf.d
 printf '[Journal]\nSystemMaxUse=1G\n' > /etc/systemd/journald.conf.d/cz-host.conf
 systemctl restart systemd-journald
+# rsyslog copies the journal into /var/log/syslog and kern.log, rotated only
+# daily and with no size cap. journalctl has everything.
+if systemctl is-enabled -q rsyslog.service 2> /dev/null; then
+  systemctl disable --now rsyslog.service syslog.socket > /dev/null 2>&1 || true
+  echo "rsyslog is off; read logs with journalctl."
+fi
 if command -v docker > /dev/null 2>&1 && [ ! -e /etc/docker/daemon.json ]; then
   mkdir -p /etc/docker
   printf '{\n  "log-driver": "json-file",\n  "log-opts": { "max-size": "50m", "max-file": "3" }\n}\n' > /etc/docker/daemon.json

@@ -15,7 +15,7 @@ import { connectionAtomRuntime } from "../connection/runtime";
 import { type EnvironmentPresentation, useEnvironments } from "./environments";
 import { useAtomCommand } from "./use-atom-command";
 
-export const hostWakeEnvironment = createHostWakeEnvironmentAtoms(connectionAtomRuntime);
+const hostWakeEnvironment = createHostWakeEnvironmentAtoms(connectionAtomRuntime);
 
 /**
  * Wakes `target` through the other connected environments. Resolves to

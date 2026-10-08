@@ -59,7 +59,7 @@ type UsageWindow = {
 };
 
 /** Spare allowance this close to a reset would expire unused, so queued runs take it. */
-export const SPARE_ALLOWANCE_LEAD_MS = 45 * 60 * 1000;
+const SPARE_ALLOWANCE_LEAD_MS = 45 * 60 * 1000;
 
 const futureResets = (windows: ReadonlyArray<UsageWindow>, now: number) =>
   windows.flatMap((window) => {
@@ -80,7 +80,7 @@ export function nextResetAt(windows: ReadonlyArray<UsageWindow>, now: number): n
 }
 
 /** True when nothing is spent and the soonest reset is near: start now rather than waste it. */
-export function spareAllowanceExpiring(windows: ReadonlyArray<UsageWindow>, now: number): boolean {
+function spareAllowanceExpiring(windows: ReadonlyArray<UsageWindow>, now: number): boolean {
   if (windows.some((window) => window.usedPercent >= 100)) return false;
   const soonest = nextResetAt(windows, now);
   return soonest !== null && soonest - now <= SPARE_ALLOWANCE_LEAD_MS;
