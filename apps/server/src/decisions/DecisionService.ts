@@ -160,7 +160,7 @@ function submissionProblem(input: DecisionSubmitInput): string | null {
 /** Checks an answer against its item. Returns a reason, or null. */
 function answerProblem(item: DecisionItem, input: DecisionAnswerInput): string | null {
   if ((input.comment?.length ?? 0) > DECISION_LIMITS.maxCommentLength) return "Comment too long.";
-  if (input.retry) return null;
+  if (input.retry || input.declined) return null;
   const optionIds = new Set(item.options.map((option) => option.id));
   const hasNote = Boolean(input.comment?.trim() || input.voice_key);
   const verdicts = VERDICTS[item.kind];

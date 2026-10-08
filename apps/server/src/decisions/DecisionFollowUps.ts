@@ -84,6 +84,7 @@ function describeAnswer(item: DecisionItem, answer: DecisionAnswer): string {
     answer.rank?.length ? `ranked ${answer.rank.map(label).join(" > ")}` : null,
     answer.choice,
     answer.retry ? "none of these, try again" : null,
+    answer.declined ? "none of these, and don't try again" : null,
     answer.marks?.length
       ? `marked ${answer.marks
           .map(

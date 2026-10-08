@@ -203,8 +203,8 @@ function DecisionAnswerForm({
   const [draft, setDraft] = useState<DecisionDraft>(() => emptyDraft(item));
   const update = (patch: Partial<DecisionDraft>) =>
     setDraft((current) => ({ ...current, ...patch }));
-  const submit = (patch: Partial<DecisionDraft> = {}, retry = false) =>
-    onSubmit(draftToAnswer(item, { ...draft, ...patch }, retry));
+  const submit = (patch: Partial<DecisionDraft> = {}, noneOfThese?: "retry" | "none") =>
+    onSubmit(draftToAnswer(item, { ...draft, ...patch }, noneOfThese));
   const [engaged, setEngaged] = useState<ReadonlySet<string>>(new Set());
   const engage = useCallback(
     (key: string) =>
@@ -216,7 +216,6 @@ function DecisionAnswerForm({
   const unseen = unseenMediaProblem(item, engaged);
   const problem = unseen ?? draftProblem(item, draft);
   const verdicts = VERDICT_BUTTONS[item.kind];
-  const hasNote = draft.comment.trim().length > 0 || draft.voiceKey !== null;
 
   return (
     <View className="flex-1">
@@ -299,12 +298,18 @@ function DecisionAnswerForm({
             />
           )}
           {item.options.length > 0 && item.kind !== "rank" ? (
-            <MaterialButton
-              tone="text"
-              label="None of these"
-              disabled={!hasNote}
-              onPress={() => submit({}, true)}
-            />
+            <>
+              <MaterialButton
+                tone="secondary"
+                label="None of these"
+                onPress={() => submit({}, "none")}
+              />
+              <MaterialButton
+                tone="text"
+                label="None of these, try again"
+                onPress={() => submit({}, "retry")}
+              />
+            </>
           ) : null}
         </View>
         {problem && (unseen !== null || (!verdicts && item.kind !== "timeline")) ? (

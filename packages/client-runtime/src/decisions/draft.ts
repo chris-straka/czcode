@@ -103,11 +103,15 @@ export function draftProblem(item: DecisionItem, draft: DecisionDraft): string |
   }
 }
 
-/** The answer to send. `retry` is "none of these, try again" and needs only the note. */
+/**
+ * The answer to send. "retry" is "none of these, try again"; "none" is "none
+ * of these" with no new round. Both carry only the note.
+ */
 export function draftToAnswer(
   item: DecisionItem,
   draft: DecisionDraft,
-  retry = false,
+  // `true` is "retry", as older callers pass it.
+  noneOfThese?: boolean | "retry" | "none",
 ): DecisionAnswerInput {
   const comment = draft.comment.trim() || null;
   const base = {
@@ -117,7 +121,8 @@ export function draftToAnswer(
     comment,
     voice_key: draft.voiceKey,
   };
-  if (retry) return { ...base, retry: true };
+  if (noneOfThese === "retry" || noneOfThese === true) return { ...base, retry: true };
+  if (noneOfThese === "none") return { ...base, declined: true };
   switch (item.kind) {
     case "pick":
       return { ...base, option_ids: draft.optionIds };
@@ -155,6 +160,7 @@ export function draftToAnswer(
 /** A one-line summary of an answer for the answered card. */
 export function answerSummary(item: DecisionItem, answer: DecisionAnswerInput): string {
   if (answer.retry) return "None of these: try again";
+  if (answer.declined) return "None of these";
   const label = (id: string) => item.options.find((option) => option.id === id)?.label ?? id;
   if (answer.option_ids?.length) return answer.option_ids.map(label).join(", ");
   if (answer.rank?.length) return answer.rank.map(label).join(" › ");

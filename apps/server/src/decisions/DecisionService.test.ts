@@ -214,6 +214,9 @@ it.layer(TestLayer)("DecisionService", (it) => {
         const retried = yield* decisions.submit(pick({ project: "answers" }));
         yield* TestClock.adjust(Duration.millis(5));
         yield* answer(retried.id, { retry: true, comment: "none of these, warmer palette" });
+        const declined = yield* decisions.submit(pick({ project: "declines" }));
+        yield* answer(declined.id, { declined: true });
+        assert.equal((yield* decisions.get(declined.id)).answer?.declined, true);
 
         const history = yield* decisions.history({ project: "answers" });
         assert.equal(history.length, 7);
