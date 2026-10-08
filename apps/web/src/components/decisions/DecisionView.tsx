@@ -151,7 +151,7 @@ export function DecisionView({
     update({ optionIds: toggleOptionId(item, draft.optionIds, id) });
   };
 
-  // Keys: j/k scroll, Space play/pause, 1-9 pick (again to clear), 0 or r none of these,
+  // Keys: j/k scroll, 1-9 pick (again to clear), 0 or r none of these,
   // Enter sends, n/p (J/K) step through Review all, Esc clears a pick, then closes. A text field keeps its keys; Esc there leaves it first.
   // They are never shown on screen (owner's call, 2026-10-07).
   const keyHandler = useRef<(event: KeyboardEvent) => void>(() => {});
@@ -185,17 +185,6 @@ export function DecisionView({
         case "Escape":
           onClose();
           return true;
-        case " ": {
-          // Space plays or pauses the view's sound or video; a focused control keeps its own.
-          if ((event.target as Element).closest?.("button,a,summary,[role],audio,video")) {
-            return false;
-          }
-          const media = scroller?.querySelector<HTMLMediaElement>("audio,video");
-          if (!media) return false;
-          if (media.paused) void media.play();
-          else media.pause();
-          return true;
-        }
         case "0":
         case "r":
           if (!declinable) return false;
