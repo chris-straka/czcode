@@ -102,6 +102,7 @@ export function parseSha256File(contents: string): string | null {
 export const MAC_SWAP_SCRIPT = `
 pid=$1 app=$2 staged=$3 relaunch=$4 failed=$5 launched=$6 log=$7 version=$8
 opener=\${CZ_UPDATE_OPEN:-open}
+launch_tries=\${CZ_UPDATE_LAUNCH_TRIES:-180}
 say() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$log"; }
 fail() { echo "$1" > "$failed"; say "failed: $1"; }
 waited=0

@@ -53,7 +53,12 @@ echo "\$1" >> "$work/opened"
 [ "\$(cat "\$1/Contents/marker")" = old ] && echo old > "$work/launched"
 exit 0
 OPEN
-chmod +x "$work/open-ok" "$work/open-dead"
+cat > "$work/open-slow" <<OPEN
+#!/bin/sh
+# Comes up a few seconds later, like a real app.
+(sleep 3; cat "\$1/Contents/marker" > "$work/launched") &
+OPEN
+chmod +x "$work/open-ok" "$work/open-dead" "$work/open-slow"
 
 echo "swap succeeds"
 setup "${1:-}"
@@ -98,6 +103,13 @@ CZ_UPDATE_OPEN="$work/open-ok" run_swap 1
 [ "$(cat "$work/Applications/czcode.app/Contents/marker")" = new ] || fail "new app not in place"
 [ "$(cat "$work/launched")" = new ] || fail "new app not opened"
 ls -a "$work/Applications" | grep -q czcode-old && fail "old app kept after a good relaunch"
+[ ! -e "$work/failed" ] || fail "failure reported: $(cat "$work/failed")"
+grep -q "relaunched: new" "$work/log" || fail "relaunch not logged"
+
+echo "relaunch: the new app takes a few seconds to come up"
+setup
+CZ_UPDATE_OPEN="$work/open-slow" run_swap 1
+[ "$(cat "$work/Applications/czcode.app/Contents/marker")" = new ] || fail "a slow start was rolled back"
 [ ! -e "$work/failed" ] || fail "failure reported: $(cat "$work/failed")"
 grep -q "relaunched: new" "$work/log" || fail "relaunch not logged"
 
