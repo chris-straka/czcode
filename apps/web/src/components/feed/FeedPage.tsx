@@ -131,18 +131,16 @@ export function FeedPage() {
   const onDecisions = location.pathname === "/decisions";
   const openKey =
     onDecisions && typeof location.search.open === "string" ? location.search.open : null;
-  const session = onDecisions && location.search.session === "1";
   const navigateBack = useNavigateBack();
-  /** Opens a Decision; inside Review all, stepping replaces the entry so Back leaves the session. */
-  const showDecision = (key: string | null, options: { session?: boolean } = {}) => {
-    const inSession = options.session ?? session;
+  /** Opens a Decision; stepping from one to the next replaces the entry, so Back leaves them all. */
+  const showDecision = (key: string | null) => {
     if (key === null) {
       navigateBack();
       return;
     }
     void navigate({
       to: "/decisions",
-      search: { open: key, ...(inSession ? { session: "1" as const } : {}) },
+      search: { open: key },
       replace: openKey !== null,
     });
   };
@@ -385,7 +383,11 @@ export function FeedPage() {
       timeout: UNDO_WINDOW_MS,
       actionProps: { children: "Undo", onClick: () => undo(key) },
     });
-    const next = session ? visible.find((candidate) => entryKey(candidate) !== key) : undefined;
+    // In the full view, answering moves on to the next open Decision, then back to the list.
+    if (openKey === null) return;
+    const index = visible.findIndex((candidate) => entryKey(candidate) === key);
+    const rest = visible.filter((candidate) => entryKey(candidate) !== key);
+    const next = rest[index] ?? rest[index - 1];
     showDecision(next ? entryKey(next) : null);
   };
   const quickAnswer = (entry: DecisionEntry, patch: Partial<DecisionAnswerInput>) =>
@@ -433,7 +435,7 @@ export function FeedPage() {
       embedded={embedded}
       age={ageLabel(entry.item.created_at, now)}
       showMachine={machine.type === "all"}
-      onOpen={() => showDecision(entryKey(entry), { session: false })}
+      onOpen={() => showDecision(entryKey(entry))}
       onQuickAnswer={(patch) => quickAnswer(entry, patch)}
       onDismiss={() => answer(entry, null)}
     />
@@ -466,7 +468,7 @@ export function FeedPage() {
         badge={filtered.entries.length}
         reviewing={visible.length > 0}
         onReviewAll={() => {
-          if (visible[0]) showDecision(entryKey(visible[0]), { session: true });
+          if (visible[0]) showDecision(entryKey(visible[0]));
         }}
         filters={filters}
       />
@@ -594,7 +596,7 @@ export function FeedPage() {
           <DecisionView
             key={openKey}
             entry={opened}
-            {...(session
+            {...(visible.length > 1
               ? {
                   position: { index: visible.indexOf(opened), total: visible.length },
                   onSkip: () => {

@@ -67,6 +67,8 @@ export function FeedModal({
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      // Claimed, so a view's own Esc handler doesn't close a second time.
+      event.preventDefault();
       if (editingText(event.target)) {
         event.target.blur();
         return;

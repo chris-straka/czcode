@@ -54,12 +54,8 @@ export function DecisionsRouteScreen() {
   const described = [
     ...new Set([...(projects.length <= 2 ? projects : []), ...(peek ? [peek] : [])]),
   ];
-  const open = (entry: DecisionEntry, session = false) =>
-    navigation.navigate("Decision", {
-      environmentId: entry.environmentId,
-      id: entry.item.id,
-      ...(session ? { session: "1" } : {}),
-    });
+  const open = (entry: DecisionEntry) =>
+    navigation.navigate("Decision", { environmentId: entry.environmentId, id: entry.item.id });
 
   return (
     <View className="flex-1 bg-screen">
@@ -73,7 +69,7 @@ export function DecisionsRouteScreen() {
                 {
                   accessibilityLabel: "Review all",
                   icon: "play",
-                  onPress: () => open(entries[0]!, true),
+                  onPress: () => open(entries[0]!),
                 },
               ],
             }
