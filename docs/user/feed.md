@@ -16,11 +16,12 @@ Beside the search bar, **All · Games · Software** and **Projects** narrow
 both pages, for one machine or all.
 
 Opening a thread or a Decision shows it on its own page; **Back** (or Esc)
-returns to the feed where you left it.
+returns to the page you came from, where you left it.
 
 ## Decisions
 
-A sound or video plays right on its card. Sound plays from its waveform,
+Each card puts the thing itself first: a sound or video plays right on it,
+and pictures show above the question. Sound plays from its waveform,
 and a video has a timeline under it: click to jump, and on a review drag
 across it to mark a part (sound: like or change; video: keep, cut, or
 change) with a note, or use **Comment at** to pin a note to the moment
@@ -28,8 +29,9 @@ playing. The agent gets the marks and comments with your answer. A
 Decision with a video shows the video first, with the write-up under
 **Details**.
 
-On a pick, **None of these** turns all the options down, and **None of
-these, try again** asks the agent for new ones; a note is optional.
+On a pick, **None of these** turns all the options down, and **Try again**
+(**None of these, try again** in the full view) asks the agent for new
+ones; a note is optional.
 
 **No longer relevant** on any Decision dismisses it (you can undo for a few
 seconds). Decisions also close themselves when the agent asks the same

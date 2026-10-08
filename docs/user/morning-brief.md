@@ -1,16 +1,16 @@
 # Morning brief
 
-From 04:00 each day, a Morning brief card sits at the top of the feed. It covers
-everything since 18:00 the evening before, on the machines the feed's machine
-filter shows (every machine on the phone):
+From 04:00 each day, a Morning brief line sits at the top of **Needs you**. It
+covers everything since 18:00 the evening before, on the machines the feed's
+machine filter shows (every machine on the phone): how many Decisions are
+waiting, how many threads finished or failed, and how many scheduled jobs
+failed. The Decisions themselves are the cards right under it.
 
-- **Decisions waiting:** how many, the three that matter most first (an agent
-  waiting on you, then ones that cost money, then the oldest), and counts by
-  Games and Software and by project. **Review all** steps through them.
+Tap the line to open the night's detail:
+
 - **Threads overnight:** threads that finished or failed, failures first, each
   with a line of its result.
 - **Scheduled jobs that failed**, with why. Tap one to open [Schedules](./schedules.md).
 
-**Done reading** folds the card to one line for the rest of the day; tap the
-line to open it again. The next morning's brief opens on its own. The card
-doesn't appear when the night left nothing to report.
+**Fold** closes it again. The line doesn't appear when the night left nothing
+to report.
