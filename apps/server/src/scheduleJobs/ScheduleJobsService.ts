@@ -5,7 +5,8 @@
  * A job run through ccez/hosts/job-run.sh also leaves a run record, which
  * says more than systemd can: "attention" runs and a one-line summary.
  * Timers found on the host but missing from jobs.toml are listed too, marked
- * unregistered, so a job an agent forgot to register still shows.
+ * unregistered, so a job an agent forgot to register still shows; the ones
+ * the OS or a package installed are marked `system`.
  *
  * @module ScheduleJobsService
  */
@@ -26,9 +27,11 @@ import { taskAsJob } from "./czTasks.ts";
 import { type JobEntry, jobsFilePath, readJobs } from "./jobsFile.ts";
 import {
   calendarInWords,
+  isVendorUnit,
   type JournalEntry,
   onCalendarOf,
   parseSystemctlShow,
+  parseSystemctlShowUnits,
   runsFromJournal,
   scheduledRun,
   unixTimestampMs,
@@ -210,7 +213,34 @@ const make = Effect.gen(function* () {
     } satisfies ScheduleJob;
   });
 
-  /** Timers on the host that jobs.toml doesn't name, so a forgotten one still shows. */
+  /** `systemctl show` of several units at once, keyed by unit name. */
+  const showUnits = (
+    scope: JobEntry["scope"],
+    units: ReadonlyArray<string>,
+    properties: ReadonlyArray<string>,
+  ) =>
+    units.length === 0
+      ? Effect.succeed(new Map<string, ReadonlyMap<string, string>>())
+      : run("systemctl", [
+          ...scopeArgs(scope),
+          "show",
+          ...units,
+          "-p",
+          "Id",
+          ...properties.flatMap((property) => ["-p", property]),
+        ]).pipe(
+          Effect.map(
+            (text) =>
+              new Map(
+                parseSystemctlShowUnits(text ?? "").map((unit) => [unit.get("Id") ?? "", unit]),
+              ),
+          ),
+        );
+
+  /**
+   * Timers on the host that jobs.toml doesn't name, so a forgotten one still
+   * shows, described by their service.
+   */
   const unregisteredTimers = Effect.fn("ScheduleJobsService.unregisteredTimers")(function* (
     registered: ReadonlySet<string>,
   ) {
@@ -223,23 +253,53 @@ const make = Effect.gen(function* () {
         "-o",
         "json",
       ]);
-      const timers = Option.getOrElse(decodeTimerListing(listing ?? "[]"), () => []);
+      const timers = Option.getOrElse(decodeTimerListing(listing ?? "[]"), () => []).filter(
+        (timer) => timer.unit && !registered.has(timer.unit),
+      );
+      const shown = yield* showUnits(
+        scope,
+        timers.map((timer) => timer.unit),
+        ["FragmentPath", "Unit", "TimersCalendar", "Description"],
+      );
+      const services = yield* showUnits(
+        scope,
+        timers.map(
+          (timer) =>
+            shown.get(timer.unit)?.get("Unit") || timer.unit.replace(/\.timer$/, ".service"),
+        ),
+        ["Description"],
+      );
       for (const timer of timers) {
-        if (!timer.unit || registered.has(timer.unit)) continue;
+        const unit = shown.get(timer.unit);
+        const service = unit?.get("Unit") || timer.unit.replace(/\.timer$/, ".service");
+        const onCalendar = onCalendarOf(unit?.get("TimersCalendar"));
+        const name = timer.unit.replace(/\.timer$/, "");
+        // systemd falls back to the unit name when a unit has no Description.
+        const described = [services.get(service)?.get("Description"), unit?.get("Description")]
+          .map((text) => text?.trim())
+          .find((text) => text && text !== service && text !== timer.unit);
         found.push({
           id: `${scope}:${timer.unit}`,
           source: "systemd",
-          what: timer.unit.replace(/\.timer$/, ""),
+          what: described ?? name,
           project: null,
           unit: timer.unit,
-          schedule: scope === "user" ? "User timer" : "System timer",
+          schedule: onCalendar
+            ? calendarInWords(onCalendar)
+            : scope === "user"
+              ? "User timer"
+              : "System timer",
           lastRun: timer.last
             ? { status: "ok", at: Math.round(timer.last / 1000), reason: null }
             : { status: "never", at: null, reason: null },
           lastScheduledRun: null,
           nextRunAt: timer.next ? Math.round(timer.next / 1000) : null,
-          output: null,
+          output: {
+            kind: "log",
+            ref: `journalctl ${scope === "user" ? "--user " : ""}-u ${service}`,
+          },
           registered: false,
+          system: isVendorUnit(timer.unit, unit?.get("FragmentPath")),
         });
       }
     }

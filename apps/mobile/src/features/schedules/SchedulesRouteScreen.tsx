@@ -2,6 +2,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import {
   scheduleJobNextRunLabel,
   scheduleJobRunLabel,
+  isSystemTimer,
   sortScheduleJobs,
 } from "@cz/client-runtime/state/jobs";
 import { type EnvironmentId, type ScheduleJob, scheduleJobFailing } from "@cz/contracts";
@@ -21,7 +22,8 @@ import { SettingsScreen } from "../settings/components/SettingsScreen";
 
 /**
  * Every recurring job on each connected machine: cz's scheduled tasks and
- * the timers registered in the host's jobs.toml. Failures come first.
+ * the timers registered in the host's jobs.toml and ones set up by hand; the
+ * OS's own timers show on request. Failures come first.
  */
 export function SchedulesRouteScreen() {
   const { environments } = useEnvironments();
@@ -54,12 +56,12 @@ function MachineJobs({
   const listAtom = jobsEnvironment.list({ environmentId, input: null });
   const result = useAtomValue(listAtom);
   const refresh = useAtomRefresh(listAtom);
-  const [showUnregistered, setShowUnregistered] = useState(false);
+  const [showSystem, setShowSystem] = useState(false);
   const jobs = sortScheduleJobs(
     Option.getOrElse(AsyncResult.value(result), (): ReadonlyArray<ScheduleJob> => []),
   );
-  const shown = jobs.filter((job) => showUnregistered || job.registered);
-  const unregistered = jobs.length - jobs.filter((job) => job.registered).length;
+  const shown = jobs.filter((job) => showSystem || !isSystemTimer(job));
+  const system = jobs.filter(isSystemTimer).length;
   return (
     <View className="gap-3">
       <Pressable onLongPress={refresh} accessibilityHint="Long-press to refresh">
@@ -70,7 +72,7 @@ function MachineJobs({
           Couldn't read this machine's jobs. Its cz may be older than Schedules.
         </Text>
       ) : shown.length === 0 && AsyncResult.isSuccess(result) ? (
-        <Text className="px-1 text-sm text-foreground-muted">No recurring jobs registered.</Text>
+        <Text className="px-1 text-sm text-foreground-muted">No recurring jobs.</Text>
       ) : shown.length > 0 ? (
         <View className="gap-4 rounded-[24px] border-continuous bg-grouped-card p-4">
           {shown.map((job) => (
@@ -78,9 +80,11 @@ function MachineJobs({
           ))}
         </View>
       ) : null}
-      {unregistered > 0 && !showUnregistered ? (
-        <Pressable onPress={() => setShowUnregistered(true)} className="px-1">
-          <Text className="text-sm text-foreground-muted">Show {unregistered} other timers</Text>
+      {system > 0 ? (
+        <Pressable onPress={() => setShowSystem((value) => !value)} className="px-1">
+          <Text className="text-sm text-foreground-muted">
+            {showSystem ? "Hide" : "Show"} {system} system timers
+          </Text>
         </Pressable>
       ) : null}
     </View>

@@ -57,6 +57,24 @@ export function parseSystemctlShow(text: string): ReadonlyMap<string, string> {
   return values;
 }
 
+/** `systemctl show` output for several units: one map per unit, in the order asked. */
+export function parseSystemctlShowUnits(text: string): ReadonlyArray<ReadonlyMap<string, string>> {
+  return text
+    .split(/\n\s*\n/)
+    .filter((block) => block.trim().length > 0)
+    .map(parseSystemctlShow);
+}
+
+/**
+ * True for a unit the OS or a package installed (apt, logrotate, snap...),
+ * as opposed to one written on this machine under /etc, ~/.config or /run.
+ */
+export function isVendorUnit(unit: string, fragmentPath: string | undefined): boolean {
+  if (unit.startsWith("snap.")) return true;
+  const file = fragmentPath?.trim() ?? "";
+  return file === "" || /^\/(usr|lib)\//.test(file);
+}
+
 /** "@1791460800" (from `--timestamp=unix`) as epoch ms; null when unset. */
 export function unixTimestampMs(value: string | undefined): number | null {
   const match = /^@(\d+)$/.exec(value?.trim() ?? "");
