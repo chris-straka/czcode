@@ -14,6 +14,15 @@
 # idle sleep) and stays up while a job runs, so the nightly jobs find the
 # other hosts awake.
 set -euo pipefail
+# fleet (~/SWE/fleet) runs the host jobs and owns idle sleep once it's
+# installed: turn the cz-job timers off and leave.
+if [ -f "$HOME/.fleet/config.toml" ]; then
+  for t in "$HOME"/.config/systemd/user/cz-job-*.timer; do
+    [ -e "$t" ] && systemctl --user disable --now "$(basename "$t")" > /dev/null 2>&1 || true
+  done
+  echo "fleet runs this host's jobs (~/SWE/fleet/hosts/cron.toml)."
+  exit 0
+fi
 # Jobs run the scripts next to this one: the installed release's copy when a
 # cz update reruns it, the checkout's when linux.sh or a person does.
 hosts=$(cd "$(dirname "$0")" && pwd)
