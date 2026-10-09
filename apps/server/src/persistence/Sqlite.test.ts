@@ -91,3 +91,38 @@ it.effect("applies busy_timeout in the shared persistence setup", () =>
     assert.equal(rows[0]?.timeout, 5000);
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),
 );
+
+it.effect(
+  "opens an already-migrated database while another process holds the write lock",
+  () => {
+    const tempDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "cz-sqlite-current-"));
+    const dbPath = NodePath.join(tempDir, "state.sqlite");
+    const open = <A, E>(effect: Effect.Effect<A, E, SqlClient.SqlClient>) =>
+      effect.pipe(
+        Effect.provide(
+          SqlitePersistence.layerFromPath(dbPath).pipe(Layer.provide(NodeServices.layer)),
+        ),
+      );
+
+    return Effect.gen(function* () {
+      // The server's first open migrates.
+      yield* open(Effect.void);
+      // The server mid-write for longer than busy_timeout (5s), as a busy host is.
+      yield* spawnWriteLockHolder(dbPath, 8000);
+      // A CLI open finds the schema current and never asks for the lock;
+      // before, it waited out busy_timeout and failed with LockTimeoutError.
+      const rows = yield* open(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient;
+          return yield* sql<{
+            readonly n: number;
+          }>`SELECT count(*) AS n FROM effect_sql_migrations`;
+        }),
+      );
+      assert.isAbove(rows[0]!.n, 0);
+    }).pipe(
+      Effect.ensuring(Effect.sync(() => NodeFS.rmSync(tempDir, { recursive: true, force: true }))),
+    );
+  },
+  20_000,
+);

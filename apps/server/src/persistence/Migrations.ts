@@ -177,9 +177,38 @@ export interface RunMigrationsOptions {
  *
  * @returns Effect containing array of executed migrations
  */
+/**
+ * Whether every migration through `throughId` is already recorded, read
+ * without a transaction. Transactions here begin IMMEDIATE (they take the
+ * write lock), so checking inside one made every `cz` CLI call wait on the
+ * running server's writes, and fail past busy_timeout ("database is locked").
+ */
+const schemaIsCurrent = Effect.fn("schemaIsCurrent")(function* (throughId?: number) {
+  const sql = yield* SqlClient.SqlClient;
+  const tables = yield* sql`
+    SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'effect_sql_migrations'
+  `;
+  if (tables.length === 0) return false;
+  const recorded = yield* sql<{
+    readonly migration_id: number;
+    readonly name: string;
+  }>`SELECT migration_id, name FROM effect_sql_migrations`;
+  // A V2 preview ledger still needs reconcileV2PreviewMigration.
+  if (recorded.some((row) => row.name === "OrchestrationV2" && row.migration_id !== 55)) {
+    return false;
+  }
+  const target = throughId ?? migrationEntries.at(-1)![0];
+  const latest = Math.max(0, ...recorded.map((row) => row.migration_id));
+  return latest >= target;
+});
+
 export const runMigrations = Effect.fn("runMigrations")(function* ({
   toMigrationInclusive,
 }: RunMigrationsOptions = {}) {
+  if (yield* schemaIsCurrent(toMigrationInclusive)) {
+    yield* Effect.logDebug("Database schema is current");
+    return [];
+  }
   const previewMigrations =
     toMigrationInclusive === undefined || toMigrationInclusive >= 55
       ? yield* reconcileV2PreviewMigration()
