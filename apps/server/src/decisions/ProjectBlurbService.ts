@@ -3,7 +3,7 @@
  * memory ("courtroom: trial adventure as a public defender"). Decision
  * projects are free names an agent picked, so the folder is found by name:
  * a cz project with that title, else `<root>/<name>` or `<root>/<any>/<name>`
- * under a cz project's root (`~/SWE/games/courtroom`). The owner's own line
+ * under a cz project's root (`~/Games/courtroom`). The owner's own line
  * wins over the folder README's opening.
  *
  * @module ProjectBlurbService
@@ -69,8 +69,8 @@ export function readmeBlurb(markdown: string): string | null {
 export type ProjectGroup = "games" | "software";
 
 /**
- * Games are whatever lives under a `games` folder (~/SWE/games/blackout,
- * ~/SWE/games/tools), so a new game lands in Games without any config.
+ * Games are whatever lives under a `games` folder (~/Games/blackout,
+ * ~/Games/tools), so a new game lands in Games without any config.
  */
 export function projectGroupOf(folderOrName: string): ProjectGroup {
   return /(^|\/)games(\/|$)/.test(folderOrName) ? "games" : "software";

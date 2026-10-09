@@ -315,8 +315,8 @@ if ! $dry; then
 fi
 
 step "Factory CLIs from this account's checkouts"
-if $dry || { [ -d "$HOME/SWE/games/_tools/gk" ] && ! have gk; }; then
-  run cargo install --locked --path "$HOME/SWE/games/_tools/gk" || echo "gk did not build; re-run later."
+if $dry || { [ -d "$HOME/Games/_tools/gk" ] && ! have gk; }; then
+  run cargo install --locked --path "$HOME/Games/_tools/gk" || echo "gk did not build; re-run later."
 fi
 
 if $dry; then

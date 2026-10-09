@@ -31,7 +31,7 @@ rm -rf node_modules apps/*/node_modules packages/*/node_modules
 t=$(seconds vp i -- --offline --store-dir "$work/store")
 echo "pnpm install (warm store): ${t%.*}s, node_modules $(du -sh node_modules | cut -f1)"
 
-git clone -q --depth 1 "file://$HOME/SWE/rfcheck" "$work/rfcheck"
+git clone -q --depth 1 "file://$HOME/Games/_blender/rfcheck" "$work/rfcheck"
 cd "$work/rfcheck"
 t=$(seconds env RUSTC_WRAPPER= CARGO_TARGET_DIR="$work/target" cargo build -j 2)
 echo "cargo build rfcheck: ${t%.*}s, target $(du -sh "$work/target" | cut -f1)"

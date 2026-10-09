@@ -24,9 +24,9 @@ const shell = (environmentId: string, projects: ReadonlyArray<ReturnType<typeof 
 
 const shells = [
   shell("mac", [
-    project("p1", "/Users/c/SWE/launchkit", "github.com/c/launchkit"),
-    project("p2", "/Users/c/SWE/games/hll", "github.com/c/hll"),
-    project("p3", "/Users/c/SWE/games", null),
+    project("p1", "/Users/c/Games/_media/launchkit", "github.com/c/launchkit"),
+    project("p2", "/Users/c/Games/hll", "github.com/c/hll"),
+    project("p3", "/Users/c/Games", null),
   ]),
   shell("wsl", [
     project("w1", "/home/c/launchkit", "github.com/c/launchkit"),
@@ -36,18 +36,18 @@ const shells = [
 
 describe("projectScope", () => {
   it("scopes to the cwd's project and the same repository on other hosts", () => {
-    const scope = projectScope(shells, "/Users/c/SWE/launchkit/src");
+    const scope = projectScope(shells, "/Users/c/Games/_media/launchkit/src");
     expect(scope?.title).toBe("launchkit");
     expect([...(scope?.keys ?? [])].sort()).toEqual(["mac:p1", "wsl:w1"]);
   });
 
   it("prefers the deepest workspace when roots nest", () => {
-    expect([...(projectScope(shells, "/Users/c/SWE/games/hll")?.keys ?? [])]).toEqual(["mac:p2"]);
+    expect([...(projectScope(shells, "/Users/c/Games/hll")?.keys ?? [])]).toEqual(["mac:p2"]);
   });
 
   it("matches the root itself but not a sibling with the same prefix", () => {
-    expect(projectScope(shells, "/Users/c/SWE/launchkit")?.title).toBe("launchkit");
-    expect(projectScope(shells, "/Users/c/SWE/launchkit-old")).toBeNull();
+    expect(projectScope(shells, "/Users/c/Games/_media/launchkit")?.title).toBe("launchkit");
+    expect(projectScope(shells, "/Users/c/Games/_media/launchkit-old")).toBeNull();
   });
 
   it("is null outside every project, so everything shows", () => {

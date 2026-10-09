@@ -267,8 +267,8 @@ done
 . "$HOME/.config/cz-host/env.sh"
 
 step "Factory CLIs from this machine's checkouts"
-if [ -d "$HOME/SWE/games/_tools/gk" ] && ! have gk; then
-  cargo install --locked --path "$HOME/SWE/games/_tools/gk" || echo "gk did not build; re-run later."
+if [ -d "$HOME/Games/_tools/gk" ] && ! have gk; then
+  cargo install --locked --path "$HOME/Games/_tools/gk" || echo "gk did not build; re-run later."
 fi
 
 step "Check"

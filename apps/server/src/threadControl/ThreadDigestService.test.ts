@@ -4,9 +4,7 @@ import { cdTargets, excerptOf } from "./ThreadDigestService.ts";
 
 describe("thread digests", () => {
   it("reads the folders a command cds into", () => {
-    expect(cdTargets("cd ~/SWE/games/hll && cargo test", "/home/f")).toEqual([
-      "/home/f/SWE/games/hll",
-    ]);
+    expect(cdTargets("cd ~/Games/hll && cargo test", "/home/f")).toEqual(["/home/f/Games/hll"]);
     expect(cdTargets('git status; cd "/home/f/SWE/ccez llm/" && ls', "/home/f")).toEqual([
       "/home/f/SWE/ccez llm",
     ]);

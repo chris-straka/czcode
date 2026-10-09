@@ -72,7 +72,7 @@ export interface OneFeedFilter {
 
 export type FeedProjectGroup = "games" | "software";
 
-/** A project is a game when its folder sits under a `games` folder (~/SWE/games/hll). */
+/** A project is a game when its folder sits under a `games` folder (~/Games/hll). */
 export function feedProjectGroup(folder: string): FeedProjectGroup {
   return /(^|\/)games(\/|$)/.test(folder) ? "games" : "software";
 }

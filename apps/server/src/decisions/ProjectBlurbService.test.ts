@@ -41,9 +41,9 @@ describe("readmeBlurb", () => {
 
 describe("projectGroupOf", () => {
   it("puts anything under a games folder in Games", () => {
-    expect(projectGroupOf("/home/f/SWE/games/blackout")).toBe("games");
-    expect(projectGroupOf("/home/f/SWE/games/tools")).toBe("games");
-    expect(projectGroupOf("/home/f/SWE/games")).toBe("games");
+    expect(projectGroupOf("/home/f/Games/blackout")).toBe("games");
+    expect(projectGroupOf("/home/f/Games/tools")).toBe("games");
+    expect(projectGroupOf("/home/f/Games")).toBe("games");
     expect(projectGroupOf("/home/f/SWE/czcode")).toBe("software");
     expect(projectGroupOf("/home/f/SWE/minigames")).toBe("software");
     expect(projectGroupOf("channel:politics")).toBe("software");
