@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalFetch:off globalDate:off -- This macOS platform boundary streams a release zip to disk while hashing it, and spawns the detached swap script that must outlive the app.
+// @effect-diagnostics nodeBuiltinImport:off globalFetch:off globalDate:off globalTimers:off -- This macOS platform boundary downloads a release zip with curl (polling its size for progress), and spawns the detached swap script that must outlive the app.
 /**
  * The Mac build's updater. It stands in for electron-updater, which can't
  * apply updates to an unsigned app: it reads the GitHub release feed
@@ -127,24 +127,41 @@ export const make = Effect.sync(() => {
     if (!expected) throw new MacUpdateError("The update's checksum file is unreadable.");
 
     const zipPath = NodePath.join(NodeOS.tmpdir(), `czcode-${release.version}.zip`);
-    const response = await fetchOk(release.zipUrl, "application/octet-stream");
-    const total = Number(response.headers.get("content-length")) || release.zipSize;
-    const hash = NodeCrypto.createHash("sha256");
-    const file = NodeFS.createWriteStream(zipPath);
-    let received = 0;
-    try {
-      for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
-        hash.update(chunk);
-        if (!file.write(chunk))
-          await new Promise<void>((resolve) => file.once("drain", () => resolve()));
-        received += chunk.length;
-        if (total > 0) events.emit("download-progress", { percent: (received / total) * 100 });
-      }
-    } catch (cause) {
-      throw new MacUpdateError("The update download was cut off.", { cause });
-    } finally {
-      await new Promise<void>((resolve) => file.end(() => resolve()));
+    // curl, not fetch: undici asserts (uncaught, freezing the app behind an
+    // error box) when a server closes the socket while a large body is paused
+    // for disk writes. curl also follows GitHub's download redirect.
+    const curl = NodeChildProcess.spawn(
+      "curl",
+      ["-fsSL", "--retry", "2", "--max-time", "1800", "-A", "czcode-mac-updater"].concat([
+        "-o",
+        zipPath,
+        release.zipUrl,
+      ]),
+      { stdio: "ignore" },
+    );
+    const progress = setInterval(() => {
+      NodeFS.stat(zipPath, (error, stats) => {
+        if (!error && release.zipSize > 0) {
+          events.emit("download-progress", {
+            percent: Math.min(100, (stats.size / release.zipSize) * 100),
+          });
+        }
+      });
+    }, 500);
+    const exitCode = await new Promise<number | null>((resolve) => {
+      curl.once("error", () => resolve(null));
+      curl.once("close", resolve);
+    }).finally(() => clearInterval(progress));
+    if (exitCode !== 0) {
+      await NodeFSP.rm(zipPath, { force: true }).catch(() => undefined);
+      throw new MacUpdateError(
+        exitCode === null
+          ? "czcode couldn't start curl to download the update."
+          : "The update download was cut off.",
+      );
     }
+    const hash = NodeCrypto.createHash("sha256");
+    for await (const chunk of NodeFS.createReadStream(zipPath)) hash.update(chunk as Buffer);
     try {
       if (hash.digest("hex") !== expected) {
         throw new MacUpdateError("The downloaded update didn't match its checksum.");
