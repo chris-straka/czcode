@@ -53,7 +53,7 @@ export const OWNER_IDLE_MS = 15 * MINUTE;
  * ccez/hosts/cz-update.sh use; replace it with the shared capacity query
  * ("anything running or about to start on this host") once that lands.
  */
-export const hostBusy = Effect.gen(function* () {
+const hostBusy = Effect.gen(function* () {
   const projections = yield* ProjectionStore.ProjectionStoreV2;
   const queue = yield* ResetQueueService.ResetQueueService;
   const scheduledTasks = yield* ScheduledTaskService.ScheduledTaskService;
