@@ -8,8 +8,8 @@
 # (Tailscale from the App Store can't run one), so the jobs only check that
 # it's online. y8 is reached with Tailscale SSH (mac.sh's tailscaled); Macs
 # run no host jobs and back up nowhere; pick-host.sh reads their load too.
-f-ms-7917    f@f-ms-7917      basement   speed=1.3
-art-ms-7917  art@art-ms-7917  basement   gpu,emulator
-basement     b@basement       f-ms-7917  speed=0.7
+f-ms-7917    f@f-ms-7917      art-ms-7917  speed=1.3
+art-ms-7917  art@art-ms-7917  f-ms-7917    gpu,emulator
+# basement     b@basement       f-ms-7917  speed=0.7   (out: owner, 2026-10-08; never place or wait on it)
 z            -                -          -
 y8           chris@y8         -          speed=1.9
