@@ -44,11 +44,17 @@ update button: the round button next to **Back** at the bottom left of
 Settings, or the button on the version row in Settings. Hover the button to see
 where things stand: **Up to date**, **Updating**, or **Restart to update**.
 
-A new build downloads by itself. It installs when no agent is working and
-nothing queued is due within 10 minutes, or when you quit czcode, or right away
-if you click **Restart to update**. czcode then reopens on the new version. If
-an update fails, the button says why in one sentence and the current version
-keeps running; click it to try again.
+A new build downloads by itself. czcode restarts into it on its own only when
+nothing has run for 10 minutes, nothing queued is due within 10 minutes, nobody
+has used the Mac for 15 minutes, and it hasn't restarted for an update in the
+last hour. It also waits 15 minutes after a build arrives, so several builds in
+a row cost one restart. Otherwise the button shows **Restart to update** and
+it installs when you click it or quit czcode.
+
+After a restart czcode checks that the new version opened. If it didn't, the
+previous version comes back and the button says why in one sentence; click it
+to try again. Each step is logged in `update.log` in czcode's folder under
+`~/Library/Application Support`.
 
 ## Update a connected server
 
