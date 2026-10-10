@@ -119,7 +119,7 @@ Games/blackout                    chris-straka/blackout
 Games/courtroom                   chris-straka/courtroom
 Games/dead-letters                chris-straka/dead-letters
 Games/hll                         chris-straka/hll
-Games/horde-tactics               chris-straka/horde-tactics
+Games/barbaricum                  chris-straka/barbaricum
 Games/interpreter                 chris-straka/interpreter
 Games/night-bakery                chris-straka/night-bakery
 Games/seven-locked-vault              chris-straka/seven-locked-vault
